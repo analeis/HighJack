@@ -1,0 +1,102 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { Badge } from '@highjack/ui';
+
+interface Entry {
+  version: string;
+  date: string;
+  title: string;
+  status: 'released' | 'in-development';
+  highlights: { label: string; tone: 'teal' | 'gold' | 'neutral'; items: string[] }[];
+}
+
+// Changelog entries, newest first. Keep in sync with git tags.
+const entries: Entry[] = [
+  {
+    version: '0.1.0',
+    date: '2026-08-26',
+    title: 'Foundation',
+    status: 'in-development',
+    highlights: [
+      {
+        label: 'Architecture',
+        tone: 'gold',
+        items: [
+          'Bun monorepo: website (apps/web), game-client shell (apps/game), protocol and UI packages',
+          'Go 1.26 modular-monolith backend with health/readiness/version surface and graceful shutdown',
+          'Deterministic game-engine boundary: phases, players, actions, events, seeded RNG',
+          'Shared client/server protocol with cross-language fixture tests (TypeScript ↔ Go)',
+        ],
+      },
+      {
+        label: 'Website & design',
+        tone: 'teal',
+        items: [
+          'Full product site with responsive layouts and accessibility baseline',
+          'Design system: felt-and-gold token set plus shared Solid primitives',
+          'Interactive GameConfig preview validated against the real protocol schema',
+        ],
+      },
+      {
+        label: 'Tooling',
+        tone: 'neutral',
+        items: [
+          'Validation pipeline: format, lint, typecheck, tests, builds, asset & repository sanity',
+          'Browser verification via Playwright including axe accessibility scans',
+          'CI (GitHub Actions), Docker packaging for the server, Cloudflare Pages deployment config',
+          'PostgreSQL migrations infrastructure with explicit SQL files',
+        ],
+      },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Changelog — HighJack"
+  description="Every HighJack milestone, documented honestly: what shipped, what's next."
+>
+  <header class="max-w-3xl">
+    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">Changelog</h1>
+    <p class="mt-4 mb-0 text-lg text-muted-400">
+      We ship foundations before fireworks. Every milestone lands here.
+    </p>
+  </header>
+
+  <div class="mt-10 flex max-w-3xl flex-col gap-6">
+    {
+      entries.map((entry) => (
+        <article
+          class="rounded-xl border border-line-subtle bg-surface-raised p-6 shadow-card sm:p-8"
+          aria-labelledby={`release-${entry.version}`}
+        >
+          <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+            <h2 id={`release-${entry.version}`} class="m-0 font-display text-2xl font-extrabold">
+              v{entry.version} — {entry.title}
+            </h2>
+            <Badge tone={entry.status === 'released' ? 'teal' : 'gold'}>
+              {entry.status === 'released' ? 'Released' : 'In development'}
+            </Badge>
+            <time class="ml-auto font-mono text-xs text-muted-500" datetime={entry.date}>
+              {entry.date}
+            </time>
+          </div>
+          {entry.highlights.map((group) => (
+            <section class="mt-5">
+              <h3
+                class={`m-0 font-mono text-xs uppercase tracking-widest ${group.tone === 'teal' ? 'text-teal-400' : group.tone === 'gold' ? 'text-gold-500' : 'text-muted-400'}`}
+              >
+                {group.label}
+              </h3>
+              <ul class="mt-2 mb-0 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-muted-400">
+                {group.items.map((item) => (
+                  <li>{item}</li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </article>
+      ))
+    }
+  </div>
+</BaseLayout>

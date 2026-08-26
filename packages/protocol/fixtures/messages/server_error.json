@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "error",
+  "error": {
+    "code": "out_of_phase",
+    "message": "action not permitted in the current game phase"
+  },
+  "ackSeq": 7
+}

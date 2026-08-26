@@ -1,0 +1,52 @@
+# HighJack game server — production image.
+#
+# Multi-stage build: compile in the Go toolchain, ship only the static
+# binary. Runs as non-root, exposes only what it serves, includes a
+# healthcheck for orchestrators.
+#
+# Build from repository root:
+#   docker build -f infra/docker/Dockerfile.server -t highjack-server .
+#
+# Version metadata (optional):
+#   --build-arg VERSION=0.1.0 --build-arg COMMIT=$(git rev-parse --short HEAD)
+
+# ---- build stage ------------------------------------------------------------
+FROM golang:1.26-alpine AS build
+
+ARG VERSION=dev
+ARG COMMIT=unknown
+
+WORKDIR /src
+
+# Cache module downloads independently of source changes.
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY server ./server
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags "-s -w -X github.com/analeis/highjack/server/internal/version.Version=${VERSION} -X github.com/analeis/highjack/server/internal/version.Commit=${COMMIT}" \
+    -o /out/highjack-server ./server/cmd/highjack
+
+# Migrations travel with the image so the server can apply them wherever
+# it runs.
+COPY server/migrations /migrations
+
+# ---- runtime stage ----------------------------------------------------------
+FROM alpine:3.20
+
+RUN addgroup -S highjack && adduser -S highjack -G highjack
+
+COPY --from=build /out/highjack-server /usr/local/bin/highjack-server
+COPY --from=build /migrations /migrations
+
+USER highjack
+
+EXPOSE 8080
+
+# Graceful shutdown on SIGTERM/SIGINT (handled by the binary).
+STOPSIGNAL SIGTERM
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1
+
+ENTRYPOINT ["/usr/local/bin/highjack-server"]

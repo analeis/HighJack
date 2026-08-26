@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "type": "event",
+  "tick": 12,
+  "event": {
+    "type": "player_joined",
+    "playerId": "pl_01J9Z8A7B6C5D4E3F2",
+    "name": "Ace",
+    "seat": 0,
+    "startingMoney": 1500
+  }
+}

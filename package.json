@@ -1,0 +1,39 @@
+{
+  "name": "highjack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HighJack- a browser-first multiplayer board/economy game built around a configurable ruleset and deterministic simulation.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "scripts": {
+    "dev": "bun run --filter='@highjack/web' dev",
+    "dev:game": "bun run --filter='@highjack/game' dev",
+    "dev:server": "./scripts/dev-server.sh",
+    "build": "bun run build:web && bun run build:game && ./scripts/build-server.sh",
+    "build:web": "bun run --filter='@highjack/web' build",
+    "build:game": "bun run --filter='@highjack/game' build",
+    "test": "bash -c 'for d in packages/protocol packages/ui apps/game; do (cd $d && bunx vitest run) || exit 1; done' && go test ./...",
+    "test:e2e": "bun run --filter='@highjack/web' test:e2e",
+    "lint": "eslint packages apps --concurrency auto && go vet ./...",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "validate": "bun scripts/validate.ts",
+    "certify": "bun scripts/certify.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "eslint": "^10.9.1",
+    "prettier": "^3.9.6",
+    "prettier-plugin-astro": "^0.14.1",
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.68.0"
+  }
+}

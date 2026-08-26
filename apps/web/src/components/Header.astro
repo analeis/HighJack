@@ -1,0 +1,56 @@
+---
+// Site header: wordmark + primary navigation.
+// The mobile drawer is a Solid island; the desktop links are static Astro
+// output so navigation renders without JavaScript.
+import Logo from './Logo.astro';
+import { MobileNav } from '../islands/MobileNav';
+
+const items = [
+  { href: '/', label: 'Home' },
+  { href: '/game', label: 'Game' },
+  { href: '/features', label: 'Features' },
+  { href: '/rules', label: 'Rules' },
+  { href: '/about', label: 'About' },
+  { href: '/changelog', label: 'Changelog' },
+];
+
+const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
+---
+
+<header class="sticky top-0 z-40 border-b border-line-subtle bg-felt-950/85 backdrop-blur">
+  <div
+    class="relative mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6"
+  >
+    <a href="/" class="flex items-center gap-2.5 no-underline" aria-label="HighJack home">
+      <Logo class="h-9 w-9" />
+      <span class="font-display text-xl font-extrabold tracking-tight text-cream-100">
+        High<span class="text-gold-500">Jack</span>
+      </span>
+    </a>
+
+    <nav aria-label="Primary" class="hidden md:block">
+      <ul class="flex items-center gap-1">
+        {
+          items.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                aria-current={currentPath === item.href ? 'page' : undefined}
+                class:list={[
+                  'rounded-md px-3 py-2 text-sm font-bold no-underline transition-colors duration-fast',
+                  currentPath === item.href
+                    ? 'bg-felt-700 text-gold-400'
+                    : 'text-muted-400 hover:bg-felt-800 hover:text-cream-100',
+                ]}
+              >
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <MobileNav client:visible items={items} currentPath={currentPath} />
+  </div>
+</header>

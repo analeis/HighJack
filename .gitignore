@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.bun/
+
+# Builds
+dist/
+.output/
+.astro/
+build/
+bin/
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+*.out
+
+# Go
+server/bin/
+*.test
+*.prof
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Generated verification artifacts (kept out of git; CI uploads them)
+verification/

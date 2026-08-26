@@ -1,0 +1,5 @@
+{
+  "type": "game_ended",
+  "winnerId": null,
+  "reason": "round_limit_reached"
+}

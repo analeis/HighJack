@@ -1,0 +1,119 @@
+/**
+ * HighJack design tokens.
+ *
+ * Raw CSS custom properties are the single source of truth. Framework
+ * mappings (Tailwind's @theme) reference these values — they never
+ * duplicate them. Tokens are namespaced `--hj-*`.
+ *
+ * See docs/design/DESIGN_SYSTEM.md for usage guidance and rationale.
+ */
+:root {
+  color-scheme: dark;
+
+  /* ---- surfaces: the card-table world -------------------------------- */
+  /* Deep felt greens-black; the table you sit down at. */
+  --hj-color-felt-950: #070d0a;
+  --hj-color-felt-900: #0b1310;
+  --hj-color-felt-800: #111c17;
+  --hj-color-felt-700: #182720;
+  --hj-color-felt-600: #20342b;
+  --hj-color-felt-500: #2c4437;
+
+  /* Raised surfaces sit above the felt like cards on the table. */
+  --hj-color-surface-base: var(--hj-color-felt-900);
+  --hj-color-surface-raised: #15231c;
+  --hj-color-surface-overlay: #1b2d24;
+  --hj-color-surface-inverse: var(--hj-color-cream-100);
+
+  /* ---- ink ------------------------------------------------------------ */
+  /* Warm cream ink reads premium against felt; pure white feels sterile. */
+  --hj-color-cream-100: #f4efe2;
+  --hj-color-cream-300: #ddd5c2;
+  --hj-color-muted-400: #a9baae;
+  --hj-color-muted-500: #7e9186;
+
+  /* ---- accents --------------------------------------------------------- */
+  /* Jackpot gold: the signature accent. Earned reward energy. */
+  --hj-color-gold-500: #e6b64e;
+  --hj-color-gold-400: #f0c96a;
+  --hj-color-gold-600: #c99a36;
+  --hj-color-gold-700: #97752a;
+
+  /* Risk crimson: stakes, danger, elimination. Used sparingly. */
+  --hj-color-crimson-500: #e05252;
+  --hj-color-crimson-400: #ea7070;
+  --hj-color-crimson-600: #bc3f3f;
+
+  /* Fortune teal: gains, success, safe states. */
+  --hj-color-teal-500: #4ec48f;
+  --hj-color-teal-400: #6fd6a6;
+  --hj-color-teal-600: #38a173;
+
+  /* Chaos violet: random events, wildcard moments. Rare by design. */
+  --hj-color-violet-500: #9d7ff2;
+  --hj-color-violet-400: #b39af5;
+  --hj-color-violet-600: #8063cc;
+
+  /* ---- lines ----------------------------------------------------------- */
+  --hj-color-line-subtle: rgba(164, 190, 172, 0.14);
+  --hj-color-line-strong: rgba(164, 190, 172, 0.28);
+
+  /* ---- typography ------------------------------------------------------ */
+  --hj-font-display:
+    'Bricolage Grotesque Variable', 'Space Grotesk Variable', system-ui, sans-serif;
+  --hj-font-body: 'Space Grotesk Variable', system-ui, sans-serif;
+  --hj-font-mono: 'Space Mono', ui-monospace, monospace;
+
+  /* Modular scale, minor-third-ish, tuned for dense game UI. */
+  --hj-text-xs: 0.75rem;
+  --hj-text-sm: 0.875rem;
+  --hj-text-md: 1rem;
+  --hj-text-lg: 1.1875rem;
+  --hj-text-xl: 1.4375rem;
+  --hj-text-2xl: 1.8125rem;
+  --hj-text-3xl: 2.375rem;
+  --hj-text-4xl: 3.125rem;
+  --hj-text-5xl: 4.0625rem;
+
+  /* ---- spacing (4px base) ---------------------------------------------- */
+  --hj-space-1: 0.25rem;
+  --hj-space-2: 0.5rem;
+  --hj-space-3: 0.75rem;
+  --hj-space-4: 1rem;
+  --hj-space-5: 1.25rem;
+  --hj-space-6: 1.5rem;
+  --hj-space-8: 2rem;
+  --hj-space-10: 2.5rem;
+  --hj-space-12: 3rem;
+  --hj-space-16: 4rem;
+  --hj-space-20: 5rem;
+  --hj-space-24: 6rem;
+
+  /* ---- radii ------------------------------------------------------------ */
+  --hj-radius-sm: 0.375rem;
+  --hj-radius-md: 0.625rem;
+  --hj-radius-lg: 1rem;
+  --hj-radius-xl: 1.5rem;
+  --hj-radius-pill: 999px;
+
+  /* ---- elevation: warm shadows, never gray ------------------------------ */
+  --hj-shadow-card: 0 1px 2px rgba(4, 8, 6, 0.5), 0 8px 24px -12px rgba(4, 8, 6, 0.55);
+  --hj-shadow-raised: 0 2px 4px rgba(4, 8, 6, 0.45), 0 16px 40px -16px rgba(4, 8, 6, 0.6);
+  --hj-shadow-gold-glow:
+    0 0 0 1px rgba(230, 182, 78, 0.35), 0 4px 24px -6px rgba(230, 182, 78, 0.35);
+
+  /* ---- motion ------------------------------------------------------------ */
+  --hj-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --hj-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --hj-duration-fast: 120ms;
+  --hj-duration-normal: 200ms;
+  --hj-duration-slow: 360ms;
+
+  /* ---- focus ------------------------------------------------------------- */
+  --hj-focus-ring: 0 0 0 2px var(--hj-color-felt-900), 0 0 0 4px var(--hj-color-gold-500);
+
+  /* ---- z-index layers ----------------------------------------------------- */
+  --hj-z-nav: 40;
+  --hj-z-overlay: 50;
+  --hj-z-toast: 60;
+}

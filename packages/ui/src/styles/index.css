@@ -1,0 +1,173 @@
+/*
+ * HighJack design system stylesheet.
+ *
+ * Apps import this single file; it wires Tailwind to the token set and
+ * registers the UI package's own classes for scanning. Component styles
+ * are Tailwind utilities in the TSX templates plus the semantic base
+ * layer below.
+ */
+@import 'tailwindcss';
+@import './tokens.css';
+
+@source "../";
+
+@theme inline {
+  /* surfaces & ink */
+  --color-felt-950: var(--hj-color-felt-950);
+  --color-felt-900: var(--hj-color-felt-900);
+  --color-felt-800: var(--hj-color-felt-800);
+  --color-felt-700: var(--hj-color-felt-700);
+  --color-felt-600: var(--hj-color-felt-600);
+  --color-felt-500: var(--hj-color-felt-500);
+  --color-surface-base: var(--hj-color-surface-base);
+  --color-surface-raised: var(--hj-color-surface-raised);
+  --color-surface-overlay: var(--hj-color-surface-overlay);
+  --color-cream-100: var(--hj-color-cream-100);
+  --color-cream-300: var(--hj-color-cream-300);
+  --color-muted-400: var(--hj-color-muted-400);
+  --color-muted-500: var(--hj-color-muted-500);
+
+  /* accents */
+  --color-gold-400: var(--hj-color-gold-400);
+  --color-gold-500: var(--hj-color-gold-500);
+  --color-gold-600: var(--hj-color-gold-600);
+  --color-gold-700: var(--hj-color-gold-700);
+  --color-crimson-400: var(--hj-color-crimson-400);
+  --color-crimson-500: var(--hj-color-crimson-500);
+  --color-crimson-600: var(--hj-color-crimson-600);
+  --color-teal-400: var(--hj-color-teal-400);
+  --color-teal-500: var(--hj-color-teal-500);
+  --color-teal-600: var(--hj-color-teal-600);
+  --color-violet-400: var(--hj-color-violet-400);
+  --color-violet-500: var(--hj-color-violet-500);
+  --color-violet-600: var(--hj-color-violet-600);
+
+  /* lines */
+  --color-line-subtle: var(--hj-color-line-subtle);
+  --color-line-strong: var(--hj-color-line-strong);
+
+  /* typography */
+  --font-display: var(--hj-font-display);
+  --font-body: var(--hj-font-body);
+  --font-mono: var(--hj-font-mono);
+  --text-xs: var(--hj-text-xs);
+  --text-sm: var(--hj-text-sm);
+  --text-md: var(--hj-text-md);
+  --text-lg: var(--hj-text-lg);
+  --text-xl: var(--hj-text-xl);
+  --text-2xl: var(--hj-text-2xl);
+  --text-3xl: var(--hj-text-3xl);
+  --text-4xl: var(--hj-text-4xl);
+  --text-5xl: var(--hj-text-5xl);
+
+  /* radii */
+  --radius-sm: var(--hj-radius-sm);
+  --radius-md: var(--hj-radius-md);
+  --radius-lg: var(--hj-radius-lg);
+  --radius-xl: var(--hj-radius-xl);
+  --radius-pill: var(--hj-radius-pill);
+
+  /* elevation */
+  --shadow-card: var(--hj-shadow-card);
+  --shadow-raised: var(--hj-shadow-raised);
+  --shadow-gold-glow: var(--hj-shadow-gold-glow);
+
+  /* motion */
+  --ease-out-hj: var(--hj-ease-out);
+  --ease-spring: var(--hj-ease-spring);
+}
+
+/* ---- base layer ---------------------------------------------------------- */
+
+@layer base {
+  html {
+    background-color: var(--hj-color-felt-950);
+    color: var(--hj-color-cream-100);
+    font-family: var(--hj-font-body);
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--hj-color-gold-500);
+    color: var(--hj-color-felt-950);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--hj-focus-ring);
+    border-radius: var(--hj-radius-sm);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--hj-font-display);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Respect users who prefer minimal motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---- shared utility patterns ---------------------------------------------- */
+
+@layer components {
+  /* Visible, high-contrast skip link for keyboard users. */
+  .hj-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: var(--hj-space-2);
+    z-index: var(--hj-z-toast);
+    padding: var(--hj-space-2) var(--hj-space-4);
+    background: var(--hj-color-gold-500);
+    color: var(--hj-color-felt-950);
+    border-radius: var(--hj-radius-md);
+    font-weight: 700;
+  }
+  .hj-skip-link:focus-visible {
+    left: var(--hj-space-2);
+  }
+
+  /* Numeric emphasis: chips, counters, ticks. */
+  .hj-numerals {
+    font-family: var(--hj-font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
+  /* Subtle felt texture used behind hero sections. Pure CSS: no assets. */
+  .hj-felt-bg {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(230, 182, 78, 0.07), transparent 60%),
+      radial-gradient(900px 500px at 85% 110%, rgba(157, 127, 242, 0.06), transparent 55%),
+      linear-gradient(180deg, var(--hj-color-felt-900) 0%, var(--hj-color-felt-950) 100%);
+  }
+}

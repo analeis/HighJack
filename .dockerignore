@@ -1,0 +1,17 @@
+# Build context hygiene for infra/docker/Dockerfile.server.
+# The build only needs go.mod/go.sum and server/.
+
+.git
+.github
+node_modules
+apps
+packages
+docs
+assets
+infra
+scripts
+verification
+test-results
+playwright-report
+dist
+.output

@@ -1,0 +1,58 @@
+---
+// The HighJack mark: a card being lifted off a chip — fortune in motion.
+//
+// "HIGH" is the upward lift; "JACK" is the taken pot. One geometric idea,
+// no borrowed iconography. Inline SVG keeps it crisp at any size and
+// themeable via currentColor / CSS variables.
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+
+<svg
+  class={className}
+  viewBox="0 0 64 64"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-label="HighJack mark: a card lifting off a chip"
+>
+  <defs>
+    <linearGradient id="hj-card-grad" x1="24" y1="6" x2="44" y2="34" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8f4e9"></stop>
+      <stop offset="1" stop-color="#ddd5c2"></stop>
+    </linearGradient>
+    <linearGradient
+      id="hj-chip-grad"
+      x1="18"
+      y1="42"
+      x2="46"
+      y2="60"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop stop-color="#e6b64e"></stop>
+      <stop offset="1" stop-color="#c99a36"></stop>
+    </linearGradient>
+  </defs>
+
+  <!-- chip -->
+  <circle cx="26" cy="47" r="13" fill="url(#hj-chip-grad)"></circle>
+  <circle cx="26" cy="47" r="8.5" fill="#111c17"></circle>
+  <g stroke="#f4efe2" stroke-width="2" stroke-linecap="round">
+    <path d="M26 36v4"></path>
+    <path d="M37 47h-4"></path>
+    <path d="M15 47h4"></path>
+    <path d="M26 58v-4"></path>
+  </g>
+
+  <!-- rising card with upward-arrow cutout -->
+  <g transform="rotate(-12 40 24)">
+    <rect x="29" y="7" width="22" height="30" rx="3.5" fill="url(#hj-card-grad)"></rect>
+    <path
+      d="M40 27 L33.5 19.5 H37 V13 H43 V19.5 H46.5 Z"
+      transform="rotate(180 40 20)"
+      fill="#0b1310"></path>
+    <rect x="34.5" y="28" width="11" height="2.5" rx="1.25" fill="#0b1310"></rect>
+  </g>
+</svg>

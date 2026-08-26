@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "action",
+  "seq": 7,
+  "action": {
+    "type": "player_join",
+    "displayName": "Ace"
+  }
+}

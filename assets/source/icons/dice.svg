@@ -1,0 +1,7 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dice">
+  <rect x="4" y="4" width="16" height="16" rx="4" stroke="#f4efe2" stroke-width="2"/>
+  <circle cx="9" cy="9" r="1.5" fill="#e6b64e"/>
+  <circle cx="15" cy="15" r="1.5" fill="#e6b64e"/>
+  <circle cx="15" cy="9" r="1.5" fill="#f4efe2"/>
+  <circle cx="9" cy="15" r="1.5" fill="#f4efe2"/>
+</svg>

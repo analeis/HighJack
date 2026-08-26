@@ -1,0 +1,16 @@
+# Cloudflare Pages configuration for the HighJack website.
+#
+# The website deploys independently of the game server. Connect the Pages
+# project to this repository (or use `wrangler pages deploy` in CI) with:
+#
+#   build command:      bun run --filter='@highjack/web' build
+#   build output dir:   apps/web/dist
+#   root dir:           / (repository root; Bun workspace resolution needs it)
+#
+# Secrets are configured in the Cloudflare dashboard, never in this file.
+
+name = "highjack-web"
+compatibility_date = "2026-08-01"
+
+[pages]
+output_directory = "apps/web/dist"

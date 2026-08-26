@@ -1,0 +1,119 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Logo from '../components/Logo.astro';
+import SystemCard from '../components/SystemCard.astro';
+import { Badge } from '@highjack/ui';
+import { SYSTEMS } from '../data/systems';
+---
+
+<BaseLayout
+  title="HighJack — the table is yours to rig"
+  description="A browser-first multiplayer board/economy game where every match is a configurable ruleset: property empires, wagers, auctions, minigames, and event-driven chaos."
+>
+  <!-- Hero -->
+  <section
+    class="relative overflow-hidden rounded-xl border border-line-subtle bg-felt-900/60 px-6 py-14 text-center shadow-raised sm:px-10 md:py-20"
+    aria-labelledby="hero-title"
+  >
+    <div
+      class="pointer-events-none absolute -top-24 left-1/2 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-gold-500/10 blur-3xl"
+      aria-hidden="true"
+    >
+    </div>
+    <div class="relative mx-auto flex max-w-2xl flex-col items-center gap-6">
+      <Logo class="h-20 w-20 drop-shadow-[0_8px_24px_rgba(230,182,78,0.25)] md:h-24 md:w-24" />
+      <h1
+        id="hero-title"
+        class="m-0 font-display text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl"
+      >
+        The table is <span class="text-gold-500">yours</span> to rig.
+      </h1>
+      <p class="m-0 text-lg leading-relaxed text-muted-400">
+        HighJack is a browser-first multiplayer board/economy game where every match runs on
+        <strong class="text-cream-100">your</strong> ruleset — property empires, side wagers, auction
+        wars, treasure cards, and events that flip the whole table at once.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <a
+          href="/game"
+          class="rounded-md bg-gold-500 px-6 py-3 font-bold text-felt-950 no-underline shadow-card transition-colors duration-fast hover:bg-gold-400"
+          >Peek at the game</a
+        >
+        <a
+          href="/features"
+          class="rounded-md border border-line-strong bg-surface-raised px-6 py-3 font-bold text-cream-100 no-underline transition-colors duration-fast hover:border-gold-700 hover:text-gold-400"
+          >Explore systems</a
+        >
+      </div>
+      <p class="m-0 mt-2 inline-flex items-center gap-2 text-sm text-muted-500">
+        <Badge tone="gold">v0.1 Foundation</Badge>
+        In active development — the foundation ships before the dice do.
+      </p>
+    </div>
+  </section>
+
+  <!-- Philosophy trio -->
+  <section class="mt-16" aria-labelledby="philosophy-title">
+    <h2 id="philosophy-title" class="text-center font-display text-2xl font-extrabold sm:text-3xl">
+      Built on three bets
+    </h2>
+    <div class="mt-8 grid gap-4 md:grid-cols-3">
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Bet one</p>
+        <h3 class="mt-2 mb-0 font-display text-xl font-bold">Rules are content</h3>
+        <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+          A match isn't a fixed script — it's a configuration. Toggle trading, auctions, gambling
+          tables, carnival, sports, and events. The engine validates your ruleset and refuses
+          impossible ones.
+        </p>
+      </article>
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Bet two</p>
+        <h3 class="mt-2 mb-0 font-display text-xl font-bold">Fortune favors the bold</h3>
+        <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+          Risk is the point. Wager on yourself, hijack a pot, ride a global event. Every system is
+          optional, so tables choose how spicy it gets — from friendly to cutthroat.
+        </p>
+      </article>
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Bet three</p>
+        <h3 class="mt-2 mb-0 font-display text-xl font-bold">Fair by construction</h3>
+        <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+          One authoritative deterministic simulation decides everything. Same seed, same actions,
+          same outcome — which means replays, debugging, and dispute-free play are built in, not
+          bolted on.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Systems preview -->
+  <section class="mt-16" aria-labelledby="systems-title">
+    <div class="flex items-end justify-between gap-4">
+      <h2 id="systems-title" class="m-0 font-display text-2xl font-extrabold sm:text-3xl">
+        One table, many games
+      </h2>
+      <a
+        href="/features"
+        class="shrink-0 text-sm font-bold text-gold-400 no-underline hover:text-gold-500"
+        >All systems →</a
+      >
+    </div>
+    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {SYSTEMS.slice(0, 6).map((system) => <SystemCard system={system} />)}
+    </div>
+  </section>
+
+  <!-- Honest status strip -->
+  <section
+    class="mt-16 rounded-lg border border-gold-700/40 bg-gold-700/10 p-6"
+    aria-label="Project status"
+  >
+    <h2 class="m-0 font-display text-lg font-bold text-gold-400">Where things stand</h2>
+    <p class="mb-0 mt-2 text-sm leading-relaxed text-cream-300">
+      v0.1 delivers the production foundation: the architecture, design system, protocol, backend,
+      and this website. Gameplay systems are being built feature-by-feature on top of it. We'd
+      rather show you an honest blueprint than a fake demo.
+    </p>
+  </section>
+</BaseLayout>

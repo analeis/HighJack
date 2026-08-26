@@ -1,0 +1,104 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { Badge } from '@highjack/ui';
+---
+
+<BaseLayout
+  title="Rules — HighJack"
+  description="How HighJack rules work: configurable rule modules, validation of impossible rulesets, and victory conditions. Full rulebook arrives with gameplay milestones."
+>
+  <header class="max-w-3xl">
+    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">Rules, your table's way</h1>
+    <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
+      HighJack doesn't ship one rulebook — it ships a ruleset format. A match is defined by its
+      <strong class="text-cream-100">GameConfig</strong>, and the engine enforces exactly what it
+      says. Here are the principles that hold for every configuration.
+    </p>
+  </header>
+
+  <section class="mt-12" aria-labelledby="principles-title">
+    <h2 id="principles-title" class="m-0 font-display text-2xl font-extrabold">Principles</h2>
+    <div class="mt-6 grid gap-4 md:grid-cols-2">
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <h3 class="m-0 font-display text-lg font-bold text-gold-400">The config is law</h3>
+        <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+          Whatever the match configuration enables is legal; everything else simply does not exist
+          at that table. Disable auctions and no auction will ever start; enable poker and Thursday
+          night gets expensive.
+        </p>
+      </article>
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <h3 class="m-0 font-display text-lg font-bold text-gold-400">
+          Impossible rules are rejected
+        </h3>
+        <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+          Validation happens in layers: malformed documents are refused outright, structural
+          mistakes (bad ranges, wrong types) are reported field-by-field, and semantically
+          impossible combinations — like poker without gambling — never reach a lobby.
+        </p>
+      </article>
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <h3 class="m-0 font-display text-lg font-bold text-gold-400">Money is exact</h3>
+        <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+          All currency is integer-valued. Chips can't be split into fractions, so arithmetic is
+          always exact and identical on every client and server — no floating-point fortunes.
+        </p>
+      </article>
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <h3 class="m-0 font-display text-lg font-bold text-gold-400">Luck is seeded, not sneaky</h3>
+        <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+          Shuffles, rolls, and event draws come from a deterministic random stream derived from the
+          match seed. The same seed and the same actions always produce the same match — which makes
+          outcomes auditable after the fact.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="mt-12" aria-labelledby="victory-title">
+    <h2 id="victory-title" class="m-0 font-display text-2xl font-extrabold">Victory conditions</h2>
+    <p class="mt-3 mb-5 max-w-3xl text-sm leading-relaxed text-muted-400">
+      Every configuration picks exactly one way to win:
+    </p>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <article
+        class="rounded-lg border border-line-subtle bg-surface-raised p-5 text-center shadow-card"
+      >
+        <Badge tone="gold">last_standing</Badge>
+        <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+          Outlive everyone. Bankruptcies thin the table until one player holds on.
+        </p>
+      </article>
+      <article
+        class="rounded-lg border border-line-subtle bg-surface-raised p-5 text-center shadow-card"
+      >
+        <Badge tone="gold">target_wealth</Badge>
+        <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+          First to cross the wealth line you set — sprint or siege, your call.
+        </p>
+      </article>
+      <article
+        class="rounded-lg border border-line-subtle bg-surface-raised p-5 text-center shadow-card"
+      >
+        <Badge tone="gold">round_limit</Badge>
+        <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+          When the round limit hits, richest player takes it. No sudden death, just bookkeeping.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section
+    class="mt-12 rounded-lg border border-line-subtle bg-felt-900/60 p-6"
+    aria-label="Rulebook status"
+  >
+    <h2 class="m-0 flex items-center gap-3 font-display text-lg font-bold text-cream-100">
+      Full rulebook
+      <Badge tone="neutral">Coming with v0.2</Badge>
+    </h2>
+    <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+      Detailed turn structure, property economics, and per-system rules arrive alongside playable
+      milestones. We document what exists — not what we hope to build.
+    </p>
+  </section>
+</BaseLayout>

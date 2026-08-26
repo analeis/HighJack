@@ -1,0 +1,21 @@
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HighJack badge mark">
+  <defs>
+    <linearGradient id="hj-card" x1="24" y1="6" x2="44" y2="34" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8f4e9"/><stop offset="1" stop-color="#ddd5c2"/>
+    </linearGradient>
+    <linearGradient id="hj-chip" x1="18" y1="42" x2="46" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e6b64e"/><stop offset="1" stop-color="#c99a36"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0b1310"/>
+  <circle cx="26" cy="47" r="13" fill="url(#hj-chip)"/>
+  <circle cx="26" cy="47" r="8.5" fill="#111c17"/>
+  <g stroke="#f4efe2" stroke-width="2" stroke-linecap="round">
+    <path d="M26 36v4"/><path d="M37 47h-4"/><path d="M15 47h4"/><path d="M26 58v-4"/>
+  </g>
+  <g transform="rotate(-12 40 24)">
+    <rect x="29" y="7" width="22" height="30" rx="3.5" fill="url(#hj-card)"/>
+    <path d="M40 27 L33.5 19.5 H37 V13 H43 V19.5 H46.5 Z" transform="rotate(180 40 20)" fill="#0b1310"/>
+    <rect x="34.5" y="28" width="11" height="2.5" rx="1.25" fill="#0b1310"/>
+  </g>
+</svg>

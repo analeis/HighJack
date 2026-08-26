@@ -1,0 +1,95 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { Badge } from '@highjack/ui';
+import { SYSTEMS, statusLabel, type SystemStatus } from '../data/systems';
+import { ConfigPlayground } from '../islands/ConfigPlayground';
+
+const groups: { status: SystemStatus; title: string; blurb: string }[] = [
+  {
+    status: 'modeled',
+    title: 'Modeled today',
+    blurb:
+      'Present in the configuration model, protocol fixtures, and engine foundations — validated and hashed on both client and server.',
+  },
+  {
+    status: 'in-development',
+    title: 'In development',
+    blurb: 'Actively being built right now.',
+  },
+  {
+    status: 'planned',
+    title: 'Planned',
+    blurb: 'Designed for in the architecture; implementation scheduled by milestone.',
+  },
+];
+---
+
+<BaseLayout
+  title="Features — HighJack"
+  description="The HighJack system catalog: property and economy gameplay, trading, auctions, gambling tables, carnival and sports minigames, treasure cards, random events, and configurable victory conditions."
+>
+  <header class="max-w-3xl">
+    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">Systems &amp; features</h1>
+    <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
+      HighJack is a chassis for table chaos. Each system below is a rule module you can enable per
+      match — and each badge tells you exactly how real it is today.
+    </p>
+  </header>
+
+  <!-- Interactive configuration preview -->
+  <section class="mt-12" aria-labelledby="config-title">
+    <h2 id="config-title" class="mb-2 font-display text-2xl font-extrabold">Rig a ruleset</h2>
+    <p class="mb-6 max-w-3xl text-sm leading-relaxed text-muted-400">
+      Flip modules and watch the actual GameConfig document update — validated live against the same
+      schema the authoritative engine uses. Try enabling poker with the gambling master switch off
+      to see the validator refuse it.
+    </p>
+    <div class="rounded-xl border border-line-subtle bg-felt-900/50 p-4 shadow-raised sm:p-6">
+      <ConfigPlayground client:visible />
+    </div>
+  </section>
+
+  <!-- Full catalog grouped by honesty. A group with no systems yet is
+       omitted — an empty grid would read as a bug, not as honesty. -->
+  {
+    groups
+      .filter((group) => SYSTEMS.some((s) => s.status === group.status))
+      .map((group) => (
+        <section class="mt-12" aria-labelledby={`group-${group.status}`}>
+          <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h2 id={`group-${group.status}`} class="m-0 font-display text-2xl font-extrabold">
+              {group.title}
+            </h2>
+            <Badge
+              tone={
+                group.status === 'modeled'
+                  ? 'teal'
+                  : group.status === 'in-development'
+                    ? 'gold'
+                    : 'neutral'
+              }
+            >
+              {statusLabel(group.status)}
+            </Badge>
+          </div>
+          <p class="mt-2 max-w-3xl text-sm text-muted-500">{group.blurb}</p>
+          <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {SYSTEMS.filter((s) => s.status === group.status).map((system) => (
+              <article class="flex h-full flex-col gap-2 rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
+                <h3 class="m-0 font-display text-lg font-bold text-cream-100">{system.name}</h3>
+                <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500/90">
+                  {system.tagline}
+                </p>
+                <p class="m-0 text-sm leading-relaxed text-muted-400">{system.description}</p>
+                <p
+                  class={`mt-auto mb-0 pt-2 font-mono text-xs uppercase tracking-wider ${system.configurable ? 'text-teal-400' : 'text-muted-500'}`}
+                >
+                  Config toggle: {system.configurable ? 'yes' : 'no'}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ))
+  }
+</BaseLayout>

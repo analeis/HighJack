@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "playerCount": { "min": 3, "max": 6 },
+  "startingMoney": 2500,
+  "trading": { "enabled": true },
+  "auctions": { "enabled": true },
+  "gambling": { "enabled": true, "poker": true, "blackjack": true, "casino": true },
+  "carnival": { "enabled": true },
+  "sports": { "enabled": true },
+  "cards": { "enabled": true },
+  "randomEvents": { "enabled": true, "intervalTicks": 40 },
+  "victory": { "type": "target_wealth", "targetWealth": 10000, "roundLimit": 0 }
+}

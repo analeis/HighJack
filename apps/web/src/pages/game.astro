@@ -1,0 +1,129 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { Badge } from '@highjack/ui';
+---
+
+<BaseLayout
+  title="The Game — HighJack"
+  description="How a HighJack match is composed: the application surface, the rendered table, and the authoritative deterministic simulation underneath."
+>
+  <header class="max-w-3xl">
+    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">The game</h1>
+    <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
+      A HighJack match is one thing at every level: a configurable ruleset, executed by an
+      authoritative simulation. Here's how that becomes something you can see and touch.
+    </p>
+  </header>
+
+  <!-- Anatomy -->
+  <section class="mt-12" aria-labelledby="anatomy-title">
+    <h2 id="anatomy-title" class="m-0 font-display text-2xl font-extrabold">
+      Anatomy of the client
+    </h2>
+    <div class="mt-6 grid gap-4 md:grid-cols-2">
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">
+          Application layer
+        </p>
+        <h3 class="mb-2 mt-2 font-display text-xl font-bold">Menus · panels · negotiation</h3>
+        <p class="m-0 text-sm leading-relaxed text-muted-400">
+          Lobbies, trade desks, auction rooms, casino tables, event tickers, and settings live in a
+          crisp SolidJS interface. Fast, accessible, keyboard-friendly — everything you read and
+          click.
+        </p>
+      </article>
+      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
+        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Render layer</p>
+        <h3 class="mb-2 mt-2 font-display text-xl font-bold">The board, alive</h3>
+        <p class="m-0 text-sm leading-relaxed text-muted-400">
+          The board itself is a GPU-rendered PixiJS stage: tactile pieces, dealt cards, chip
+          physics, event effects. The two layers stay cleanly separated — UI never fights pixels.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Authority diagram -->
+  <section class="mt-12" aria-labelledby="authority-title">
+    <h2 id="authority-title" class="m-0 font-display text-2xl font-extrabold">
+      Who decides what happens
+    </h2>
+    <div
+      class="mt-6 overflow-x-auto rounded-lg border border-line-subtle bg-felt-900/50 p-6 shadow-card"
+      tabindex={0}
+      aria-label="Action flow diagram, scrollable"
+    >
+      <pre
+        class="m-0 min-w-[28rem] font-mono text-xs leading-relaxed text-muted-400 sm:text-sm"><code>Your move
+   ↓
+Action (validated against current state)
+   ↓
+Authoritative engine — one deterministic transition
+   ↓
+Events (what changed)
+   ↓
+New state → everyone sees the same truth</code></pre>
+    </div>
+    <p class="mt-4 max-w-3xl text-sm leading-relaxed text-muted-400">
+      Clients never decide outcomes; they propose actions. The server's engine validates and applies
+      each one atomically, then broadcasts the events. Deterministic seeds mean any match can be
+      replayed move-for-move — great for debugging, better for trust.
+    </p>
+  </section>
+
+  <!-- Honest status + shell pointer -->
+  <section
+    class="mt-12 rounded-lg border border-gold-700/40 bg-gold-700/10 p-6"
+    aria-label="Development status"
+  >
+    <h2 class="m-0 flex flex-wrap items-center gap-3 font-display text-lg font-bold text-gold-400">
+      Current status
+      <Badge tone="gold">Shell only</Badge>
+    </h2>
+    <p class="mt-2 mb-0 text-sm leading-relaxed text-cream-300">
+      What exists today: this website, the game-client shell (application chrome over a live render
+      stage), the engine skeleton with real lifecycle rules, the wire protocol, and the Go backend.
+      Board gameplay begins with the next milestone. Run the shell locally with:
+      <code class="ml-1 rounded bg-felt-950 px-2 py-1 font-mono text-xs text-gold-400"
+        >bun run dev:game</code
+      >
+    </p>
+  </section>
+
+  <!-- Roadmap teaser -->
+  <section class="mt-12" aria-labelledby="roadmap-title">
+    <h2 id="roadmap-title" class="m-0 font-display text-2xl font-extrabold">The road ahead</h2>
+    <ol class="mt-6 list-none space-y-3 p-0">
+      <li class="flex items-start gap-4 rounded-lg border border-line-subtle bg-surface-raised p-4">
+        <span
+          class="hj-numerals shrink-0 rounded-md bg-teal-600/20 px-2 py-1 text-xs font-bold text-teal-400"
+          >v0.1</span
+        >
+        <span class="text-sm text-muted-400"
+          ><strong class="text-cream-100">Foundation</strong> — architecture, protocol, design system,
+          website, backend. Shipped.</span
+        >
+      </li>
+      <li class="flex items-start gap-4 rounded-lg border border-line-subtle bg-surface-raised p-4">
+        <span
+          class="hj-numerals shrink-0 rounded-md bg-gold-700/25 px-2 py-1 text-xs font-bold text-gold-400"
+          >v0.2</span
+        >
+        <span class="text-sm text-muted-400"
+          ><strong class="text-cream-100">First table</strong> — core board loop: movement, property,
+          rent, bankruptcy.</span
+        >
+      </li>
+      <li class="flex items-start gap-4 rounded-lg border border-line-subtle bg-surface-raised p-4">
+        <span
+          class="hj-numerals shrink-0 rounded-md bg-felt-700 px-2 py-1 text-xs font-bold text-muted-400"
+          >v0.3+</span
+        >
+        <span class="text-sm text-muted-400"
+          ><strong class="text-cream-100">The chaos catalog</strong> — trading, auctions, gambling tables,
+          carnival, sports, global events.</span
+        >
+      </li>
+    </ol>
+  </section>
+</BaseLayout>

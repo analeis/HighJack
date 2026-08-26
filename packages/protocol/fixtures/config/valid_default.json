@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "playerCount": { "min": 2, "max": 8 },
+  "startingMoney": 1500,
+  "trading": { "enabled": true },
+  "auctions": { "enabled": true },
+  "gambling": { "enabled": false, "poker": false, "blackjack": false, "casino": false },
+  "carnival": { "enabled": false },
+  "sports": { "enabled": false },
+  "cards": { "enabled": true },
+  "randomEvents": { "enabled": false, "intervalTicks": 0 },
+  "victory": { "type": "last_standing", "targetWealth": 0, "roundLimit": 0 }
+}

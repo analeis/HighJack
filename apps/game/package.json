@@ -1,0 +1,28 @@
+{
+  "name": "@highjack/game",
+  "version": "0.1.0",
+  "description": "HighJack game client shell: SolidJS application surface over a PixiJS render layer.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@fontsource-variable/space-grotesk": "^5.2.5",
+    "@highjack/protocol": "workspace:*",
+    "@highjack/ui": "workspace:*",
+    "pixi.js": "^8.6.6",
+    "solid-js": "^1.9.5",
+    "tailwindcss": "^4.1.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.0",
+    "vite": "^7.0.0",
+    "vite-plugin-solid": "^2.11.0",
+    "vitest": "^3.2.0"
+  }
+}

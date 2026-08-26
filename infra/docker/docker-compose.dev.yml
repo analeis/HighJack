@@ -1,0 +1,47 @@
+# Development database only. Production deployment does not use this file.
+#
+#   docker compose -f infra/docker/docker-compose.dev.yml up -d
+#
+# Provides:
+#   - highjack       main dev database        (localhost:5432)
+#   - highjack_test  disposable test database (localhost:5433)
+#
+# Credentials are deliberately trivial and local-only.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: highjack-postgres-dev
+    environment:
+      POSTGRES_USER: highjack
+      POSTGRES_PASSWORD: highjack
+      POSTGRES_DB: highjack
+    ports:
+      - '5432:5432'
+    volumes:
+      - highjack-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U highjack']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-test:
+    image: postgres:17-alpine
+    container_name: highjack-postgres-test
+    environment:
+      POSTGRES_USER: highjack
+      POSTGRES_PASSWORD: highjack
+      POSTGRES_DB: highjack_test
+    ports:
+      - '5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U highjack']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  highjack-pgdata:

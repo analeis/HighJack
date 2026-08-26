@@ -1,0 +1,33 @@
+{
+  "name": "@highjack/web",
+  "version": "0.1.0",
+  "description": "HighJack product website.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@astrojs/solid-js": "^5.0.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.2.5",
+    "@fontsource-variable/space-grotesk": "^5.2.5",
+    "@fontsource/space-mono": "^5.2.5",
+    "@highjack/protocol": "workspace:*",
+    "@highjack/ui": "workspace:*",
+    "solid-js": "^1.9.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@axe-core/playwright": "^4.10.1",
+    "@playwright/test": "^1.54.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "astro": "^5.12.0",
+    "tailwindcss": "^4.1.0",
+    "vitest": "^3.2.0"
+  }
+}

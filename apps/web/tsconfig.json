@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["astro/client"],
+    "noEmit": true,
+    "moduleResolution": "bundler"
+  },
+  "include": ["src/**/*", "e2e/**/*", "astro.config.mjs"],
+  "exclude": ["dist"]
+}
