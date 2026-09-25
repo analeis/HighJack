@@ -15,9 +15,14 @@ const (
 	KindAction ClientMessageKind = "action"
 )
 
-// Hello is the first message every client must send.
+// Hello is the first message every client must send. MatchId/Token are
+// optional: omitting both performs a handshake-only connection, which is
+// what the v0.1 seam verified.
 type Hello struct {
-	Client string `json:"client"`
+	Client         string `json:"client"`
+	MatchID        string `json:"matchId,omitempty"`
+	Token          string `json:"token,omitempty"`
+	ResumeFromTick *int64 `json:"resumeFromTick,omitempty"`
 }
 
 // Ping is answered with a Pong carrying the same nonce.

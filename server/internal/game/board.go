@@ -55,8 +55,13 @@ type BoardState struct {
 	Spaces []RuntimeSpace `json:"spaces"`
 }
 
-// newBoardRuntime builds the pristine board from validated configuration.
-// All spaces start unowned at level 0; every player starts on space 0.
+// NewBoardState builds the pristine board from validated configuration.
+// All spaces start unowned at level 0 and every player starts on space 0.
+// Exported so the server can expose a complete board (definition + runtime
+// ownership) from the moment a match exists, including in the lobby.
+func NewBoardState(cfg *GameConfig) BoardState { return newBoardRuntime(cfg) }
+
+// newBoardRuntime is the internal constructor used by the start transition.
 func newBoardRuntime(cfg *GameConfig) BoardState {
 	spaces := make([]RuntimeSpace, len(cfg.Board.Spaces))
 	for i, s := range cfg.Board.Spaces {

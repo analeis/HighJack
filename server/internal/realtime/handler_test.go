@@ -10,15 +10,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/analeis/highjack/server/internal/match"
 	"github.com/analeis/highjack/server/internal/protocol"
 
 	"github.com/coder/websocket"
 )
 
+// wsTestServer starts the transport with an empty registry: the v0.1
+// handshake/ping/malformed paths are transport-level and need no match.
+// Match binding and gameplay are covered by the multiplayer integration
+// test in this package.
 func wsTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	log := slog.New(slog.DiscardHandler)
-	h := NewHandler(log, 30000)
+	h := NewHandler(log, 30000, match.NewRegistry(log, nil))
 	mux := http.NewServeMux()
 	h.Register(mux)
 	srv := httptest.NewServer(mux)
@@ -135,12 +140,15 @@ func TestPingPongRoundTrip(t *testing.T) {
 	}
 }
 
-func TestActionReceivesNotSupportedErrorWithAckSeq(t *testing.T) {
+// v0.2: gameplay is implemented, but an unbound connection has no match
+// and therefore no actor. Actions are rejected as not_permitted, not
+// not_supported (that code now only means "recognized but unimplemented").
+func TestActionWithoutMatchBindingIsNotPermitted(t *testing.T) {
 	srv := wsTestServer(t)
 	conn, _ := dial(t, srv.URL+"/ws")
 
 	send(t, conn, map[string]any{"v": 1, "type": "hello", "client": "test"})
-	_ = receive(t, conn)
+	_ = receive(t, conn) // welcome
 
 	send(t, conn, map[string]any{
 		"v": 1, "type": "action", "seq": 12,
@@ -152,7 +160,7 @@ func TestActionReceivesNotSupportedErrorWithAckSeq(t *testing.T) {
 		t.Fatalf("expected structured error, got %v", msg)
 	}
 	errBody := msg["error"].(map[string]any)
-	if errBody["code"] != string(protocol.CodeNotSupported) {
+	if errBody["code"] != string(protocol.CodeNotPermitted) {
 		t.Fatalf("code = %v", errBody["code"])
 	}
 	if msg["ackSeq"].(float64) != 12 {

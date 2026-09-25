@@ -16,6 +16,7 @@ import (
 
 	"github.com/analeis/highjack/server/internal/config"
 	"github.com/analeis/highjack/server/internal/logging"
+	"github.com/analeis/highjack/server/internal/match"
 	"github.com/analeis/highjack/server/internal/realtime"
 )
 
@@ -26,10 +27,11 @@ const (
 
 // Server assembles the HTTP handler and owns the listener lifecycle.
 type Server struct {
-	cfg    *config.Config
-	log    *slog.Logger
-	router *http.ServeMux
-	http   *http.Server
+	cfg      *config.Config
+	log      *slog.Logger
+	router   *http.ServeMux
+	http     *http.Server
+	registry *match.Registry
 
 	// readiness reports component health; nil means always ready.
 	readiness func(ctx context.Context) error
@@ -67,6 +69,11 @@ func (s *Server) routes() {
 func (s *Server) MountRealtime(h *realtime.Handler) {
 	h.Register(s.router)
 }
+
+// Handler exposes the fully wrapped HTTP handler (middleware chain
+// included). Tests mount it on their own servers; the binary uses
+// ListenAndServe.
+func (s *Server) Handler() http.Handler { return s.http.Handler }
 
 // Addr returns the configured listen address (for tests).
 func (s *Server) Addr() string { return s.cfg.Addr }
@@ -175,6 +182,12 @@ type statusRecorder struct {
 	status int
 	wrote  bool
 }
+
+// Unwrap exposes the underlying writer so http.ResponseController (used by
+// the WebSocket upgrader to reach the hijacker and deadlines) can traverse
+// the middleware chain. Without it, a wrapped writer looks like it cannot
+// be upgraded and the handshake fails with 501.
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 func (r *statusRecorder) WriteHeader(code int) {
 	if !r.wrote {

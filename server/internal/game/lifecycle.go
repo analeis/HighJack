@@ -188,9 +188,12 @@ func (r LifecycleRuleset) start(state *GameState, cfg *GameConfig, actor PlayerI
 	next.Phase = PhasePlaying
 	next.ConfigHash = hash
 
-	// The board is built once from validated config; every player starts
-	// on space 0 and the lowest active seat rolls first in round 1.
-	next.Board = newBoardRuntime(cfg)
+	// The board is derived from validated config and already exists from
+	// match creation; starting the match only arms the first turn. Players
+	// stand on space 0 and the lowest active seat rolls first in round 1.
+	if len(next.Board.Spaces) == 0 {
+		next.Board = newBoardRuntime(cfg)
+	}
 	next.Turn = TurnState{CurrentSeat: active[0].Seat, Phase: TurnAwaitRoll, Round: 1}
 
 	_ = rng // lifecycle transitions consume no randomness; board rolls use their per-tick stream.

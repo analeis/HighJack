@@ -18,6 +18,7 @@ import (
 	"github.com/analeis/highjack/server/internal/api"
 	"github.com/analeis/highjack/server/internal/config"
 	"github.com/analeis/highjack/server/internal/logging"
+	"github.com/analeis/highjack/server/internal/match"
 	"github.com/analeis/highjack/server/internal/persistence"
 	"github.com/analeis/highjack/server/internal/realtime"
 	"github.com/analeis/highjack/server/internal/version"
@@ -77,8 +78,17 @@ func run() error {
 		return store.Ping(ctx)
 	}
 
+	// Live matches are not restored across process restarts in v0.2: any
+	// match left active by a previous process is marked interrupted at
+	// boot instead of being silently resumed from partial data.
+	bootCtx, cancelBoot := context.WithTimeout(context.Background(), 10*time.Second)
+	registry := match.NewRegistry(log, store)
+	registry.MarkInterruptedFlags(bootCtx)
+	cancelBoot()
+
 	server := api.New(cfg, log, readiness)
-	realtimeHandler := realtime.NewHandler(log, cfg.HeartbeatMs)
+	server.MountMatches(registry)
+	realtimeHandler := realtime.NewHandler(log, cfg.HeartbeatMs, registry)
 	server.MountRealtime(realtimeHandler)
 
 	// Signal-driven lifecycle: serve until SIGINT/SIGTERM, then drain.
