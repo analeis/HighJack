@@ -1,8 +1,8 @@
 # v0.2 Board Loop — Design & Implementation Plan
 
 > Status: **plan, not implementation**. Nothing below is built. Mechanics
-> marked *(proposal)* are defaults for review, not decisions; architecture
-> marked *(invariant)* carries v0.1.0 forward unchanged.
+> marked _(proposal)_ are defaults for review, not decisions; architecture
+> marked _(invariant)_ carries v0.1.0 forward unchanged.
 
 ## 1. Goal
 
@@ -15,13 +15,13 @@ carnival, sports, events) are built.
 ## 2. Invariants carried forward from v0.1.0
 
 | Boundary    | Invariant (non-negotiable unless implementation evidence shows a defect) |
-| ----------- | ----------------------------------------------------------------------- |
-| Game engine | Pure deterministic transitions; **no** transport/persistence deps       |
-| Protocol    | Explicitly versioned, shared TS/Go contract; additive changes only      |
-| Config      | Validated (3 tiers), canonicalized, sha256-hashable                     |
-| Frontends   | SolidJS application UI; PixiJS rendering isolated from shared UI        |
-| Backend     | Go modular monolith; PostgreSQL for durable state                       |
-| Quality     | Certification gates mandatory for every release (`bun run certify`)     |
+| ----------- | ------------------------------------------------------------------------ |
+| Game engine | Pure deterministic transitions; **no** transport/persistence deps        |
+| Protocol    | Explicitly versioned, shared TS/Go contract; additive changes only       |
+| Config      | Validated (3 tiers), canonicalized, sha256-hashable                      |
+| Frontends   | SolidJS application UI; PixiJS rendering isolated from shared UI         |
+| Backend     | Go modular monolith; PostgreSQL for durable state                        |
+| Quality     | Certification gates mandatory for every release (`bun run certify`)      |
 
 Extension, not redesign. Any plan item that requires touching
 `Engine.Apply`, the envelope format, or the phase graph must justify why
@@ -50,7 +50,7 @@ Turn  TurnState  `json:"turn"`  // whose turn, turn-phase, consecutive doubles
 
 - `BoardState`: ordered `Spaces []Space` (fixed at match start from
   config), each space `{ID, Kind, Price, BaseRent, Owner *PlayerID, Level}`.
-  *(Proposal: space kinds `go | property | tax | neutral` only.)*
+  _(Proposal: space kinds `go | property | tax | neutral` only.)_
 - `TurnState`: `{CurrentSeat Seat, Phase TurnPhase, DoublesStreak int}`
   with `TurnPhase ∈ {await_roll, await_buy_decision, turn_over}`.
   `Player.Position` (space index) is added to `Player`.
@@ -58,12 +58,12 @@ Turn  TurnState  `json:"turn"`  // whose turn, turn-phase, consecutive doubles
 
 ### 4.2 New actions (same `Action` interface, new payload structs)
 
-| Action              | Legal when                                              |
-| ------------------- | ------------------------------------------------------- |
-| `RollDiceAction{}`  | `PhasePlaying`, actor is current seat, `await_roll`     |
+| Action              | Legal when                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `RollDiceAction{}`  | `PhasePlaying`, actor is current seat, `await_roll`                                          |
 | `BuyPropertyAction` | `PhasePlaying`, actor is current seat, `await_buy_decision`, space unowned, actor can afford |
-| `DeclineBuyAction`  | same gating as buy; explicit no-op that ends the decision (auditable; future auction hook) |
-| `EndTurnAction`     | `PhasePlaying`, actor is current seat, `turn_over` (or decision resolved) |
+| `DeclineBuyAction`  | same gating as buy; explicit no-op that ends the decision (auditable; future auction hook)   |
+| `EndTurnAction`     | `PhasePlaying`, actor is current seat, `turn_over` (or decision resolved)                    |
 
 All other conditions → existing domain errors (`ErrOutOfPhase`,
 `ErrNotPermitted`); new errors only if no existing one fits.
@@ -82,7 +82,7 @@ All other conditions → existing domain errors (`ErrOutOfPhase`,
 - Dice consume the tick stream directly: `d1 = rng.IntN(6)+1`,
   `d2 = rng.IntN(6)+1`, in that fixed order. Same tick ⇒ same roll,
   covered by the existing determinism test shape.
-- *(Proposal)* doubles grant one extra roll (`DoublesStreak`, capped at 3
+- _(Proposal)_ doubles grant one extra roll (`DoublesStreak`, capped at 3
   → turn passes). Any streak rule must be a pure function of the roll
   history, never of wall-clock or connection state.
 
@@ -101,19 +101,19 @@ turn_over → (end_turn) → advance seat → await_roll
 Rent that the payer cannot afford triggers insolvency (§6), never a
 negative balance: `Money` stays `>= 0` by construction.
 
-## 5. Board & property data model *(proposals for review)*
+## 5. Board & property data model _(proposals for review)_
 
 - **Starting board**: one fixed loop of 24 spaces defined as config data
   (not code): 1 go, 16 properties in 4 color groups, 3 tax, 4 neutral.
   JSON schema for spaces lives in config; unknown space kinds are
   structural errors.
 - **Property economics**: `price` and `baseRent` per space from board
-  data; rent *(proposal)* = `baseRent × (level + 1)`, level 0 only in v0.2
+  data; rent _(proposal)_ = `baseRent × (level + 1)`, level 0 only in v0.2
   (development arrives later — the `Level` field reserves it).
 - **Payout curves live in config, not code** (per GAME_DESIGN.md
   direction): `property_rules {passingGoBonus, bankruptcyRule}`.
 
-## 6. Economy rules *(proposals for review)*
+## 6. Economy rules _(proposals for review)_
 
 - **Buy**: `money -= price`, ownership set, `property_bought` emitted.
   Atomic with validation; unaffordable → `ErrNotPermitted`-family error,
@@ -121,13 +121,13 @@ negative balance: `Money` stays `>= 0` by construction.
 - **Rent**: `payer -= rent; owner += rent; rent_paid` emitted. The bank is
   an explicit counterparty for go-bonus/tax so chip conservation is
   auditable: every chip movement appears in exactly one event.
-- **Insolvency** *(proposal)*: any payment that would drive money below 0
+- **Insolvency** _(proposal)_: any payment that would drive money below 0
   bankrupts the payer instead — holdings revert to the bank (unowned),
   `player_bankrupt` + elimination events emitted, existing
   `maybeEndForInsufficientPlayers` decides the match end. No debt, no
   partial payment in v0.2.
 - **Victory**: reuse configured conditions against **net worth**
-  *(proposal: money + sum of purchase prices of holdings)* —
+  _(proposal: money + sum of purchase prices of holdings)_ —
   `last_standing` unchanged; `target_wealth`/`round_limit` compare net
   worth. Keeps v0.1 config semantics intact.
 
@@ -165,7 +165,7 @@ Fill the realtime seam without redesigning it:
 - **Persistence**: `games`/`game_players` rows now track live money,
   position, and status; board ownership snapshot per match (new table or
   `JSONB` column — decide at implementation, migrate explicitly).
-  **Reconnection** *(proposal)*: rejoin with same session replays state
+  **Reconnection** _(proposal)_: rejoin with same session replays state
   snapshot + missed events since a client-supplied tick; no speculative
   client simulation — server snapshot is truth.
 
