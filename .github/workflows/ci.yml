@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Dependency audit
+        run: bun audit
+
       - name: Format check
         run: bunx prettier --check .
 
@@ -76,6 +79,9 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
       - name: Tests (hermetic)
         run: go test -race ./...
