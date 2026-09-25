@@ -1,0 +1,105 @@
+{
+  "v": 1,
+  "type": "snapshot",
+  "snapshot": {
+    "matchId": "m_01J9Z8A7B6C5D4E3F2",
+    "phase": "playing",
+    "tick": 9,
+    "players": [
+      {
+        "playerId": "pl_78FB853327D328A5343B",
+        "name": "Ace",
+        "seat": 0,
+        "money": 1400,
+        "status": "active",
+        "ready": true,
+        "isHost": true,
+        "position": 5
+      },
+      {
+        "playerId": "pl_9C04D2A1B6E5F7081923",
+        "name": "Bit",
+        "seat": 1,
+        "money": 1500,
+        "status": "active",
+        "ready": true,
+        "isHost": false,
+        "position": 0
+      }
+    ],
+    "spaces": [
+      {
+        "id": "go",
+        "kind": "go",
+        "name": "Start",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0,
+        "owned": false,
+        "owner": "",
+        "level": 0
+      },
+      {
+        "id": "a1",
+        "kind": "property",
+        "name": "Copper Row",
+        "group": "Copper",
+        "price": 100,
+        "rent": 10,
+        "amount": 0,
+        "owned": true,
+        "owner": "pl_78FB853327D328A5343B",
+        "level": 0
+      }
+    ],
+    "turn": {
+      "currentSeat": 1,
+      "phase": "await_roll",
+      "round": 1,
+      "doublesStreak": 0,
+      "awardExtraRoll": false
+    },
+    "winnerId": null,
+    "endReason": "",
+    "configHash": "9f2c4a1b3d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8"
+  },
+  "config": {
+    "version": 1,
+    "playerCount": { "min": 2, "max": 8 },
+    "startingMoney": 1500,
+    "trading": { "enabled": true },
+    "auctions": { "enabled": true },
+    "gambling": { "enabled": false, "poker": false, "blackjack": false, "casino": false },
+    "carnival": { "enabled": false },
+    "sports": { "enabled": false },
+    "cards": { "enabled": true },
+    "randomEvents": { "enabled": false, "intervalTicks": 0 },
+    "victory": { "type": "last_standing", "targetWealth": 0, "roundLimit": 0 },
+    "board": {
+      "spaces": [
+        {
+          "id": "go",
+          "kind": "go",
+          "name": "Start",
+          "group": "",
+          "price": 0,
+          "rent": 0,
+          "amount": 0
+        },
+        {
+          "id": "a1",
+          "kind": "property",
+          "name": "Copper Row",
+          "group": "Copper",
+          "price": 100,
+          "rent": 10,
+          "amount": 0
+        }
+      ]
+    },
+    "propertyRules": { "passingGoBonus": 200, "doublesExtraRoll": true, "maxDoublesStreak": 3 }
+  },
+  "nextSeq": 8,
+  "resync": false
+}

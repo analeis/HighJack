@@ -12,3 +12,4 @@ export * from './actions.ts';
 export * from './events.ts';
 export * from './messages.ts';
 export * from './config.ts';
+export * from './state.ts';

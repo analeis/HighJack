@@ -5,15 +5,17 @@ import (
 	"slices"
 )
 
-// Player is a participant in a match.
+// Player is a participant in a match. Position is the board-space index;
+// meaningful only while PhasePlaying.
 type Player struct {
-	ID     PlayerID     `json:"playerId"`
-	Name   string       `json:"name"`
-	Seat   Seat         `json:"seat"`
-	Money  Money        `json:"money"`
-	Status PlayerStatus `json:"status"`
-	Ready  bool         `json:"ready"`
-	IsHost bool         `json:"isHost"`
+	ID       PlayerID     `json:"playerId"`
+	Name     string       `json:"name"`
+	Seat     Seat         `json:"seat"`
+	Money    Money        `json:"money"`
+	Status   PlayerStatus `json:"status"`
+	Ready    bool         `json:"ready"`
+	IsHost   bool         `json:"isHost"`
+	Position int          `json:"position"`
 }
 
 // Active reports whether the player can act right now.
@@ -30,10 +32,12 @@ func (p *Player) Active() bool { return p.Status == PlayerActive }
 // Engine handlers must treat state as immutable input and return a new,
 // modified copy; they must never mutate the caller's value in place.
 type GameState struct {
-	ID      GameID   `json:"id"`
-	Phase   Phase    `json:"phase"`
-	Tick    uint64   `json:"tick"`
-	Players []Player `json:"players"`
+	ID      GameID     `json:"id"`
+	Phase   Phase      `json:"phase"`
+	Tick    uint64     `json:"tick"`
+	Players []Player   `json:"players"`
+	Board   BoardState `json:"board"`
+	Turn    TurnState  `json:"turn"`
 
 	// RootSeedHex records the engine root seed for replay/debugging. It is
 	// server-visible metadata, not part of client-visible game state; the
@@ -47,11 +51,17 @@ type GameState struct {
 }
 
 // Clone returns a deep copy of the state so handlers can modify freely.
+// RuntimeSpace stores ownership as values (never pointers), so copying
+// the slices is a true deep copy with no aliasing between states.
 func (s *GameState) Clone() *GameState {
 	out := *s
 	if s.Players != nil {
 		out.Players = make([]Player, len(s.Players))
 		copy(out.Players, s.Players)
+	}
+	if s.Board.Spaces != nil {
+		out.Board.Spaces = make([]RuntimeSpace, len(s.Board.Spaces))
+		copy(out.Board.Spaces, s.Board.Spaces)
 	}
 	return &out
 }

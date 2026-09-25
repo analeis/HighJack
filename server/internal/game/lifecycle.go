@@ -117,6 +117,20 @@ func (r LifecycleRuleset) leave(state *GameState, actor PlayerID) (*GameState, [
 			return nil, nil, err
 		}
 		consequences = append(consequences, endEvents...)
+		if next.Phase == PhasePlaying {
+			// The match continues: a leaver holding the current turn must
+			// not strand it. Advance past them deterministically.
+			leaver := state.PlayerByID(actor)
+			if leaver != nil && leaver.Seat == next.Turn.CurrentSeat {
+				seat, round := advanceSeat(next, leaver.Seat)
+				next.Turn.CurrentSeat = seat
+				next.Turn.Round = round
+				next.Turn.Phase = TurnAwaitRoll
+				next.Turn.DoublesStreak = 0
+				next.Turn.AwardExtraRoll = false
+				consequences = append(consequences, &TurnAdvancedEvent{Seat: seat, Round: round})
+			}
+		}
 	}
 
 	events := append([]Event{&PlayerLeftEvent{PlayerID: actor, Reason: "voluntary"}}, consequences...)
@@ -174,25 +188,39 @@ func (r LifecycleRuleset) start(state *GameState, cfg *GameConfig, actor PlayerI
 	next.Phase = PhasePlaying
 	next.ConfigHash = hash
 
-	_ = rng // lifecycle transitions consume no randomness; future rulesets use their labeled stream here.
+	// The board is built once from validated config; every player starts
+	// on space 0 and the lowest active seat rolls first in round 1.
+	next.Board = newBoardRuntime(cfg)
+	next.Turn = TurnState{CurrentSeat: active[0].Seat, Phase: TurnAwaitRoll, Round: 1}
+
+	_ = rng // lifecycle transitions consume no randomness; board rolls use their per-tick stream.
 
 	events := []Event{&GameStartedEvent{ConfigHash: hash, Seed: matchSeed.Hex()}}
 	return next, events, nil
 }
 
 // maybeEndForInsufficientPlayers ends a playing match when fewer than two
-// active players remain.
+// active players remain. A sole survivor wins by last_standing; an empty
+// table ends with no winner. Shared by voluntary leave and bankruptcy so
+// both paths record identical terminal metadata.
 func maybeEndForInsufficientPlayers(state *GameState) ([]Event, error) {
-	if state.Phase != PhasePlaying || len(state.ActivePlayers()) >= 2 {
+	active := state.ActivePlayers()
+	if state.Phase != PhasePlaying || len(active) >= 2 {
 		return nil, nil
 	}
 	if err := state.Phase.canTransitionTo(PhaseEnded); err != nil {
 		return nil, err
 	}
 	state.Phase = PhaseEnded
-	state.EndReason = "insufficient_players"
-	state.WinnerID = nil
-	return []Event{&GameEndedEvent{WinnerID: nil, Reason: state.EndReason}}, nil
+	if len(active) == 1 {
+		winner := active[0].ID
+		state.WinnerID = &winner
+		state.EndReason = "last_standing"
+	} else {
+		state.WinnerID = nil
+		state.EndReason = "insufficient_players"
+	}
+	return []Event{&GameEndedEvent{WinnerID: state.WinnerID, Reason: state.EndReason}}, nil
 }
 
 // mustParseSeed is used on seeds the engine itself serialized; failure

@@ -26,6 +26,15 @@ const (
 	MinPlayersFloor   = 2
 	MaxPlayersCeiling = 12
 	StartingMoneyMax  = 1_000_000
+
+	MinBoardSpaces = 2
+	MaxBoardSpaces = 64
+	MaxSpaceIDLen  = 32
+	MaxSpaceName   = 64
+	MaxGroupLen    = 32
+	MaxSpacePrice  = 1_000_000
+	MaxSpaceRent   = 100_000
+	MaxTaxAmount   = 1_000_000
 )
 
 type PlayerCountRange struct {
@@ -71,6 +80,39 @@ type VictoryConfig struct {
 	RoundLimit   int         `json:"roundLimit"`
 }
 
+// SpaceKind names the mechanical category of a board space.
+type SpaceKind string
+
+const (
+	SpaceGo       SpaceKind = "go"
+	SpaceProperty SpaceKind = "property"
+	SpaceTax      SpaceKind = "tax"
+	SpaceNeutral  SpaceKind = "neutral"
+)
+
+// BoardSpace is one configured board space. All fields are always present
+// in the canonical JSON form (zero values for non-applicable kinds) so Go
+// and TypeScript serializations stay byte-identical.
+type BoardSpace struct {
+	ID     string    `json:"id"`
+	Kind   SpaceKind `json:"kind"`
+	Name   string    `json:"name"`
+	Group  string    `json:"group"`
+	Price  Money     `json:"price"`
+	Rent   Money     `json:"rent"`
+	Amount Money     `json:"amount"`
+}
+
+type BoardConfig struct {
+	Spaces []BoardSpace `json:"spaces"`
+}
+
+type PropertyRules struct {
+	PassingGoBonus   Money `json:"passingGoBonus"`
+	DoublesExtraRoll bool  `json:"doublesExtraRoll"`
+	MaxDoublesStreak int   `json:"maxDoublesStreak"`
+}
+
 // GameConfig is a first-class domain object: a HighJack match is a
 // configurable ruleset, and this structure is that ruleset's canonical
 // representation. Fields for systems that are not implemented yet are
@@ -92,6 +134,8 @@ type GameConfig struct {
 	Cards         CardsConfig        `json:"cards"`
 	RandomEvents  RandomEventsConfig `json:"randomEvents"`
 	Victory       VictoryConfig      `json:"victory"`
+	Board         BoardConfig        `json:"board"`
+	PropertyRules PropertyRules      `json:"propertyRules"`
 }
 
 // DefaultConfig returns the baseline configuration used by the server and
@@ -109,6 +153,44 @@ func DefaultConfig() GameConfig {
 		Cards:         CardsConfig{Enabled: true},
 		RandomEvents:  RandomEventsConfig{},
 		Victory:       VictoryConfig{Type: VictoryLastStanding},
+		Board:         BoardConfig{Spaces: DefaultBoard()},
+		PropertyRules: PropertyRules{PassingGoBonus: 200, DoublesExtraRoll: true, MaxDoublesStreak: 3},
+	}
+}
+
+// DefaultBoard returns the standard 24-space loop used when no custom
+// board is configured. Movement is clockwise (increasing index) with
+// wraparound; space 0 is always go. Mirrored by DEFAULT_BOARD in
+// packages/protocol; the canonical-hash fixture pins parity.
+func DefaultBoard() []BoardSpace {
+	prop := func(id, name, group string, price, rent Money) BoardSpace {
+		return BoardSpace{ID: id, Kind: SpaceProperty, Name: name, Group: group, Price: price, Rent: rent}
+	}
+	return []BoardSpace{
+		{ID: "go", Kind: SpaceGo, Name: "Start"},
+		prop("a1", "Copper Row", "Copper", 100, 10),
+		prop("a2", "Tin Lane", "Copper", 120, 12),
+		{ID: "n1", Kind: SpaceNeutral, Name: "Old Fountain"},
+		{ID: "t1", Kind: SpaceTax, Name: "Toll Gate", Amount: 75},
+		prop("a3", "Brass Way", "Copper", 140, 14),
+		prop("a4", "Nickel Court", "Copper", 160, 16),
+		{ID: "n2", Kind: SpaceNeutral, Name: "Night Market"},
+		prop("b1", "Lantern Row", "Lantern", 180, 18),
+		prop("b2", "Wick Street", "Lantern", 200, 20),
+		{ID: "t2", Kind: SpaceTax, Name: "Harbor Toll", Amount: 100},
+		prop("b3", "Glow Alley", "Lantern", 220, 22),
+		prop("b4", "Beacon Court", "Lantern", 240, 24),
+		{ID: "n3", Kind: SpaceNeutral, Name: "Grand Plaza"},
+		prop("c1", "Dockside Row", "Harbor", 260, 26),
+		prop("c2", "Anchor Lane", "Harbor", 280, 28),
+		{ID: "t3", Kind: SpaceTax, Name: "Crown Tax", Amount: 150},
+		prop("c3", "Tideway", "Harbor", 300, 30),
+		prop("c4", "Lighthouse Point", "Harbor", 320, 32),
+		{ID: "n4", Kind: SpaceNeutral, Name: "Sky Garden"},
+		prop("d1", "Summit Rise", "Summit", 340, 34),
+		prop("d2", "Cloud Terrace", "Summit", 360, 36),
+		prop("d3", "Peak View", "Summit", 380, 38),
+		prop("d4", "Crown Heights", "Summit", 400, 40),
 	}
 }
 

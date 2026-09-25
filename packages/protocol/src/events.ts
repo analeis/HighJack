@@ -15,6 +15,13 @@ export const EVENT_TYPES = [
   'game_started',
   'player_eliminated',
   'game_ended',
+  'dice_rolled',
+  'property_bought',
+  'buy_declined',
+  'rent_paid',
+  'bank_transfer',
+  'player_bankrupt',
+  'turn_advanced',
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -65,13 +72,74 @@ export interface GameEndedEvent extends EventBase {
   readonly reason: string;
 }
 
+export interface DiceRolledEvent extends EventBase {
+  readonly type: 'dice_rolled';
+  readonly playerId: PlayerId;
+  readonly die1: number;
+  readonly die2: number;
+  readonly fromSpace: string;
+  readonly toSpace: string;
+  readonly passedGo: boolean;
+}
+
+export interface PropertyBoughtEvent extends EventBase {
+  readonly type: 'property_bought';
+  readonly playerId: PlayerId;
+  readonly spaceId: string;
+  readonly price: Money;
+}
+
+export interface BuyDeclinedEvent extends EventBase {
+  readonly type: 'buy_declined';
+  readonly playerId: PlayerId;
+  readonly spaceId: string;
+}
+
+export interface RentPaidEvent extends EventBase {
+  readonly type: 'rent_paid';
+  readonly fromPlayerId: PlayerId;
+  readonly toPlayerId: PlayerId;
+  readonly spaceId: string;
+  readonly amount: Money;
+}
+
+export interface BankTransferEvent extends EventBase {
+  readonly type: 'bank_transfer';
+  readonly playerId: PlayerId;
+  readonly amount: Money;
+  readonly direction: 'to_player' | 'to_bank';
+  /** "pass_go" | "land_go" | "tax"; extensible via new codes only. */
+  readonly reason: string;
+}
+
+export interface PlayerBankruptEvent extends EventBase {
+  readonly type: 'player_bankrupt';
+  readonly playerId: PlayerId;
+  readonly cause: string;
+  readonly creditorId?: string | undefined;
+  readonly amountOwed: Money;
+}
+
+export interface TurnAdvancedEvent extends EventBase {
+  readonly type: 'turn_advanced';
+  readonly seat: Seat;
+  readonly round: number;
+}
+
 export type GameEvent =
   | PlayerJoinedEvent
   | PlayerLeftEvent
   | PlayerReadyChangedEvent
   | GameStartedEvent
   | PlayerEliminatedEvent
-  | GameEndedEvent;
+  | GameEndedEvent
+  | DiceRolledEvent
+  | PropertyBoughtEvent
+  | BuyDeclinedEvent
+  | RentPaidEvent
+  | BankTransferEvent
+  | PlayerBankruptEvent
+  | TurnAdvancedEvent;
 
 // ---- runtime guards --------------------------------------------------------
 
@@ -130,6 +198,68 @@ export function isGameEndedEvent(value: unknown): value is GameEndedEvent {
   return winnerOk && hasString(value, 'reason');
 }
 
+function isSafeInt(v: unknown): v is number {
+  return typeof v === 'number' && Number.isSafeInteger(v);
+}
+
+export function isDiceRolledEvent(value: unknown): value is DiceRolledEvent {
+  if (!isRecord(value) || value['type'] !== 'dice_rolled') return false;
+  return (
+    hasString(value, 'playerId') &&
+    isSafeInt(value['die1']) &&
+    isSafeInt(value['die2']) &&
+    hasString(value, 'fromSpace') &&
+    hasString(value, 'toSpace') &&
+    typeof value['passedGo'] === 'boolean'
+  );
+}
+
+export function isPropertyBoughtEvent(value: unknown): value is PropertyBoughtEvent {
+  if (!isRecord(value) || value['type'] !== 'property_bought') return false;
+  return hasString(value, 'playerId') && hasString(value, 'spaceId') && isSafeInt(value['price']);
+}
+
+export function isBuyDeclinedEvent(value: unknown): value is BuyDeclinedEvent {
+  if (!isRecord(value) || value['type'] !== 'buy_declined') return false;
+  return hasString(value, 'playerId') && hasString(value, 'spaceId');
+}
+
+export function isRentPaidEvent(value: unknown): value is RentPaidEvent {
+  if (!isRecord(value) || value['type'] !== 'rent_paid') return false;
+  return (
+    hasString(value, 'fromPlayerId') &&
+    hasString(value, 'toPlayerId') &&
+    hasString(value, 'spaceId') &&
+    isSafeInt(value['amount'])
+  );
+}
+
+export function isBankTransferEvent(value: unknown): value is BankTransferEvent {
+  if (!isRecord(value) || value['type'] !== 'bank_transfer') return false;
+  return (
+    hasString(value, 'playerId') &&
+    isSafeInt(value['amount']) &&
+    (value['direction'] === 'to_player' || value['direction'] === 'to_bank') &&
+    hasString(value, 'reason')
+  );
+}
+
+export function isPlayerBankruptEvent(value: unknown): value is PlayerBankruptEvent {
+  if (!isRecord(value) || value['type'] !== 'player_bankrupt') return false;
+  const creditor = value['creditorId'];
+  return (
+    hasString(value, 'playerId') &&
+    hasString(value, 'cause') &&
+    (creditor === undefined || typeof creditor === 'string') &&
+    isSafeInt(value['amountOwed'])
+  );
+}
+
+export function isTurnAdvancedEvent(value: unknown): value is TurnAdvancedEvent {
+  if (!isRecord(value) || value['type'] !== 'turn_advanced') return false;
+  return isSafeInt(value['seat']) && isSafeInt(value['round']);
+}
+
 export function isGameEvent(value: unknown): value is GameEvent {
   if (!isRecord(value)) return false;
   switch (value['type']) {
@@ -145,6 +275,20 @@ export function isGameEvent(value: unknown): value is GameEvent {
       return isPlayerEliminatedEvent(value);
     case 'game_ended':
       return isGameEndedEvent(value);
+    case 'dice_rolled':
+      return isDiceRolledEvent(value);
+    case 'property_bought':
+      return isPropertyBoughtEvent(value);
+    case 'buy_declined':
+      return isBuyDeclinedEvent(value);
+    case 'rent_paid':
+      return isRentPaidEvent(value);
+    case 'bank_transfer':
+      return isBankTransferEvent(value);
+    case 'player_bankrupt':
+      return isPlayerBankruptEvent(value);
+    case 'turn_advanced':
+      return isTurnAdvancedEvent(value);
     default:
       return false;
   }

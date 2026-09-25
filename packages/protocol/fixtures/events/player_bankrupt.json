@@ -1,0 +1,7 @@
+{
+  "type": "player_bankrupt",
+  "playerId": "pl_78FB853327D328A5343B",
+  "cause": "bankruptcy_rent",
+  "creditorId": "pl_9C04D2A1B6E5F7081923",
+  "amountOwed": 40
+}

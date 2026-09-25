@@ -9,5 +9,28 @@
   "sports": { "enabled": false },
   "cards": { "enabled": true },
   "randomEvents": { "enabled": true, "intervalTicks": 0 },
-  "victory": { "type": "round_limit", "targetWealth": 0, "roundLimit": 0 }
+  "victory": { "type": "round_limit", "targetWealth": 0, "roundLimit": 0 },
+  "board": {
+    "spaces": [
+      {
+        "id": "go",
+        "kind": "go",
+        "name": "Start",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "p1",
+        "kind": "property",
+        "name": "Lot",
+        "group": "G",
+        "price": 100,
+        "rent": 10,
+        "amount": 0
+      }
+    ]
+  },
+  "propertyRules": { "passingGoBonus": 200, "doublesExtraRoll": true, "maxDoublesStreak": 0 }
 }

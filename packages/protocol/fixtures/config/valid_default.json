@@ -1,13 +1,263 @@
 {
   "version": 1,
-  "playerCount": { "min": 2, "max": 8 },
+  "playerCount": {
+    "min": 2,
+    "max": 8
+  },
   "startingMoney": 1500,
-  "trading": { "enabled": true },
-  "auctions": { "enabled": true },
-  "gambling": { "enabled": false, "poker": false, "blackjack": false, "casino": false },
-  "carnival": { "enabled": false },
-  "sports": { "enabled": false },
-  "cards": { "enabled": true },
-  "randomEvents": { "enabled": false, "intervalTicks": 0 },
-  "victory": { "type": "last_standing", "targetWealth": 0, "roundLimit": 0 }
+  "trading": {
+    "enabled": true
+  },
+  "auctions": {
+    "enabled": true
+  },
+  "gambling": {
+    "enabled": false,
+    "poker": false,
+    "blackjack": false,
+    "casino": false
+  },
+  "carnival": {
+    "enabled": false
+  },
+  "sports": {
+    "enabled": false
+  },
+  "cards": {
+    "enabled": true
+  },
+  "randomEvents": {
+    "enabled": false,
+    "intervalTicks": 0
+  },
+  "victory": {
+    "type": "last_standing",
+    "targetWealth": 0,
+    "roundLimit": 0
+  },
+  "board": {
+    "spaces": [
+      {
+        "id": "go",
+        "kind": "go",
+        "name": "Start",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "a1",
+        "kind": "property",
+        "name": "Copper Row",
+        "group": "Copper",
+        "price": 100,
+        "rent": 10,
+        "amount": 0
+      },
+      {
+        "id": "a2",
+        "kind": "property",
+        "name": "Tin Lane",
+        "group": "Copper",
+        "price": 120,
+        "rent": 12,
+        "amount": 0
+      },
+      {
+        "id": "n1",
+        "kind": "neutral",
+        "name": "Old Fountain",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "t1",
+        "kind": "tax",
+        "name": "Toll Gate",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 75
+      },
+      {
+        "id": "a3",
+        "kind": "property",
+        "name": "Brass Way",
+        "group": "Copper",
+        "price": 140,
+        "rent": 14,
+        "amount": 0
+      },
+      {
+        "id": "a4",
+        "kind": "property",
+        "name": "Nickel Court",
+        "group": "Copper",
+        "price": 160,
+        "rent": 16,
+        "amount": 0
+      },
+      {
+        "id": "n2",
+        "kind": "neutral",
+        "name": "Night Market",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "b1",
+        "kind": "property",
+        "name": "Lantern Row",
+        "group": "Lantern",
+        "price": 180,
+        "rent": 18,
+        "amount": 0
+      },
+      {
+        "id": "b2",
+        "kind": "property",
+        "name": "Wick Street",
+        "group": "Lantern",
+        "price": 200,
+        "rent": 20,
+        "amount": 0
+      },
+      {
+        "id": "t2",
+        "kind": "tax",
+        "name": "Harbor Toll",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 100
+      },
+      {
+        "id": "b3",
+        "kind": "property",
+        "name": "Glow Alley",
+        "group": "Lantern",
+        "price": 220,
+        "rent": 22,
+        "amount": 0
+      },
+      {
+        "id": "b4",
+        "kind": "property",
+        "name": "Beacon Court",
+        "group": "Lantern",
+        "price": 240,
+        "rent": 24,
+        "amount": 0
+      },
+      {
+        "id": "n3",
+        "kind": "neutral",
+        "name": "Grand Plaza",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "c1",
+        "kind": "property",
+        "name": "Dockside Row",
+        "group": "Harbor",
+        "price": 260,
+        "rent": 26,
+        "amount": 0
+      },
+      {
+        "id": "c2",
+        "kind": "property",
+        "name": "Anchor Lane",
+        "group": "Harbor",
+        "price": 280,
+        "rent": 28,
+        "amount": 0
+      },
+      {
+        "id": "t3",
+        "kind": "tax",
+        "name": "Crown Tax",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 150
+      },
+      {
+        "id": "c3",
+        "kind": "property",
+        "name": "Tideway",
+        "group": "Harbor",
+        "price": 300,
+        "rent": 30,
+        "amount": 0
+      },
+      {
+        "id": "c4",
+        "kind": "property",
+        "name": "Lighthouse Point",
+        "group": "Harbor",
+        "price": 320,
+        "rent": 32,
+        "amount": 0
+      },
+      {
+        "id": "n4",
+        "kind": "neutral",
+        "name": "Sky Garden",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "d1",
+        "kind": "property",
+        "name": "Summit Rise",
+        "group": "Summit",
+        "price": 340,
+        "rent": 34,
+        "amount": 0
+      },
+      {
+        "id": "d2",
+        "kind": "property",
+        "name": "Cloud Terrace",
+        "group": "Summit",
+        "price": 360,
+        "rent": 36,
+        "amount": 0
+      },
+      {
+        "id": "d3",
+        "kind": "property",
+        "name": "Peak View",
+        "group": "Summit",
+        "price": 380,
+        "rent": 38,
+        "amount": 0
+      },
+      {
+        "id": "d4",
+        "kind": "property",
+        "name": "Crown Heights",
+        "group": "Summit",
+        "price": 400,
+        "rent": 40,
+        "amount": 0
+      }
+    ]
+  },
+  "propertyRules": {
+    "passingGoBonus": 200,
+    "doublesExtraRoll": true,
+    "maxDoublesStreak": 3
+  }
 }

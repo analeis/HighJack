@@ -11,7 +11,7 @@
  * sides of the boundary.
  */
 
-export const PROTOCOL_VERSION = '1.0.0';
+export const PROTOCOL_VERSION = '1.1.0';
 
 /** Integer protocol major version carried by every message envelope (`v`). */
 export const PROTOCOL_MAJOR_VERSION = 1;

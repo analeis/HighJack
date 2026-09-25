@@ -1,0 +1,7 @@
+{
+  "type": "bank_transfer",
+  "playerId": "pl_78FB853327D328A5343B",
+  "amount": 200,
+  "direction": "to_player",
+  "reason": "pass_go"
+}

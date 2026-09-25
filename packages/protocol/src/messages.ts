@@ -16,6 +16,9 @@ import type { ProtocolError } from './errors.ts';
 import { isProtocolError } from './errors.ts';
 import type { GameEvent } from './events.ts';
 import { isGameEvent } from './events.ts';
+import type { GameConfig } from './config.ts';
+import type { GameSnapshot } from './state.ts';
+import { isGameSnapshot } from './state.ts';
 import { PROTOCOL_MAJOR_VERSION } from './version.ts';
 
 /** Protocol major version stamp present on every envelope. */
@@ -33,6 +36,12 @@ export interface HelloMessage extends EnvelopeBase {
   readonly type: 'hello';
   /** Short client identifier, e.g. "web/0.1.0". */
   readonly client: string;
+  /** Match to bind this connection to (omit for handshake-only). */
+  readonly matchId?: string | undefined;
+  /** Join token minted by POST /matches/{id}/players. */
+  readonly token?: string | undefined;
+  /** Last engine tick the client has applied; drives catch-up. */
+  readonly resumeFromTick?: number | undefined;
 }
 
 export interface PingMessage extends EnvelopeBase {
@@ -85,7 +94,30 @@ export interface ErrorMessage extends EnvelopeBase {
   readonly ackSeq?: number | undefined;
 }
 
-export type ServerMessage = WelcomeMessage | PongMessage | EventMessage | ErrorMessage;
+export interface SnapshotMessage extends EnvelopeBase {
+  readonly v: ProtocolMajor;
+  readonly type: 'snapshot';
+  /** Full authoritative state; clients must render from this, never guess. */
+  readonly snapshot: GameSnapshot;
+  /** Match configuration the snapshot runs under (board data included). */
+  readonly config: GameConfig;
+  /** Next action `seq` the server expects from this player. */
+  readonly nextSeq: number;
+  /** True when the client cursor was too old and no catch-up was attempted. */
+  readonly resync: boolean;
+}
+
+export interface CatchupMessage extends EnvelopeBase {
+  readonly v: ProtocolMajor;
+  readonly type: 'catchup';
+  /** Missed events with their engine ticks, in causal order. */
+  readonly events: readonly { readonly tick: number; readonly event: GameEvent }[];
+  /** Engine tick the catch-up reaches (client cursor becomes this). */
+  readonly cursor: number;
+}
+
+export type ServerMessage =
+  WelcomeMessage | PongMessage | EventMessage | ErrorMessage | SnapshotMessage | CatchupMessage;
 
 // ---- runtime guards --------------------------------------------------------
 
@@ -101,7 +133,17 @@ function isEnvelope(value: unknown): value is Record<string, unknown> {
 export function isHelloMessage(value: unknown): value is HelloMessage {
   if (!isEnvelope(value)) return false;
   const v = value as Record<string, unknown>;
-  return v['type'] === 'hello' && typeof v['client'] === 'string' && v['client'].length > 0;
+  if (v['type'] !== 'hello' || typeof v['client'] !== 'string' || v['client'].length === 0) {
+    return false;
+  }
+  for (const key of ['matchId', 'token'] as const) {
+    if (v[key] !== undefined && typeof v[key] !== 'string') return false;
+  }
+  const resume = v['resumeFromTick'];
+  if (resume !== undefined && (typeof resume !== 'number' || !Number.isSafeInteger(resume))) {
+    return false;
+  }
+  return true;
 }
 
 export function isPingMessage(value: unknown): value is PingMessage {
@@ -161,6 +203,35 @@ export function isServerMessage(value: unknown): value is ServerMessage {
     isWelcomeMessage(value) ||
     isPongMessage(value) ||
     isEventMessage(value) ||
-    isErrorMessage(value)
+    isErrorMessage(value) ||
+    isSnapshotMessage(value) ||
+    isCatchupMessage(value)
   );
+}
+
+export function isSnapshotMessage(value: unknown): value is SnapshotMessage {
+  if (!isEnvelope(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    v['type'] === 'snapshot' &&
+    isGameSnapshot(v['snapshot']) &&
+    typeof v['config'] === 'object' &&
+    v['config'] !== null &&
+    typeof v['nextSeq'] === 'number' &&
+    Number.isSafeInteger(v['nextSeq']) &&
+    typeof v['resync'] === 'boolean'
+  );
+}
+
+export function isCatchupMessage(value: unknown): value is CatchupMessage {
+  if (!isEnvelope(value)) return false;
+  const v = value as Record<string, unknown>;
+  if (v['type'] !== 'catchup' || !Array.isArray(v['events'])) return false;
+  for (const item of v['events'] as unknown[]) {
+    if (typeof item !== 'object' || item === null) return false;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec['tick'] !== 'number' || !Number.isSafeInteger(rec['tick'])) return false;
+    if (!isGameEvent(rec['event'])) return false;
+  }
+  return typeof v['cursor'] === 'number' && Number.isSafeInteger(v['cursor']);
 }

@@ -11,7 +11,16 @@
  */
 import type { Money } from './ids.ts';
 
-export const ACTION_TYPES = ['player_join', 'player_leave', 'player_ready', 'game_start'] as const;
+export const ACTION_TYPES = [
+  'player_join',
+  'player_leave',
+  'player_ready',
+  'game_start',
+  'roll_dice',
+  'buy_property',
+  'decline_buy',
+  'end_turn',
+] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -38,7 +47,35 @@ export interface GameStartAction extends ActionBase {
   readonly type: 'game_start';
 }
 
-export type GameAction = PlayerJoinAction | PlayerLeaveAction | PlayerReadyAction | GameStartAction;
+/**
+ * Board-loop actions carry no payload: the authoritative turn state
+ * already identifies the roller, the space, and the decision.
+ */
+export interface RollDiceAction extends ActionBase {
+  readonly type: 'roll_dice';
+}
+
+export interface BuyPropertyAction extends ActionBase {
+  readonly type: 'buy_property';
+}
+
+export interface DeclineBuyAction extends ActionBase {
+  readonly type: 'decline_buy';
+}
+
+export interface EndTurnAction extends ActionBase {
+  readonly type: 'end_turn';
+}
+
+export type GameAction =
+  | PlayerJoinAction
+  | PlayerLeaveAction
+  | PlayerReadyAction
+  | GameStartAction
+  | RollDiceAction
+  | BuyPropertyAction
+  | DeclineBuyAction
+  | EndTurnAction;
 
 // ---- runtime guards --------------------------------------------------------
 
@@ -72,6 +109,22 @@ export function isGameStartAction(value: unknown): value is GameStartAction {
   return isRecord(value) && value['type'] === 'game_start';
 }
 
+export function isRollDiceAction(value: unknown): value is RollDiceAction {
+  return isRecord(value) && value['type'] === 'roll_dice';
+}
+
+export function isBuyPropertyAction(value: unknown): value is BuyPropertyAction {
+  return isRecord(value) && value['type'] === 'buy_property';
+}
+
+export function isDeclineBuyAction(value: unknown): value is DeclineBuyAction {
+  return isRecord(value) && value['type'] === 'decline_buy';
+}
+
+export function isEndTurnAction(value: unknown): value is EndTurnAction {
+  return isRecord(value) && value['type'] === 'end_turn';
+}
+
 export function isGameAction(value: unknown): value is GameAction {
   if (!isRecord(value)) return false;
   switch (value['type']) {
@@ -83,6 +136,14 @@ export function isGameAction(value: unknown): value is GameAction {
       return isPlayerReadyAction(value);
     case 'game_start':
       return isGameStartAction(value);
+    case 'roll_dice':
+      return isRollDiceAction(value);
+    case 'buy_property':
+      return isBuyPropertyAction(value);
+    case 'decline_buy':
+      return isDeclineBuyAction(value);
+    case 'end_turn':
+      return isEndTurnAction(value);
     default:
       return false;
   }

@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "type": "catchup",
+  "events": [
+    {
+      "tick": 8,
+      "event": {
+        "type": "dice_rolled",
+        "playerId": "pl_78FB853327D328A5343B",
+        "die1": 2,
+        "die2": 3,
+        "fromSpace": "go",
+        "toSpace": "a3",
+        "passedGo": false
+      }
+    },
+    {
+      "tick": 9,
+      "event": {
+        "type": "turn_advanced",
+        "seat": 1,
+        "round": 1
+      }
+    }
+  ],
+  "cursor": 9
+}

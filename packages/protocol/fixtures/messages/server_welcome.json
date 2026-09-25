@@ -2,6 +2,6 @@
   "v": 1,
   "type": "welcome",
   "session": "sess_01J9Z8A7B6C5D4E3F2",
-  "protocolVersion": "1.0.0",
+  "protocolVersion": "1.1.0",
   "heartbeatMs": 30000
 }

@@ -36,8 +36,35 @@
       "type": "target_wealth",
       "targetWealth": 10000,
       "roundLimit": 0
+    },
+    "board": {
+      "spaces": [
+        {
+          "id": "go",
+          "kind": "go",
+          "name": "Start",
+          "group": "",
+          "price": 0,
+          "rent": 0,
+          "amount": 0
+        },
+        {
+          "id": "p1",
+          "kind": "property",
+          "name": "Lot",
+          "group": "G",
+          "price": 200,
+          "rent": 25,
+          "amount": 0
+        }
+      ]
+    },
+    "propertyRules": {
+      "passingGoBonus": 250,
+      "doublesExtraRoll": false,
+      "maxDoublesStreak": 0
     }
   },
-  "canonical": "{\"auctions\":{\"enabled\":true},\"cards\":{\"enabled\":true},\"carnival\":{\"enabled\":true},\"gambling\":{\"blackjack\":true,\"casino\":true,\"enabled\":true,\"poker\":true},\"playerCount\":{\"max\":6,\"min\":3},\"randomEvents\":{\"enabled\":true,\"intervalTicks\":40},\"sports\":{\"enabled\":true},\"startingMoney\":2500,\"trading\":{\"enabled\":true},\"version\":1,\"victory\":{\"roundLimit\":0,\"targetWealth\":10000,\"type\":\"target_wealth\"}}",
-  "sha256": "74a9060df3d94ffa8490a7eba4683c01f3fb930821b45e0480221742e25f612f"
+  "canonical": "{\"auctions\":{\"enabled\":true},\"board\":{\"spaces\":[{\"amount\":0,\"group\":\"\",\"id\":\"go\",\"kind\":\"go\",\"name\":\"Start\",\"price\":0,\"rent\":0},{\"amount\":0,\"group\":\"G\",\"id\":\"p1\",\"kind\":\"property\",\"name\":\"Lot\",\"price\":200,\"rent\":25}]},\"cards\":{\"enabled\":true},\"carnival\":{\"enabled\":true},\"gambling\":{\"blackjack\":true,\"casino\":true,\"enabled\":true,\"poker\":true},\"playerCount\":{\"max\":6,\"min\":3},\"propertyRules\":{\"doublesExtraRoll\":false,\"maxDoublesStreak\":0,\"passingGoBonus\":250},\"randomEvents\":{\"enabled\":true,\"intervalTicks\":40},\"sports\":{\"enabled\":true},\"startingMoney\":2500,\"trading\":{\"enabled\":true},\"version\":1,\"victory\":{\"roundLimit\":0,\"targetWealth\":10000,\"type\":\"target_wealth\"}}",
+  "sha256": "63a762a5cc669f75a64ae2cda19bbae654d3f5afc66b32407cad784775aa4fce"
 }

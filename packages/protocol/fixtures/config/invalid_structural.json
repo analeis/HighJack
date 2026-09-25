@@ -9,5 +9,37 @@
   "sports": { "enabled": false },
   "cards": { "enabled": true },
   "randomEvents": { "enabled": false, "intervalTicks": 1.5 },
-  "victory": { "type": "sudden_death", "targetWealth": 0, "roundLimit": 0 }
+  "victory": { "type": "sudden_death", "targetWealth": 0, "roundLimit": 0 },
+  "board": {
+    "spaces": [
+      {
+        "id": "n1",
+        "kind": "neutral",
+        "name": "Park",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "x",
+        "kind": "property",
+        "name": "Dup",
+        "group": "G",
+        "price": 100,
+        "rent": 10,
+        "amount": 0
+      },
+      {
+        "id": "x",
+        "kind": "teleport",
+        "name": "Bad",
+        "group": "",
+        "price": -5,
+        "rent": 0,
+        "amount": 0
+      }
+    ]
+  },
+  "propertyRules": { "passingGoBonus": -1, "doublesExtraRoll": "yes", "maxDoublesStreak": 3 }
 }

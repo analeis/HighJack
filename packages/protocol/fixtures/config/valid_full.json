@@ -9,5 +9,46 @@
   "sports": { "enabled": true },
   "cards": { "enabled": true },
   "randomEvents": { "enabled": true, "intervalTicks": 40 },
-  "victory": { "type": "target_wealth", "targetWealth": 10000, "roundLimit": 0 }
+  "victory": { "type": "target_wealth", "targetWealth": 10000, "roundLimit": 0 },
+  "board": {
+    "spaces": [
+      {
+        "id": "go",
+        "kind": "go",
+        "name": "Start",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      },
+      {
+        "id": "p1",
+        "kind": "property",
+        "name": "First Lot",
+        "group": "Solo",
+        "price": 200,
+        "rent": 25,
+        "amount": 0
+      },
+      {
+        "id": "t1",
+        "kind": "tax",
+        "name": "Toll",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 50
+      },
+      {
+        "id": "n1",
+        "kind": "neutral",
+        "name": "Park",
+        "group": "",
+        "price": 0,
+        "rent": 0,
+        "amount": 0
+      }
+    ]
+  },
+  "propertyRules": { "passingGoBonus": 250, "doublesExtraRoll": false, "maxDoublesStreak": 0 }
 }

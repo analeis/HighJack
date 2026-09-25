@@ -1,0 +1,9 @@
+{
+  "type": "dice_rolled",
+  "playerId": "pl_78FB853327D328A5343B",
+  "die1": 3,
+  "die2": 4,
+  "fromSpace": "go",
+  "toSpace": "n2",
+  "passedGo": false
+}

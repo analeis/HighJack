@@ -26,6 +26,7 @@ func validateGenericShape(root any) []ValidationIssue {
 		"trading": true, "auctions": true, "gambling": true,
 		"carnival": true, "sports": true, "cards": true,
 		"randomEvents": true, "victory": true,
+		"board": true, "propertyRules": true,
 	}
 	for key := range obj {
 		if !known[key] {
@@ -190,7 +191,104 @@ func validateGenericShape(root any) []ValidationIssue {
 		}
 	}
 
+	// board
+	board, present := obj["board"].(map[string]any)
+	if !present {
+		add("board", "must be an object")
+	} else {
+		for key := range board {
+			if key != "spaces" {
+				add("board."+key, "unknown field %q", key)
+			}
+		}
+		spacesRaw, ok := board["spaces"].([]any)
+		if !ok {
+			add("board.spaces", "must be an array")
+		} else {
+			for i, item := range spacesRaw {
+				sp, ok := item.(map[string]any)
+				if !ok {
+					add(fmt.Sprintf("board.spaces[%d]", i), "must be an object")
+					continue
+				}
+				shapeSpace(fmt.Sprintf("board.spaces[%d]", i), sp, add)
+			}
+		}
+	}
+
+	// propertyRules
+	pr, present := obj["propertyRules"].(map[string]any)
+	if !present {
+		add("propertyRules", "must be an object")
+	} else {
+		if v, exists := pr["passingGoBonus"]; exists {
+			if n, err := asInt(v); err != nil || n < 0 {
+				add("propertyRules.passingGoBonus", "must be a non-negative integer")
+			}
+		} else {
+			add("propertyRules.passingGoBonus", "missing required field")
+		}
+		if v, exists := pr["doublesExtraRoll"]; exists {
+			if _, isBool := v.(bool); !isBool {
+				add("propertyRules.doublesExtraRoll", "must be a boolean")
+			}
+		} else {
+			add("propertyRules.doublesExtraRoll", "missing required field")
+		}
+		if v, exists := pr["maxDoublesStreak"]; exists {
+			if n, err := asInt(v); err != nil || n < 0 {
+				add("propertyRules.maxDoublesStreak", "must be a non-negative integer")
+			}
+		} else {
+			add("propertyRules.maxDoublesStreak", "missing required field")
+		}
+		for key := range pr {
+			if key != "passingGoBonus" && key != "doublesExtraRoll" && key != "maxDoublesStreak" {
+				add("propertyRules."+key, "unknown field %q", key)
+			}
+		}
+	}
+
 	return issues
+}
+
+// shapeSpace validates one board space's field presence and JSON types.
+// Value ranges and cross-space rules are typed validation's job.
+func shapeSpace(path string, sp map[string]any, add func(path, format string, args ...any)) {
+	for _, f := range []string{"id", "kind", "name", "group"} {
+		if v, exists := sp[f]; exists {
+			if _, isStr := v.(string); !isStr {
+				add(path+"."+f, "must be a string")
+			}
+		} else {
+			add(path+"."+f, "missing required field")
+		}
+	}
+	for _, f := range []string{"price", "rent", "amount"} {
+		if v, exists := sp[f]; exists {
+			if _, err := asInt(v); err != nil {
+				add(path+"."+f, "must be an integer")
+			}
+		} else {
+			add(path+"."+f, "missing required field")
+		}
+	}
+	for key := range sp {
+		switch key {
+		case "id", "kind", "name", "group", "price", "rent", "amount":
+		default:
+			add(path+"."+key, "unknown field %q", key)
+		}
+	}
+}
+
+// asInt converts a generic JSON number to int64.
+func asInt(v any) (int64, error) {
+	n, ok := v.(json.Number)
+	if !ok {
+		return 0, fmt.Errorf("not a number")
+	}
+	return n.Int64()
 }
 
 func decodeGeneric(data []byte) (any, error) {

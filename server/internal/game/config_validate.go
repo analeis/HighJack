@@ -151,6 +151,64 @@ func (c *GameConfig) validateStructural() []ValidationIssue {
 	if c.Victory.RoundLimit < 0 {
 		add(structural("victory.roundLimit", "must not be negative"))
 	}
+	issues = append(issues, c.validateBoardStructural()...)
+	if c.PropertyRules.PassingGoBonus < 0 {
+		add(structural("propertyRules.passingGoBonus", "must not be negative"))
+	}
+	if c.PropertyRules.MaxDoublesStreak < 0 {
+		add(structural("propertyRules.maxDoublesStreak", "must not be negative"))
+	}
+	return issues
+}
+
+// validateBoardStructural checks the configured board shape: dimensions,
+// stable ordering, known kinds, and per-kind field requirements.
+func (c *GameConfig) validateBoardStructural() []ValidationIssue {
+	var issues []ValidationIssue
+	add := func(i ValidationIssue) { issues = append(issues, i) }
+
+	n := len(c.Board.Spaces)
+	if n < MinBoardSpaces || n > MaxBoardSpaces {
+		add(structural("board.spaces", "must have between %d and %d spaces", MinBoardSpaces, MaxBoardSpaces))
+		return issues
+	}
+	if c.Board.Spaces[0].Kind != SpaceGo {
+		add(structural("board.spaces[0].kind", "first space must be go"))
+	}
+	seen := make(map[string]bool, n)
+	for i, s := range c.Board.Spaces {
+		path := fmt.Sprintf("board.spaces[%d]", i)
+		if len(s.ID) == 0 || len(s.ID) > MaxSpaceIDLen {
+			add(structural(path+".id", "must be 1..%d characters", MaxSpaceIDLen))
+		} else if seen[s.ID] {
+			add(structural(path+".id", "duplicate space id %q", s.ID))
+		} else {
+			seen[s.ID] = true
+		}
+		if len(s.Name) == 0 || len(s.Name) > MaxSpaceName {
+			add(structural(path+".name", "must be 1..%d characters", MaxSpaceName))
+		}
+		switch s.Kind {
+		case SpaceGo, SpaceNeutral:
+			// no priced fields
+		case SpaceProperty:
+			if len(s.Group) == 0 || len(s.Group) > MaxGroupLen {
+				add(structural(path+".group", "property group must be 1..%d characters", MaxGroupLen))
+			}
+			if s.Price <= 0 || s.Price > MaxSpacePrice {
+				add(structural(path+".price", "must be between 1 and %d", MaxSpacePrice))
+			}
+			if s.Rent < 0 || s.Rent > MaxSpaceRent {
+				add(structural(path+".rent", "must be between 0 and %d", MaxSpaceRent))
+			}
+		case SpaceTax:
+			if s.Amount <= 0 || s.Amount > MaxTaxAmount {
+				add(structural(path+".amount", "must be between 1 and %d", MaxTaxAmount))
+			}
+		default:
+			add(structural(path+".kind", "unknown space kind %q", s.Kind))
+		}
+	}
 	return issues
 }
 
@@ -171,11 +229,18 @@ func (c *GameConfig) validateSemantics() []ValidationIssue {
 	case VictoryTargetWealth:
 		if c.Victory.TargetWealth <= 0 {
 			add(semantic("victory.targetWealth", "target wealth must be positive for target_wealth victory"))
+		} else if Money(c.Victory.TargetWealth) <= c.StartingMoney {
+			// Net worth starts at startingMoney with no holdings: a target
+			// at or below it would end the match on the first action.
+			add(semantic("victory.targetWealth", "target wealth must exceed starting money"))
 		}
 	case VictoryRoundLimit:
 		if c.Victory.RoundLimit <= 0 {
 			add(semantic("victory.roundLimit", "round limit must be positive for round_limit victory"))
 		}
+	}
+	if c.PropertyRules.DoublesExtraRoll && c.PropertyRules.MaxDoublesStreak < 1 {
+		add(semantic("propertyRules.maxDoublesStreak", "must be at least 1 when doubles grant extra rolls"))
 	}
 	return issues
 }

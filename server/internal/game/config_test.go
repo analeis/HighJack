@@ -46,8 +46,18 @@ func TestDefaultConfigIsValidAndMirrorsProtocol(t *testing.T) {
 	if parsed.Version != ConfigSchemaVersion {
 		t.Fatalf("fixture version %d != engine schema version %d (bump both sides together)", parsed.Version, ConfigSchemaVersion)
 	}
-	if *parsed != cfg {
-		t.Fatalf("default configs diverged between Go and TypeScript fixtures:\n got: %+v\nwant: %+v", parsed, cfg)
+	// GameConfig contains slices and is no longer directly comparable;
+	// canonical bytes are the parity contract both sides hash.
+	want, err := cfg.CanonicalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := parsed.CanonicalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("default configs diverged between Go and TypeScript fixtures:\n got: %s\nwant: %s", got, want)
 	}
 }
 

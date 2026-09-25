@@ -191,8 +191,9 @@ func TestLeaveDuringPlayEliminatesAndEndsWhenLonely(t *testing.T) {
 	if next.Phase != PhaseEnded {
 		t.Fatalf("match with <2 active players must end, got phase %q", next.Phase)
 	}
-	if next.EndReason != "insufficient_players" || next.WinnerID != nil {
-		t.Fatalf("unexpected end metadata: %+v", next)
+	// v0.2 decision: a sole survivor wins by last_standing.
+	if next.EndReason != "last_standing" || next.WinnerID == nil || *next.WinnerID != ids[1] {
+		t.Fatalf("sole survivor must win by last_standing: %+v", next)
 	}
 	var sawEliminated, sawEnded bool
 	for _, ev := range events {

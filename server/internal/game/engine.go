@@ -93,6 +93,27 @@ func stamp(ev Event, tick uint64) Event {
 	case *GameEndedEvent:
 		e.tick = tick
 		return e
+	case *DiceRolledEvent:
+		e.tick = tick
+		return e
+	case *PropertyBoughtEvent:
+		e.tick = tick
+		return e
+	case *BuyDeclinedEvent:
+		e.tick = tick
+		return e
+	case *RentPaidEvent:
+		e.tick = tick
+		return e
+	case *BankTransferEvent:
+		e.tick = tick
+		return e
+	case *PlayerBankruptEvent:
+		e.tick = tick
+		return e
+	case *TurnAdvancedEvent:
+		e.tick = tick
+		return e
 	default:
 		panic(fmt.Sprintf("game: unstampable event type %T", ev))
 	}

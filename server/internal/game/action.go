@@ -10,6 +10,10 @@ const (
 	ActionPlayerLeave ActionType = "player_leave"
 	ActionPlayerReady ActionType = "player_ready"
 	ActionGameStart   ActionType = "game_start"
+	ActionRollDice    ActionType = "roll_dice"
+	ActionBuyProperty ActionType = "buy_property"
+	ActionDeclineBuy  ActionType = "decline_buy"
+	ActionEndTurn     ActionType = "end_turn"
 )
 
 // Action is a request to transition the game state. Actions never mutate
@@ -40,6 +44,25 @@ type GameStartAction struct{}
 
 func (GameStartAction) Type() ActionType { return ActionGameStart }
 
+// Board-loop actions carry no payload: the authoritative turn state
+// already identifies the roller, the space, and the decision. There is no
+// property id to forge and no amount to manipulate.
+type RollDiceAction struct{}
+
+func (RollDiceAction) Type() ActionType { return ActionRollDice }
+
+type BuyPropertyAction struct{}
+
+func (BuyPropertyAction) Type() ActionType { return ActionBuyProperty }
+
+type DeclineBuyAction struct{}
+
+func (DeclineBuyAction) Type() ActionType { return ActionDeclineBuy }
+
+type EndTurnAction struct{}
+
+func (EndTurnAction) Type() ActionType { return ActionEndTurn }
+
 // Domain errors. The API layer maps these onto protocol error codes;
 // they must remain transport-agnostic.
 
@@ -53,6 +76,7 @@ var (
 	ErrInvalidName     = fmt.Errorf("display name is invalid")
 	ErrPlayerNotInGame = fmt.Errorf("player is not part of this match")
 	ErrNoPlayers       = fmt.Errorf("match has no players")
+	ErrNotYourTurn     = fmt.Errorf("it is not the actor's turn")
 )
 
 // Ruleset is the pluggable behavior layer of the engine: it binds each

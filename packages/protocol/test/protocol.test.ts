@@ -11,14 +11,17 @@ import {
   SCHEMA_VERSION,
   canonicalJson,
   isActionMessage,
+  isCatchupMessage,
   isClientMessage,
   isErrorMessage,
   isEventMessage,
   isGameAction,
   isGameEvent,
+  isGameSnapshot,
   isHelloMessage,
   isPongMessage,
   isServerMessage,
+  isSnapshotMessage,
   isWelcomeMessage,
   validateConfig,
   validateSemantics,
@@ -53,12 +56,18 @@ describe('protocol versioning', () => {
 
   it('exposes a stable set of action, event, and error types', () => {
     expect([...ACTION_TYPES].sort()).toEqual([
+      'buy_property',
+      'decline_buy',
+      'end_turn',
       'game_start',
       'player_join',
       'player_leave',
       'player_ready',
+      'roll_dice',
     ]);
     expect([...EVENT_TYPES]).toContain('game_started');
+    expect([...EVENT_TYPES]).toContain('dice_rolled');
+    expect([...EVENT_TYPES]).toContain('turn_advanced');
     expect(ERROR_CODES).toContain('malformed_message');
   });
 });
@@ -91,12 +100,15 @@ describe('event fixtures', () => {
 describe('message fixtures', () => {
   it.each([
     ['messages/client_hello.json', isHelloMessage],
+    ['messages/client_hello_match.json', isHelloMessage],
     ['messages/client_ping.json', isPing],
     ['messages/client_action_join.json', isActionMsg],
     ['messages/server_welcome.json', isWelcomeMessage],
     ['messages/server_pong.json', isPongMessage],
     ['messages/server_event_player_joined.json', isEventMessage],
     ['messages/server_error.json', isErrorMessage],
+    ['messages/server_snapshot.json', isSnapshotMessage],
+    ['messages/server_catchup.json', isCatchupMessage],
   ])('$1 satisfies its guard', (file, guard) => {
     const raw = load(file);
     expect(guard(raw)).toBe(true);
@@ -114,6 +126,15 @@ describe('message fixtures', () => {
     const raw = load('messages/client_action_join.json') as GameAction;
     const encoded = JSON.parse(JSON.stringify(raw));
     expect(encoded).toEqual(raw);
+  });
+
+  it('validates the snapshot and catchup fixtures structurally', () => {
+    const snapshot = load('messages/server_snapshot.json') as {
+      snapshot: unknown;
+      config: unknown;
+    };
+    expect(isGameSnapshot(snapshot.snapshot)).toBe(true);
+    expect(validateConfig(snapshot.config)).toEqual({ ok: true });
   });
 });
 

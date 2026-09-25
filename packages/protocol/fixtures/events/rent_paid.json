@@ -1,0 +1,7 @@
+{
+  "type": "rent_paid",
+  "fromPlayerId": "pl_78FB853327D328A5343B",
+  "toPlayerId": "pl_9C04D2A1B6E5F7081923",
+  "spaceId": "a1",
+  "amount": 10
+}
