@@ -1,6 +1,9 @@
 package game
 
-import "sort"
+import (
+	"cmp"
+	"slices"
+)
 
 // Player is a participant in a match.
 type Player struct {
@@ -81,7 +84,7 @@ func (s *GameState) ActivePlayers() []Player {
 			out = append(out, p)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Seat < out[j].Seat })
+	slices.SortFunc(out, func(a, b Player) int { return cmp.Compare(a.Seat, b.Seat) })
 	return out
 }
 

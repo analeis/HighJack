@@ -1,8 +1,9 @@
 package game
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -93,7 +94,7 @@ func (r LifecycleRuleset) leave(state *GameState, actor PlayerID) (*GameState, [
 		}
 		next.Players = remaining
 		if hostLeft && len(remaining) > 0 {
-			sort.Slice(remaining, func(i, j int) bool { return remaining[i].Seat < remaining[j].Seat })
+			slices.SortFunc(remaining, func(a, b Player) int { return cmp.Compare(a.Seat, b.Seat) })
 			successor := remaining[0].ID
 			for i := range next.Players {
 				if next.Players[i].ID == successor {

@@ -29,11 +29,15 @@
     "certify": "bun scripts/certify.ts"
   },
   "devDependencies": {
-    "@types/bun": "1.4.0",
-    "eslint": "^10.9.1",
+    "bun-types": "1.4.2",
+    "eslint": "^10.10.0",
     "prettier": "^3.9.6",
-    "prettier-plugin-astro": "^0.14.1",
-    "typescript": "^7.0.2",
-    "typescript-eslint": "^8.68.0"
+    "prettier-plugin-astro": "^1.0.0",
+    "typescript": "^6",
+    "typescript-eslint": "^8.70.0"
+  },
+  "overrides": {
+    "playwright-core": "1.63.0",
+    "js-yaml": "^4.3.2"
   }
 }

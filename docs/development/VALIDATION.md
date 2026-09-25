@@ -15,7 +15,7 @@ Single entry point; exits non-zero on the first failed gate.
 
 ```
 validate
-├── format        prettier --check (all TS/CSS/MD/JSON)
+├── format        prettier --check (TS/TSX/CSS/MD/JSON + .astro via prettier-plugin-astro)
 ├── lint          eslint (packages+apps) · go vet ./...
 ├── gofmt         gofmt -l on server/ reports nothing
 ├── typecheck     tsc --noEmit (root project) · astro check
@@ -64,7 +64,31 @@ gofmt -l ./server && go vet ./... && go test ./...
 
 ## Adding a new gate
 
-Gates live in `scripts/validate.ts` as ordered entries with a name and a
-shell command (or script). A gate that cannot run on CI must be marked
+Gates live in `scripts/lib/validation-gates.ts` as ordered entries with a
+name and a shell command (or script). Both `scripts/validate.ts` and
+`scripts/certify.ts` import that single list, so the two pipelines can
+never drift apart. A gate that cannot run on CI must be marked
 `optional` so it never silently fails a machine it cannot execute on —
 but anything release-mandatory stays required.
+
+## Toolchain pins & overrides
+
+Decisions recorded here so they are not re-litigated by accident:
+
+- **TypeScript stays on the 6.x line.** typescript-eslint does not support
+  the TS 7 native port (it refuses to load); our lint config needs it, and
+  nothing in the codebase needs TS 7 features. Revisit when
+  typescript-eslint supports a stable TS ≥ 7.1.
+- **`bun-types` (oven-sh), not `@types/bun`.** The `@types/bun` name on npm
+  resolves to a DefinitelyTyped stub whose `/// <reference types="bun-types" />`
+  does not resolve, silently dropping `import.meta.dir` and friends (masked
+  further by `skipLibCheck`). The root tsconfig pins `"types": ["bun-types"]`.
+- **`playwright-core` is overridden to a single version** in the root
+  `package.json`. `@axe-core/playwright` and `@playwright/test` otherwise
+  resolve two nominally incompatible `Page` types and root `tsc` rejects the
+  e2e suite.
+- **One major per tool across the workspace.** `vitest`, `jest-dom`, and
+  `tailwindcss` ranges are kept identical in every workspace package; mixed
+  majors previously produced duplicate `vite` (rollup vs rolldown plugin
+  types) and duplicate `vitest` (`Assertion` augmentation hitting only one
+  copy) failures in the root typecheck.

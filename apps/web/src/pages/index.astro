@@ -18,8 +18,7 @@ import { SYSTEMS } from '../data/systems';
     <div
       class="pointer-events-none absolute -top-24 left-1/2 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-gold-500/10 blur-3xl"
       aria-hidden="true"
-    >
-    </div>
+    ></div>
     <div class="relative mx-auto flex max-w-2xl flex-col items-center gap-6">
       <Logo class="h-20 w-20 drop-shadow-[0_8px_24px_rgba(230,182,78,0.25)] md:h-24 md:w-24" />
       <h1
@@ -30,20 +29,22 @@ import { SYSTEMS } from '../data/systems';
       </h1>
       <p class="m-0 text-lg leading-relaxed text-muted-400">
         HighJack is a browser-first multiplayer board/economy game where every match runs on
-        <strong class="text-cream-100">your</strong> ruleset — property empires, side wagers, auction
-        wars, treasure cards, and events that flip the whole table at once.
+        <strong class="text-cream-100">your</strong> ruleset — property empires, side wagers,
+        auction wars, treasure cards, and events that flip the whole table at once.
       </p>
       <div class="flex flex-wrap items-center justify-center gap-3">
         <a
           href="/game"
           class="rounded-md bg-gold-500 px-6 py-3 font-bold text-felt-950 no-underline shadow-card transition-colors duration-fast hover:bg-gold-400"
-          >Peek at the game</a
         >
+          Peek at the game
+        </a>
         <a
           href="/features"
           class="rounded-md border border-line-strong bg-surface-raised px-6 py-3 font-bold text-cream-100 no-underline transition-colors duration-fast hover:border-gold-700 hover:text-gold-400"
-          >Explore systems</a
         >
+          Explore systems
+        </a>
       </div>
       <p class="m-0 mt-2 inline-flex items-center gap-2 text-sm text-muted-500">
         <Badge tone="gold">v0.1 Foundation</Badge>
@@ -96,11 +97,14 @@ import { SYSTEMS } from '../data/systems';
       <a
         href="/features"
         class="shrink-0 text-sm font-bold text-gold-400 no-underline hover:text-gold-500"
-        >All systems →</a
       >
+        All systems →
+      </a>
     </div>
     <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {SYSTEMS.slice(0, 6).map((system) => <SystemCard system={system} />)}
+      {SYSTEMS.slice(0, 6).map((system) => (
+        <SystemCard system={system} />
+      ))}
     </div>
   </section>
 

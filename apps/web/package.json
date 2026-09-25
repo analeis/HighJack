@@ -13,21 +13,21 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@astrojs/solid-js": "^5.0.0",
-    "@fontsource-variable/bricolage-grotesque": "^5.2.5",
-    "@fontsource-variable/space-grotesk": "^5.2.5",
-    "@fontsource/space-mono": "^5.2.5",
+    "@astrojs/solid-js": "^7.0.2",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@fontsource/space-mono": "^5.3.0",
     "@highjack/protocol": "workspace:*",
     "@highjack/ui": "workspace:*",
-    "solid-js": "^1.9.5"
+    "solid-js": "^1.9.15"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
-    "@axe-core/playwright": "^4.10.1",
-    "@playwright/test": "^1.54.0",
-    "@tailwindcss/vite": "^4.1.0",
-    "astro": "^5.12.0",
-    "tailwindcss": "^4.1.0",
-    "vitest": "^3.2.0"
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.2",
+    "tailwindcss": "^4.3.3",
+    "vitest": "^5.0.0"
   }
 }

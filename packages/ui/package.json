@@ -9,6 +9,9 @@
     "./styles/index.css": "./src/styles/index.css",
     "./styles/tokens.css": "./src/styles/tokens.css"
   },
+  "dependencies": {
+    "tailwindcss": "^4.3.3"
+  },
   "peerDependencies": {
     "solid-js": "^1.9.0"
   },
@@ -17,10 +20,10 @@
   },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",
-    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/user-event": "^14.5.0",
     "jsdom": "^26.0.0",
     "vite-plugin-solid": "^2.11.0",
-    "vitest": "^3.2.0"
+    "vitest": "^5.0.0"
   }
 }

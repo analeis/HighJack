@@ -18,7 +18,8 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "jsx": "preserve",
-    "jsxImportSource": "solid-js"
+    "jsxImportSource": "solid-js",
+    "types": ["bun-types"]
   },
   "exclude": ["node_modules", "dist", ".output", ".astro"]
 }
