@@ -112,7 +112,7 @@ func TestServerFramesMatchSharedFixtures(t *testing.T) {
 	// so this still exercises production encoding.
 	log := slog.New(slog.DiscardHandler)
 	registry := match.NewRegistry(log, nil)
-	h := NewHandler(log, 30000, registry, nil)
+	h := NewHandler(log, 30000, registry, nil, true)
 	mux := http.NewServeMux()
 	h.Register(mux)
 	ts := httptest.NewServer(mux)

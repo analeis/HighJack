@@ -45,7 +45,7 @@ func newTestServer(t *testing.T) *testServer {
 	cfg := &config.Config{Addr: ":0", HeartbeatMs: 30000, LogLevel: "error"}
 	srv := api.New(cfg, log, nil)
 	srv.MountMatches(registry)
-	srv.MountRealtime(realtime.NewHandler(log, 30000, registry, nil))
+	srv.MountRealtime(realtime.NewHandler(log, 30000, registry, nil, true))
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return &testServer{Server: ts, registry: registry}
@@ -226,11 +226,22 @@ func (c *client) hasEventAt(prefix string) bool {
 }
 
 func frameLabel(msg map[string]any) string {
-	if msg["type"] != "event" {
+	switch msg["type"] {
+	case "transition":
+		batch, _ := msg["events"].([]any)
+		names := make([]string, 0, len(batch))
+		for _, entry := range batch {
+			em, _ := entry.(map[string]any)
+			ev, _ := em["event"].(map[string]any)
+			names = append(names, fmt.Sprint(ev["type"]))
+		}
+		return fmt.Sprintf("transition(%v:%v)", msg["tick"], strings.Join(names, "+"))
+	case "event":
+		ev, _ := msg["event"].(map[string]any)
+		return fmt.Sprintf("event(%v:%v)", msg["tick"], ev["type"])
+	default:
 		return fmt.Sprint(msg["type"])
 	}
-	ev, _ := msg["event"].(map[string]any)
-	return fmt.Sprintf("event(%v:%v)", msg["tick"], ev["type"])
 }
 
 func dialClient(t *testing.T, ts *testServer, matchID, token string, resume *int64) *client {
@@ -308,7 +319,20 @@ func (c *client) observe(msg map[string]any) {
 		if s, ok := msg["snapshot"].(map[string]any); ok {
 			c.lastView = s
 		}
+	case "transition":
+		// One frame per transition, carrying the whole batch. observe already
+		// holds the lock for the whole switch.
+		if c.delivered == nil {
+			c.delivered = map[string]int{}
+		}
+		batch, _ := msg["events"].([]any)
+		for _, entry := range batch {
+			em, _ := entry.(map[string]any)
+			ev, _ := em["event"].(map[string]any)
+			c.delivered[frameKey(em["tick"], ev["type"])]++
+		}
 	case "event":
+		// Compatibility with a single-event frame.
 		if c.delivered == nil {
 			c.delivered = map[string]int{}
 		}

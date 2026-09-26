@@ -3,6 +3,7 @@ package match
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/analeis/highjack/server/internal/game"
+	"github.com/analeis/highjack/server/internal/persistence"
 	"github.com/analeis/highjack/server/internal/protocol"
 )
 
@@ -45,49 +47,86 @@ func (s *recordingSink) Send(msg any) bool {
 	return true
 }
 
+// settleFrames drains anything the sink has recorded so far. Broadcast is
+// synchronous, so a short wait is only insurance against scheduling.
+func (s *recordingSink) settleFrames() {
+	time.Sleep(20 * time.Millisecond)
+}
+
 func (s *recordingSink) count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.frames)
 }
 
-// eventTypes returns the type of every `event` frame received, in arrival
-// order: the wire-level view of what a peer was told and in what sequence.
+// eventTypes returns the type of every event delivered, in arrival order: the
+// wire-level view of what a peer was told and in what sequence. A transition
+// arrives as one `transition` frame carrying a batch, so each entry in the batch
+// counts.
 func (s *recordingSink) eventTypes() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var types []string
 	for _, f := range s.frames {
 		m, ok := f.(map[string]any)
-		if !ok || m["type"] != "event" {
-			continue
-		}
-		ev, ok := m["event"].(map[string]any)
 		if !ok {
 			continue
 		}
-		if t, ok := ev["type"].(string); ok {
-			types = append(types, t)
+		switch m["type"] {
+		case "transition":
+			for _, entry := range batchOf(m) {
+				types = append(types, eventTypeOf(entry))
+			}
+		case "event": // tolerated for compatibility with older frames
+			types = append(types, eventTypeOf(m["event"]))
 		}
 	}
 	return types
 }
 
-// eventTicks returns the tick of every `event` frame received, in arrival order.
-func (s *recordingSink) eventTicks() []uint64 {
+// transitionTicks returns one entry per delivered transition frame, holding the
+// tick that transition belongs to.
+func (s *recordingSink) transitionTicks() []uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var ticks []uint64
 	for _, f := range s.frames {
 		m, ok := f.(map[string]any)
-		if !ok || m["type"] != "event" {
+		if !ok {
 			continue
 		}
-		if tick, ok := m["tick"].(uint64); ok {
-			ticks = append(ticks, tick)
+		switch m["type"] {
+		case "transition":
+			if tick, ok := m["tick"].(uint64); ok {
+				ticks = append(ticks, tick)
+			}
+		case "event":
+			if tick, ok := m["tick"].(uint64); ok {
+				ticks = append(ticks, tick)
+			}
 		}
 	}
 	return ticks
+}
+
+func batchOf(frame map[string]any) []any {
+	raw, _ := frame["events"].([]any)
+	return raw
+}
+
+// eventTypeOf reads the discriminator from either a bare event object or a
+// {tick, event} batch entry.
+func eventTypeOf(v any) string {
+	m, _ := v.(map[string]any)
+	if t, ok := m["type"].(string); ok {
+		return t
+	}
+	if inner, ok := m["event"].(map[string]any); ok {
+		if t, ok := inner["type"].(string); ok {
+			return t
+		}
+	}
+	return ""
 }
 
 // fakeStore can be made to fail on demand. A fake cannot prove SQL,
@@ -99,8 +138,16 @@ type fakeStore struct {
 	mu sync.Mutex
 
 	commits   int
+	joins     int
+	players   []game.Player
 	commitErr error
 	saveErr   error
+	// durable is what LoadMatch reports, i.e. what a real database would hold.
+	// nil means "no such match".
+	durable *persistence.MatchRow
+	// loadErr makes the read-back fail, modelling a database that cannot be
+	// consulted at all.
+	loadErr error
 }
 
 func (f *fakeStore) CreateMatch(context.Context, game.GameID, *game.GameConfig, *game.GameState, string) error {
@@ -113,14 +160,65 @@ func (f *fakeStore) SavePlayer(_ context.Context, _ game.GameID, _ game.Player, 
 	return f.saveErr
 }
 
-func (f *fakeStore) CommitTransition(_ context.Context, _ game.GameID, _ *game.GameState, _ []game.Event) error {
+func (f *fakeStore) joinCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.joins
+}
+
+func (f *fakeStore) playerCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.players)
+}
+
+func (f *fakeStore) CommitTransition(_ context.Context, _ game.GameID, state *game.GameState, _ []game.Event) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.commits++
-	return f.commitErr
+	if f.commitErr != nil {
+		return f.commitErr
+	}
+	f.durable = &persistence.MatchRow{State: *state.Clone(), Cursor: state.Tick}
+	return nil
+}
+
+// CommitJoin is the transactional path a seat claim now takes: the transition and
+// the player row commit together, so a failure must leave nothing behind.
+func (f *fakeStore) CommitJoin(
+	_ context.Context,
+	_ game.GameID,
+	_ *game.GameState,
+	_ []game.Event,
+	p game.Player,
+	_ string,
+) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	f.joins++
+	f.players = append(f.players, p)
+	return nil
 }
 
 func (f *fakeStore) MarkInterrupted(context.Context) (int64, error) { return 0, nil }
+
+// LoadMatch reports what the "database" holds. A fake cannot prove SQL, but it
+// can model the case that actually breaks the system: a transaction that
+// committed durably while the client never learned the result.
+func (f *fakeStore) LoadMatch(_ context.Context, _ game.GameID) (*persistence.MatchRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.loadErr != nil {
+		return nil, f.loadErr
+	}
+	if f.durable == nil {
+		return nil, persistence.ErrNoMatch
+	}
+	return f.durable, nil
+}
 
 func (f *fakeStore) commitCount() int {
 	f.mu.Lock()
@@ -175,12 +273,8 @@ func newFixture(t *testing.T) *fixture {
 func (f *fixture) playing(t *testing.T) (*recordingSink, *recordingSink) {
 	t.Helper()
 	sink1, sink2 := &recordingSink{}, &recordingSink{}
-	if _, err := f.m.Bind("s1", f.tok1, "c1", sink1); err != nil {
-		t.Fatalf("bind p1: %v", err)
-	}
-	if _, err := f.m.Bind("s2", f.tok2, "c2", sink2); err != nil {
-		t.Fatalf("bind p2: %v", err)
-	}
+	bindReady(t, f, "s1", f.tok1, sink1)
+	bindReady(t, f, "s2", f.tok2, sink2)
 	ctx := context.Background()
 	if _, err := f.m.ApplyAction(ctx, "s1", 1, game.PlayerReadyAction{Ready: true}); err != nil {
 		t.Fatalf("ready p1: %v", err)
@@ -220,9 +314,7 @@ func TestApplyActionRejectsUnboundSessions(t *testing.T) {
 // a dropped connection would remain an impersonation path.
 func TestDisconnectedSessionCannotAct(t *testing.T) {
 	f := newFixture(t)
-	if _, err := f.m.Bind("s1", f.tok1, "c1", &recordingSink{}); err != nil {
-		t.Fatalf("bind: %v", err)
-	}
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
 	f.m.Disconnect("s1")
 	if _, err := f.m.ApplyAction(context.Background(), "s1", 1, game.PlayerReadyAction{Ready: true}); !errors.Is(err, ErrUnboundSession) {
 		t.Fatalf("err = %v, want ErrUnboundSession after disconnect", err)
@@ -334,9 +426,7 @@ func TestApplyActionRejectsSeqBelowOne(t *testing.T) {
 // NextSeq and permanently wedge the session.
 func TestApplyActionRejectsOverflowingSeq(t *testing.T) {
 	f := newFixture(t)
-	if _, err := f.m.Bind("s1", f.tok1, "c1", &recordingSink{}); err != nil {
-		t.Fatalf("bind: %v", err)
-	}
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
 	res, err := f.m.ApplyAction(context.Background(), "s1", math.MaxInt64, game.PlayerReadyAction{Ready: true})
 	if err == nil {
 		t.Fatalf("MaxInt64 seq was accepted with nextSeq=%d", res.NextSeq)
@@ -403,9 +493,7 @@ func TestDuplicateSeqReplaysIdenticalSnapshot(t *testing.T) {
 
 func TestOlderSeqIsRejectedAsStale(t *testing.T) {
 	f := newFixture(t)
-	if _, err := f.m.Bind("s1", f.tok1, "c1", &recordingSink{}); err != nil {
-		t.Fatalf("bind: %v", err)
-	}
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
 	ctx := context.Background()
 	if _, err := f.m.ApplyAction(ctx, "s1", 5, game.PlayerReadyAction{Ready: true}); err != nil {
 		t.Fatalf("seq 5: %v", err)
@@ -551,10 +639,9 @@ func TestBroadcastReachesEveryPeerExactlyOnce(t *testing.T) {
 				t.Fatalf("peer %d received an event with no type", i)
 			}
 		}
-		// Every event in one transition shares one tick, so a peer must see a
-		// single contiguous tick group.
-		if !allSameTick(sink) {
-			t.Fatalf("peer %d saw interleaved ticks in a single transition: %v", i, sink.eventTicks())
+		// Delivered transitions must arrive in tick order.
+		if !ticksAreNonDecreasing(sink) {
+			t.Fatalf("peer %d saw out-of-order transitions: %v", i, sink.transitionTicks())
 		}
 	}
 }
@@ -563,12 +650,8 @@ func TestBroadcastIsolatesFailingSinks(t *testing.T) {
 	f := newFixture(t)
 	bad := &recordingSink{fail: true}
 	good := &recordingSink{}
-	if _, err := f.m.Bind("s1", f.tok1, "c1", bad); err != nil {
-		t.Fatalf("bind p1: %v", err)
-	}
-	if _, err := f.m.Bind("s2", f.tok2, "c2", good); err != nil {
-		t.Fatalf("bind p2: %v", err)
-	}
+	bindReady(t, f, "s1", f.tok1, bad)
+	bindReady(t, f, "s2", f.tok2, good)
 
 	res, err := f.m.ApplyAction(context.Background(), "s1", 1, game.PlayerReadyAction{Ready: true})
 	if err != nil {
@@ -588,12 +671,8 @@ func TestBroadcastSkipsDisconnectedSessions(t *testing.T) {
 	f := newFixture(t)
 	gone := &recordingSink{}
 	staying := &recordingSink{}
-	if _, err := f.m.Bind("s1", f.tok1, "c1", gone); err != nil {
-		t.Fatalf("bind p1: %v", err)
-	}
-	if _, err := f.m.Bind("s2", f.tok2, "c2", staying); err != nil {
-		t.Fatalf("bind p2: %v", err)
-	}
+	bindReady(t, f, "s1", f.tok1, gone)
+	bindReady(t, f, "s2", f.tok2, staying)
 	f.m.Disconnect("s1")
 
 	res, err := f.m.ApplyAction(context.Background(), "s2", 1, game.PlayerReadyAction{Ready: true})
@@ -722,14 +801,30 @@ func TestRateLimiterIsolatesKeys(t *testing.T) {
 
 // --- helpers ---------------------------------------------------------------
 
-// allSameTick reports whether every event frame the sink received belongs to a
-// single tick, i.e. the transition arrived contiguously.
-func allSameTick(s *recordingSink) bool {
-	ticks := s.eventTicks()
-	if len(ticks) < 2 {
-		return true
+// ticksAreNonDecreasing reports whether delivered transitions arrived in order.
+// A transition is one frame, so its own events cannot be split by another
+// transition; this checks the ordering of the transitions themselves.
+func ticksAreNonDecreasing(s *recordingSink) bool {
+	ticks := s.transitionTicks()
+	for i := 1; i < len(ticks); i++ {
+		if ticks[i] < ticks[i-1] {
+			return false
+		}
 	}
-	return ticks[0] == ticks[len(ticks)-1]
+	return true
+}
+
+// bindReady binds a session and completes its handshake, which is what makes it
+// eligible for publications. A bound-but-not-ready session is exactly the state a
+// client is in between its token being accepted and its snapshot being written.
+func bindReady(t *testing.T, f *fixture, session, token string, sink Sink) game.PlayerID {
+	t.Helper()
+	id, err := f.m.Bind(session, token, "test-client", sink)
+	if err != nil {
+		t.Fatalf("bind %s: %v", session, err)
+	}
+	f.m.MarkReady(session)
+	return id
 }
 
 // readyAndStartActionless binds both players and starts the match without
@@ -752,5 +847,381 @@ func readyAndStartActionless(t *testing.T, f *fixture) {
 	}
 	if _, err := f.m.ApplyAction(ctx, "s1", 2, game.GameStartAction{}); err != nil {
 		t.Fatalf("start: %v", err)
+	}
+}
+
+// --- the join path ---------------------------------------------------------
+
+// A seat claim is a transition: it must be committed through the same durable
+// path as a roll, and published, so a restarted process can load a match whose
+// state its event log explains. It previously wrote only a `game_players` row.
+func TestJoinCommitsAsATransition(t *testing.T) {
+	store := &fakeStore{}
+	reg := NewRegistry(testLogger(), store)
+	m, err := reg.Create(context.Background(), game.DefaultConfig())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := m.Join(context.Background(), "Ace"); err != nil {
+		t.Fatalf("join: %v", err)
+	}
+	if got := store.joinCount(); got != 1 {
+		t.Fatalf("join made %d durable commits, want 1", got)
+	}
+	// And the join must be in the retained history, so a reconnecting client can
+	// be told about it.
+	events, ok := m.Since(0)
+	if !ok {
+		t.Fatal("Since(0) should be inside the retained window")
+	}
+	found := false
+	for _, e := range events {
+		if e.Event.Type() == game.EventPlayerJoined {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("the join was not recorded in the transition history")
+	}
+}
+
+// A new seat must reach the clients already at the table. Previously a join was
+// never broadcast, so the lobby could show a stale roster with an empty-looking
+// table while players waited for someone who had already joined.
+func TestJoinIsPublishedToConnectedClients(t *testing.T) {
+	store := &fakeStore{}
+	reg := NewRegistry(testLogger(), store)
+	m, err := reg.Create(context.Background(), game.DefaultConfig())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	first, tok1, err := m.Join(context.Background(), "Ace")
+	if err != nil {
+		t.Fatalf("join ace: %v", err)
+	}
+	watcher := &recordingSink{}
+	if _, err := m.Bind("s1", tok1, "c1", watcher); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	m.MarkReady("s1")
+
+	if _, _, err := m.Join(context.Background(), "Bit"); err != nil {
+		t.Fatalf("join bit: %v", err)
+	}
+	_ = first
+
+	// Give the (synchronous) broadcast a chance to be observed.
+	watcher.settleFrames()
+	types := watcher.eventTypes()
+	if len(types) == 0 {
+		t.Fatal("a connected client was not told about a new seat")
+	}
+	if types[0] != string(game.EventPlayerJoined) {
+		t.Fatalf("published %v, want player_joined first", types)
+	}
+}
+
+// A join that cannot be committed must consume no seat at all. The caller is an
+// unauthenticated HTTP endpoint whose context dies when the client hangs up, so
+// this is reachable without any credentials.
+func TestJoinCommitFailureConsumesNoSeat(t *testing.T) {
+	store := &fakeStore{saveErr: errors.New("connection reset by peer")}
+	reg := NewRegistry(testLogger(), store)
+	m, err := reg.Create(context.Background(), game.DefaultConfig())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	for i := 0; i < 5; i++ {
+		if _, _, err := m.Join(context.Background(), "Ghost"); err == nil {
+			t.Fatalf("attempt %d: expected the failed join to surface", i)
+		}
+		if got := len(m.Snapshot().Players); got != 0 {
+			t.Fatalf("attempt %d consumed a seat: %d players", i, got)
+		}
+	}
+	if got := store.playerCount(); got != 0 {
+		t.Fatalf("a failed join persisted %d player row(s)", got)
+	}
+}
+
+// The store interface gained CommitJoin; the fake must implement it, and the
+// runtime must go through it rather than the legacy player-only write.
+func TestJoinUsesTheTransactionalPath(t *testing.T) {
+	store := &fakeStore{}
+	reg := NewRegistry(testLogger(), store)
+	m, err := reg.Create(context.Background(), game.DefaultConfig())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, _, err := m.Join(context.Background(), "Ace"); err != nil {
+		t.Fatalf("join: %v", err)
+	}
+	if store.joinCount() != 1 {
+		t.Fatalf("join did not use the transactional commit")
+	}
+	if len(m.Snapshot().Players) != 1 {
+		t.Fatalf("expected one player, got %d", len(m.Snapshot().Players))
+	}
+}
+
+// --- handshake ordering ----------------------------------------------------
+
+// A session must not receive any transition before its snapshot has been written.
+// Otherwise a client can receive event(11) and then snapshot(10): the snapshot
+// overwrites the newer transition, which is then lost with no signal, because the
+// client has no resync to react to.
+func TestBoundSessionReceivesNothingUntilItsSnapshotIsWritten(t *testing.T) {
+	f := newFixture(t)
+	m := f.m
+
+	// Player one is fully handshaken, so its publications do reach the fan-out.
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
+	// Player two has only had its token accepted: the handshake has not written
+	// its snapshot yet.
+	sink := &recordingSink{}
+	if _, err := m.Bind("s2", f.tok2, "c2", sink); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+
+	if _, err := m.ApplyAction(context.Background(), "s1", 1, game.PlayerReadyAction{Ready: true}); err != nil {
+		t.Fatalf("ready: %v", err)
+	}
+	m.Broadcast(m.envelopesForTest(), 1)
+	if sink.count() != 0 {
+		t.Fatalf("a session that has not received its snapshot was published to (%d frames)", sink.count())
+	}
+
+	// Once the handshake completes, publications resume.
+	m.MarkReady("s2")
+	m.Broadcast(m.envelopesForTest(), 1)
+	if sink.count() == 0 {
+		t.Fatal("a ready session received no publications")
+	}
+}
+
+// The handshake must be handed one consistent view of the match.
+func TestResumeReturnsAConsistentSnapshotAndCatchup(t *testing.T) {
+	f := newFixture(t)
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
+	bindReady(t, f, "s2", f.tok2, &recordingSink{})
+
+	cursor := int64(0)
+	snap, catchup, resync := f.m.Resume(&cursor)
+	if snap.Tick != f.m.Snapshot().Tick {
+		t.Fatalf("Resume returned tick %d but the match is at %d", snap.Tick, f.m.Snapshot().Tick)
+	}
+	if resync {
+		t.Fatal("a client at the origin must not be told to resync")
+	}
+	// Every catch-up event must be strictly after the cursor and no later than the
+	// snapshot it accompanies.
+	for _, e := range catchup {
+		if e.Tick <= uint64(cursor) {
+			t.Fatalf("catch-up included tick %d at or before the cursor %d", e.Tick, cursor)
+		}
+		if e.Tick > snap.Tick {
+			t.Fatalf("catch-up included tick %d, ahead of the snapshot tick %d", e.Tick, snap.Tick)
+		}
+	}
+	// A nil cursor means "give me everything": the snapshot alone, no catch-up.
+	snap2, catchup2, resync2 := f.m.Resume(nil)
+	if snap2.Tick != snap.Tick || len(catchup2) != 0 || resync2 {
+		t.Fatalf("nil cursor = %v/%d/%v, want the snapshot alone", snap2.Tick, len(catchup2), resync2)
+	}
+}
+
+// A client whose cursor is ahead of the server must be resynced, not served.
+func TestResumeResyncsACursorAheadOfTheServer(t *testing.T) {
+	f := newFixture(t)
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
+
+	ahead := int64(f.m.Snapshot().Tick) + 500
+	snap, catchup, resync := f.m.Resume(&ahead)
+	if !resync {
+		t.Fatal("a cursor ahead of the server must trigger a resync")
+	}
+	if len(catchup) != 0 {
+		t.Fatalf("a resyncing client must not also receive catch-up (%d events)", len(catchup))
+	}
+	if snap.Tick == 0 {
+		t.Fatal("a resync must still carry the authoritative snapshot")
+	}
+}
+
+// --- indeterminate commits -------------------------------------------------
+
+// A commit that reports an error may nonetheless have committed: the deadline can
+// expire while COMMIT is in flight, or the connection can drop after the database
+// made the transaction durable. Treating that as "did not happen" left memory one
+// tick behind the database, and the next transition's INSERT then collided on the
+// (match_id, tick, seq) primary key — so every later action failed the same way
+// and the match was bricked for good.
+func TestIndeterminateCommitIsReconciledNotReverted(t *testing.T) {
+	f := newFixture(t)
+	store := f.store
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
+	bindReady(t, f, "s2", f.tok2, &recordingSink{})
+	ctx := context.Background()
+
+	first, err := f.m.ApplyAction(ctx, "s1", 1, game.PlayerReadyAction{Ready: true})
+	if err != nil {
+		t.Fatalf("ready: %v", err)
+	}
+	durableTick := uint64(first.Snapshot.Tick)
+
+	// Now model a commit that durably succeeded but reported a failure: the
+	// database holds the post-transition state, while the caller never learned
+	// the result.
+	ahead := f.m.snapshotStateForTest()
+	ahead.Tick = durableTick + 1
+	store.mu.Lock()
+	store.commitErr = errors.New("connection reset after the server committed")
+	store.durable = &persistence.MatchRow{State: *ahead, Cursor: ahead.Tick}
+	store.mu.Unlock()
+
+	// The action is refused — the client is told the truth — but memory must end up
+	// agreeing with the database rather than behind it.
+	if _, err := f.m.ApplyAction(ctx, "s1", 2, game.PlayerReadyAction{Ready: false}); err == nil {
+		t.Fatal("expected the ambiguous commit to be reported as a failure")
+	}
+	if got := f.m.Snapshot().Tick; uint64(got) != durableTick+1 {
+		t.Fatalf("memory is at tick %d but the database committed tick %d; the match would "+
+			"collide on the next insert", got, durableTick+1)
+	}
+
+	// And crucially, the next action must succeed rather than collide.
+	store.mu.Lock()
+	store.commitErr = nil
+	store.mu.Unlock()
+	if _, err := f.m.ApplyAction(ctx, "s1", 3, game.PlayerReadyAction{Ready: true}); err != nil {
+		t.Fatalf("the action after a reconciled commit must succeed: %v", err)
+	}
+}
+
+// When the database cannot be consulted at all, memory must hold the last durable
+// state rather than guess: nothing uncommitted may ever be published.
+func TestUnreconcilableCommitHoldsTheLastDurableState(t *testing.T) {
+	f := newFixture(t)
+	store := f.store
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
+	bindReady(t, f, "s2", f.tok2, &recordingSink{})
+	ctx := context.Background()
+
+	first, err := f.m.ApplyAction(ctx, "s1", 1, game.PlayerReadyAction{Ready: true})
+	if err != nil {
+		t.Fatalf("ready: %v", err)
+	}
+	tickBefore := first.Snapshot.Tick
+
+	store.mu.Lock()
+	store.commitErr = errors.New("commit failed")
+	store.loadErr = errors.New("database unreachable")
+	store.mu.Unlock()
+
+	if _, err := f.m.ApplyAction(ctx, "s1", 2, game.PlayerReadyAction{Ready: false}); err == nil {
+		t.Fatal("expected the failure to be reported")
+	}
+	if got := f.m.Snapshot().Tick; got != tickBefore {
+		t.Fatalf("memory advanced to tick %d without durability (was %d)", got, tickBefore)
+	}
+}
+
+// --- resource bounds -------------------------------------------------------
+
+// The limiter is process-global and keyed by session ids that are never reused, so
+// without an eviction sweep every connection ever opened leaked a key for the life
+// of the process — unreachable by any code path, including eviction of a match
+// that has already ended.
+func TestRateLimiterSweepsIdleKeys(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	rl := NewRateLimiter(5, 10*time.Second)
+	rl.now = func() time.Time { return now }
+
+	// Far more distinct keys than the sweep interval, all inside the window.
+	for i := 0; i < 1000; i++ {
+		if !rl.Allow(keyN(i)) {
+			t.Fatalf("first use of key %d should be allowed", i)
+		}
+	}
+	if rl.tracked() == 0 {
+		t.Fatal("expected tracked keys while the window is open")
+	}
+
+	// Move past the window. Sweeping is amortised, so drive enough calls for one
+	// to happen; all of them are the same live key, which must survive.
+	now = now.Add(2 * time.Minute)
+	rl.Allow("live")
+	for i := 0; i < sweepEvery; i++ {
+		rl.Allow("live")
+	}
+	if got := rl.tracked(); got > 2 {
+		t.Fatalf("idle keys were not swept: %d still tracked", got)
+	}
+	if rl.tracked() == 0 {
+		t.Fatal("the sweep dropped the live key too")
+	}
+}
+
+func TestRateLimiterStillEnforcesWithinTheWindow(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	rl := NewRateLimiter(2, 10*time.Second)
+	rl.now = func() time.Time { return now }
+	// Sweeping must not weaken the limit for a live key.
+	for i := 0; i < 200; i++ {
+		rl.Allow("live")
+	}
+	if rl.Allow("live") {
+		t.Fatal("a live key's limit was lost to sweeping")
+	}
+}
+
+// POST /matches is unauthenticated and unrated, so the registry needs a bound.
+func TestRegistryRefusesToGrowWithoutLimit(t *testing.T) {
+	reg := NewRegistry(testLogger(), &fakeStore{})
+	ctx := context.Background()
+	for i := 0; i < maxLiveMatches; i++ {
+		if _, err := reg.Create(ctx, game.DefaultConfig()); err != nil {
+			t.Fatalf("create %d: %v", i, err)
+		}
+	}
+	if _, err := reg.Create(ctx, game.DefaultConfig()); !errors.Is(err, ErrRegistryFull) {
+		t.Fatalf("err = %v, want ErrRegistryFull", err)
+	}
+	// The bound is a refusal, not a panic or a silent overwrite.
+	if got := len(reg.matches); got != maxLiveMatches {
+		t.Fatalf("registry holds %d matches, want %d", got, maxLiveMatches)
+	}
+}
+
+func keyN(i int) string { return fmt.Sprintf("sess_%08d", i) }
+
+// --- credential comparison -------------------------------------------------
+
+// A token must not be matched by a byte-wise comparison: that short-circuits on
+// the first differing byte, and Go visits map entries in a randomized order, so
+// the work per attempt is not even stable.
+func TestTokenLookupIsExactAndRejectsMutations(t *testing.T) {
+	f := newFixture(t)
+	hash := hashToken(f.tok1)
+	if hash == "" || hash == f.tok1 {
+		t.Fatalf("token must be stored hashed, got %q", hash)
+	}
+
+	if _, ok := (&Match{players: map[game.PlayerID]string{"pl_a": hash}}).
+		playersByTokenLocked(hash); !ok {
+		t.Fatal("the correct hash must resolve")
+	}
+	for _, bad := range []string{"", hash[:len(hash)-1], hash + "x", "0" + hash[1:]} {
+		if _, ok := (&Match{players: map[game.PlayerID]string{"pl_a": hash}}).
+			playersByTokenLocked(bad); ok {
+			t.Fatalf("a mutated hash %q resolved", bad)
+		}
+	}
+	// A player whose stored hash is empty must never be bindable with an empty
+	// token, which is what the input-side guard alone would not prevent.
+	if _, ok := (&Match{players: map[game.PlayerID]string{"pl_a": ""}}).
+		playersByTokenLocked(""); ok {
+		t.Fatal("an empty stored hash matched an empty token")
 	}
 }

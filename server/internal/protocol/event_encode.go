@@ -33,5 +33,13 @@ func EncodeEvent(ev game.Event) ([]byte, error) {
 		return nil, err
 	}
 	out["type"] = discriminator
+	// The match seed is durable replay/debug metadata, never client-visible state:
+	// NewGameSnapshot deliberately omits it, and the durable event payload is
+	// where it belongs. Broadcasting it leaked a value the codebase classifies as
+	// server-secret to every participant, including eliminated ones, and recorded
+	// that disclosure in the wire contract itself.
+	if _, isGameStarted := ev.(*game.GameStartedEvent); isGameStarted {
+		delete(out, "seed")
+	}
 	return json.Marshal(out)
 }

@@ -12,6 +12,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -22,12 +23,20 @@ import (
 	"time"
 
 	"github.com/analeis/highjack/server/internal/game"
+	"github.com/analeis/highjack/server/internal/persistence"
 	"github.com/analeis/highjack/server/internal/protocol"
 )
 
 // historyCap bounds per-match event retention (v0.2 decision). A cursor
 // older than the retained base gets a snapshot instead of a catch-up.
 const historyCap = 1024
+
+// reconcileTimeout bounds the read-back used to resolve an indeterminate commit.
+const reconcileTimeout = 5 * time.Second
+
+// joinTimeout bounds a seat claim's database work, so a hung database cannot hold
+// the match lock indefinitely on the unauthenticated lobby path.
+const joinTimeout = 5 * time.Second
 
 // Sink is a connected client the runtime can publish to. Send must be
 // non-blocking with respect to the match lock: implementations must never
@@ -48,8 +57,13 @@ type Sink interface {
 type Store interface {
 	CreateMatch(ctx context.Context, id game.GameID, cfg *game.GameConfig, state *game.GameState, seedHex string) error
 	SavePlayer(ctx context.Context, matchID game.GameID, player game.Player, tokenHash string) error
+	CommitJoin(ctx context.Context, id game.GameID, state *game.GameState, events []game.Event, player game.Player, tokenHash string) error
 	CommitTransition(ctx context.Context, id game.GameID, state *game.GameState, events []game.Event) error
 	MarkInterrupted(ctx context.Context) (int64, error)
+	// LoadMatch reads back a match's authoritative state. The runtime uses it to
+	// reconcile after a commit whose outcome is unknown, which is the only way to
+	// learn whether a transaction that reported an error actually committed.
+	LoadMatch(ctx context.Context, id game.GameID) (*persistence.MatchRow, error)
 }
 
 // EventEnvelope pairs an event with the tick that produced it, matching
@@ -95,6 +109,12 @@ type Match struct {
 	history []EventEnvelope
 	base    uint64 // oldest retained tick (0 when history is empty)
 
+	// fanoutMu serialises publication for this match, so two transitions cannot
+	// interleave on a peer's socket. It is separate from mu on purpose: holding
+	// mu across a network write would stall the authoritative state behind a
+	// slow consumer, which is what mu's contract forbids.
+	fanoutMu sync.Mutex
+
 	sessions map[string]*session
 	players  map[game.PlayerID]string // player id → hashed token
 
@@ -114,6 +134,10 @@ type session struct {
 	lastAck   ActionResult
 	haveAck   bool
 	connected bool
+	// ready is false until the handshake has delivered this session's snapshot.
+	// Publications are withheld until then, so a joining client can never receive
+	// a transition ahead of the state it is about to be given.
+	ready bool
 }
 
 // Registry holds live matches keyed by id.
@@ -134,24 +158,38 @@ func NewRegistry(log *slog.Logger, store Store) *Registry {
 // MarkInterruptedFlags runs at boot: any match left active by a previous
 // process is marked interrupted rather than silently resumed. v0.2 does
 // not restore live matches across restarts.
-func (r *Registry) MarkInterruptedFlags(ctx context.Context) {
+func (r *Registry) MarkInterruptedFlags(ctx context.Context) error {
 	if r.store == nil {
-		return
+		return nil
 	}
 	n, err := r.store.MarkInterrupted(ctx)
 	if err != nil {
-		r.log.Error("failed to mark interrupted matches", "error", err.Error())
-		return
+		return fmt.Errorf("mark interrupted: %w", err)
 	}
 	if n > 0 {
 		r.log.Warn("marked leftover matches interrupted", "count", n)
 	}
+	return nil
 }
+
+// maxLiveMatches bounds the registry. POST /matches is unauthenticated and
+// unrated, and every match retains a full board, a bounded history ring and a
+// session table, so an unbounded registry is a trivial way to exhaust memory.
+const maxLiveMatches = 512
+
+// ErrRegistryFull is returned once the live-match bound is reached.
+var ErrRegistryFull = errors.New("match: too many live matches")
 
 // Create mints a private match with an unguessable id and root seed.
 func (r *Registry) Create(ctx context.Context, cfg game.GameConfig) (*Match, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+	r.mu.RLock()
+	full := len(r.matches) >= maxLiveMatches
+	r.mu.RUnlock()
+	if full {
+		return nil, ErrRegistryFull
 	}
 	id, err := newMatchID()
 	if err != nil {
@@ -215,45 +253,86 @@ func (m *Match) Config() *game.GameConfig { return m.cfg }
 
 // Join mints a seat and reconnect token for a new player. The token is
 // returned once; only its sha256 is retained.
+// Join claims a seat: the only path that mints a player's identity and its
+// reconnect token.
+//
+// The work happens under the match lock and the publication happens after it is
+// released, because the lock is not reentrant and Broadcast takes it to collect
+// its sinks. Every return path must therefore unlock explicitly, or defer the
+// unlock inside a helper whose scope excludes the broadcast.
 func (m *Match) Join(ctx context.Context, displayName string) (game.PlayerID, string, error) {
+	playerID, token, envelopes, err := m.claimSeat(ctx, displayName)
+	if err != nil {
+		return "", "", err
+	}
+	// Tell the clients. Existing lobby members previously learned about a new seat
+	// only when some later action happened to produce a snapshot, so a table could
+	// sit showing a stale roster while waiting for players who had already joined.
+	m.Broadcast(envelopes, 0)
+	return playerID, token, nil
+}
+
+// claimSeat applies and durably commits a seat claim, returning the envelopes to
+// publish. It must be called with the lock held and releases it before returning.
+func (m *Match) claimSeat(ctx context.Context, displayName string) (game.PlayerID, string, []EventEnvelope, error) {
+	// Bound the database round trip. This runs on the unauthenticated lobby
+	// endpoint, where the caller's context is the HTTP request: a client that hangs
+	// up cancels it, which is exactly the trigger for a failed seat claim. A hung
+	// database would otherwise hold the match lock for as long as the query took.
+	ctx, cancel := context.WithTimeout(ctx, joinTimeout)
+	defer cancel()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.state.Phase != game.PhaseLobby {
-		return "", "", game.ErrAlreadyStarted
+		return "", "", nil, game.ErrAlreadyStarted
 	}
 	next, events, err := m.engine.Apply(m.state, "", game.PlayerJoinAction{DisplayName: displayName})
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	joined, ok := events[0].(*game.PlayerJoinedEvent)
 	if !ok {
-		return "", "", errors.New("match: join produced no player_joined event")
+		return "", "", nil, errors.New("match: join produced no player_joined event")
 	}
 	token, err := newID("tok_")
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	tokenHash := hashToken(token)
 
-	// Persist first. A join that cannot be stored must leave nothing behind: the
-	// caller is an unauthenticated HTTP endpoint whose context dies the moment
-	// the client hangs up, and a seat consumed by a player whose token was then
-	// discarded could never be released, because leaving requires a bindable
-	// actor. Four aborted requests would fill the match for good.
 	joinedPlayer := next.PlayerByID(joined.PlayerID)
 	if joinedPlayer == nil {
-		return "", "", errors.New("match: joined player missing from state")
+		return "", "", nil, errors.New("match: joined player missing from state")
 	}
+
+	// A join is a transition like any other, and goes through the same durable
+	// commit as a roll or a purchase. It previously wrote only a `game_players`
+	// row: no event, no `games` update, no snapshot upsert, so a restarted
+	// process would load a match whose state its event log could not explain and
+	// whose snapshot predated every seat. The player row and the transition are
+	// written in one transaction, so either both exist or neither does.
 	if m.store != nil {
-		if err := m.store.SavePlayer(ctx, m.id, *joinedPlayer, tokenHash); err != nil {
-			return "", "", fmt.Errorf("persist player: %w", err)
+		if err := m.store.CommitJoin(ctx, m.id, next, events, *joinedPlayer, tokenHash); err != nil {
+			// Nothing was applied in memory, so no seat is consumed. The caller is
+			// an unauthenticated HTTP endpoint whose context dies the moment the
+			// client hangs up, and a seat consumed by a player whose token was then
+			// discarded could never be released, because leaving requires a bindable
+			// actor. A few aborted requests would fill the match for good.
+			return "", "", nil, fmt.Errorf("persist join: %w", err)
 		}
 	}
 	m.state = next
 	m.appendHistory(events)
 	m.players[joined.PlayerID] = tokenHash
-	return joined.PlayerID, token, nil
+
+	// Exactly the events this transition appended, so the publication cannot
+	// include anything from a concurrent transition.
+	count := len(events)
+	tail := make([]EventEnvelope, count)
+	copy(tail, m.history[len(m.history)-count:])
+	return joined.PlayerID, token, tail, nil
 }
 
 // Bind attaches a live connection to a player via its reconnect token.
@@ -291,8 +370,17 @@ func (m *Match) Bind(sessionID, token, clientID string, sink Sink) (game.PlayerI
 // playersByTokenLocked resolves a hashed token inside the match. Callers
 // hold m.mu.
 func (m *Match) playersByTokenLocked(tokenHash string) (game.PlayerID, bool) {
+	if tokenHash == "" {
+		return "", false
+	}
 	for id, h := range m.players {
-		if h == tokenHash && tokenHash != "" {
+		// Constant-time: a byte-wise string comparison short-circuits on the first
+		// difference, and Go visits map entries in a randomized order, so the work
+		// done per attempt is not even stable. The compared value is a digest rather
+		// than the token, which is what makes this hygiene rather than an exploit —
+		// but a credential comparison has no reason to leak timing.
+		if len(h) == len(tokenHash) &&
+			subtle.ConstantTimeCompare([]byte(h), []byte(tokenHash)) == 1 {
 			return id, true
 		}
 	}
@@ -391,10 +479,7 @@ func (m *Match) ApplyAction(ctx context.Context, sessionID string, seq int64, ac
 	// the client may retry the same sequence.
 	if m.store != nil {
 		if perr := m.store.CommitTransition(ctx, m.id, next, events); perr != nil {
-			m.state = prev
-			m.log.Error("transition not durable; rolled back",
-				"match", m.id, "error", perr.Error())
-			return ActionResult{DomainCode: protocol.CodeInternalError, Err: perr}, perr
+			return ActionResult{DomainCode: protocol.CodeInternalError, Err: perr}, m.reconcileCommit(ctx, prev, perr)
 		}
 	}
 
@@ -456,12 +541,50 @@ func (m *Match) trimHistoryLocked() {
 	}
 }
 
+// Resume is a consistent (snapshot, catch-up, resync) triple.
+//
+// The handshake used to take the snapshot and the history range under two
+// separate lock acquisitions and then write both frames with no lock held, so a
+// transition applied in between could reach the socket before the snapshot: a
+// joining client could receive event(11), then catchup(8,9,10), then
+// snapshot(10) — losing a transition, with resync false and no signal that
+// anything was wrong. Taking both under one acquisition, and buffering
+// publications for a session until its snapshot frame is written, closes the
+// window.
+func (m *Match) Resume(cursor *int64) (protocol.GameSnapshot, []EventEnvelope, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	snap := protocol.NewGameSnapshot(m.state)
+	if cursor == nil {
+		return snap, nil, false
+	}
+	c := uint64(*cursor)
+	// A cursor the server has never reached means the client's view is ahead of
+	// authoritative state; it cannot be brought forward by replaying history.
+	if c > m.state.Tick {
+		return snap, nil, true
+	}
+	events, ok := m.sinceLocked(c)
+	if !ok || len(events) == 0 {
+		// Either the cursor is outside the retained window, or the client is
+		// already current. Both are served by the snapshot, but only the former
+		// needs telling, since a current client is not losing anything.
+		return snap, nil, c > 0 && c < m.state.Tick
+	}
+	return snap, events, false
+}
+
 // Since returns retained events strictly after a cursor, and whether the
 // cursor is still catch-up-able. An empty (or too old) window means the
 // client must take a fresh snapshot instead of assuming continuity.
 func (m *Match) Since(cursor uint64) (events []EventEnvelope, ok bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.sinceLocked(cursor)
+}
+
+// sinceLocked is Since with the match lock already held.
+func (m *Match) sinceLocked(cursor uint64) (events []EventEnvelope, ok bool) {
 	if len(m.history) == 0 {
 		if cursor == 0 {
 			return nil, true
@@ -490,35 +613,73 @@ func (m *Match) Since(cursor uint64) (events []EventEnvelope, ok bool) {
 // released, so a slow consumer can never stall the match or a peer. Each
 // event carries its tick, which is the client-side cursor and the dedup
 // key (delivery is at-least-once).
+// Broadcast publishes one transition to every connected peer.
+//
+// The transition is delivered as a *single* frame. It used to be written event
+// by event, which broke the atomicity the engine works to guarantee: two
+// transitions applied back to back could interleave their writes on the same
+// socket, so a client could observe turn_advanced for tick N+1 before
+// property_bought for tick N and fold them in the wrong order, ending up with the
+// wrong turn pointer and the wrong ownership, with no error to indicate it.
+//
+// fanoutMu serialises publications for this match so two transitions can never
+// interleave even across peers. It is deliberately a separate lock from mu:
+// holding mu here would serialise the whole match behind a network write, which
+// is exactly what the architecture notes forbid.
 func (m *Match) Broadcast(events []EventEnvelope, exceptSeq int64) {
 	if len(events) == 0 {
 		return
 	}
+	frame, ok := transitionFrame(events)
+	if !ok {
+		return
+	}
+
+	m.fanoutMu.Lock()
+	defer m.fanoutMu.Unlock()
+
 	m.mu.Lock()
 	sinks := make([]Sink, 0, len(m.sessions))
 	for _, s := range m.sessions {
-		if s.bound && s.connected && s.sink != nil {
+		if s.bound && s.connected && s.sink != nil && s.ready {
 			sinks = append(sinks, s.sink)
 		}
 	}
 	m.mu.Unlock()
 
 	for _, sink := range sinks {
-		for _, e := range events {
-			payload, err := protocol.EncodeEvent(e.Event)
-			if err != nil {
-				continue
-			}
-			var generic any
-			if err := json.Unmarshal(payload, &generic); err != nil {
-				continue
-			}
-			sink.Send(map[string]any{
-				"v": protocol.ProtocolMajorVersion, "type": "event",
-				"tick": e.Tick, "event": generic,
-			})
-		}
+		sink.Send(frame)
 	}
+}
+
+// transitionFrame encodes a transition's events as one `transition` frame.
+//
+// Every event in a transition shares one tick, because the engine stamps a whole
+// transition with the tick it produced. The tick is therefore the transition's
+// identity on the wire, and a client can apply the batch in one step.
+func transitionFrame(events []EventEnvelope) (any, bool) {
+	// The batch is []any rather than a typed slice so that a consumer inspecting
+	// the frame in-process — the transport tests do exactly that — sees the same
+	// shape the JSON produces.
+	out := make([]any, 0, len(events))
+	for _, e := range events {
+		payload, err := protocol.EncodeEvent(e.Event)
+		if err != nil {
+			continue
+		}
+		var generic any
+		if err := json.Unmarshal(payload, &generic); err != nil {
+			continue
+		}
+		out = append(out, map[string]any{"tick": e.Tick, "event": generic})
+	}
+	if len(out) == 0 {
+		return nil, false
+	}
+	return map[string]any{
+		"v": protocol.ProtocolMajorVersion, "type": "transition",
+		"tick": events[0].Tick, "events": out,
+	}, true
 }
 
 // ---- errors -----------------------------------------------------------------
@@ -554,6 +715,7 @@ func hashToken(token string) string {
 // RateLimiter bounds actions per session on a sliding window. It is a
 // per-connection abuse guard, not gameplay logic.
 type RateLimiter struct {
+	swept  int
 	mu     sync.Mutex
 	limit  int
 	window time.Duration
@@ -572,6 +734,24 @@ func (r *RateLimiter) Allow(key string) bool {
 	defer r.mu.Unlock()
 	now := r.now()
 	cutoff := now.Add(-r.window)
+
+	// Amortised sweep, before any early return. Only the queried key used to be
+	// pruned, and the map is keyed by session ids that are never reused, so every
+	// connection ever opened left a key behind for the life of the process —
+	// roughly 560 bytes each, hundreds of megabytes a day at a plausible
+	// connection rate, reachable by nothing. It runs first because a flood of
+	// denied requests returns early, and that is exactly when the map would
+	// otherwise stop shrinking.
+	r.swept++
+	if r.swept >= sweepEvery {
+		r.swept = 0
+		for k, times := range r.hits {
+			if len(times) == 0 || !times[len(times)-1].After(cutoff) {
+				delete(r.hits, k)
+			}
+		}
+	}
+
 	kept := r.hits[key][:0]
 	for _, t := range r.hits[key] {
 		if t.After(cutoff) {
@@ -584,4 +764,96 @@ func (r *RateLimiter) Allow(key string) bool {
 	}
 	r.hits[key] = append(kept, now)
 	return true
+}
+
+// tracked reports how many keys the limiter is holding. Exposed for the eviction
+// test; production code has no reason to ask.
+func (r *RateLimiter) tracked() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.hits)
+}
+
+// sweepEvery is the number of Allow calls between eviction sweeps. Amortised so
+// the cost is O(1) per call rather than O(keys) on every call.
+const sweepEvery = 64
+
+// reconcileCommit resolves a commit whose outcome is unknown and returns the
+// error the caller should report.
+//
+// A commit that returns an error did not necessarily fail. The 5s deadline can
+// expire while COMMIT is in flight, and the connection can drop after the server
+// made the transaction durable but before the result reached us. Treating that as
+// "did not happen" and reverting memory is what created a permanent divergence:
+// memory sat one tick behind the database, the next transition's INSERT then
+// collided on the (match_id, tick, seq) primary key, and every later action failed
+// the same way, bricking the match.
+//
+// So the durable cursor is read back. If it moved, the transition committed and
+// memory is corrected to agree; if it did not, memory is restored. Either way the
+// caller is told the truth.
+//
+// Called with m.mu held, like the rest of ApplyAction. The read-back is a network
+// round trip, so it is bounded by reconcileTimeout and happens on a caller that
+// is already serialised per match; the alternative — releasing the lock and
+// re-taking it — would let two transitions interleave around the ambiguity, which
+// is a far worse failure than a bounded stall.
+func (m *Match) reconcileCommit(ctx context.Context, prev *game.GameState, cause error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), reconcileTimeout)
+	defer cancel()
+	row, err := m.store.LoadMatch(ctx, m.id)
+	if err != nil {
+		// The database cannot be consulted. Do not guess: keep the last durable
+		// state in memory so nothing uncommitted is ever published, and report the
+		// failure loudly. The next action's commit will surface the real conflict.
+		m.state = prev
+		m.log.Error("commit outcome unknown and could not be reconciled; holding last durable state",
+			"match", m.id, "error", cause.Error(), "reconcileError", err.Error())
+		return cause
+	}
+	if uint64(row.Cursor) == nextTickOf(prev)+1 {
+		// It committed. Adopt the durable state rather than diverging.
+		m.state = row.State.Clone()
+		m.log.Warn("commit reported an error but was durable; reconciled to the stored state",
+			"match", m.id, "cursor", row.Cursor)
+		return cause
+	}
+	m.state = prev
+	m.log.Error("transition not durable; rolled back",
+		"match", m.id, "error", cause.Error())
+	return cause
+}
+
+func nextTickOf(s *game.GameState) uint64 { return s.Tick }
+
+// MarkReady releases a session's buffered publications.
+//
+// A session is not published to until its handshake snapshot has been written,
+// so a client can never observe a transition that is ahead of the state it was
+// given. Must be called after the snapshot frame is on the wire.
+func (m *Match) MarkReady(sessionID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s := m.sessions[sessionID]; s != nil {
+		s.ready = true
+	}
+}
+
+// snapshotStateForTest returns the authoritative state behind a snapshot. It
+// exists so a test can model a database that is ahead of memory without reaching
+// into unexported fields from another package.
+func (m *Match) snapshotStateForTest() *game.GameState {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.state.Clone()
+}
+
+// envelopesForTest returns the current history as envelopes. It exists only so
+// tests can publish already-recorded transitions without going through Apply.
+func (m *Match) envelopesForTest() []EventEnvelope {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]EventEnvelope, len(m.history))
+	copy(out, m.history)
+	return out
 }

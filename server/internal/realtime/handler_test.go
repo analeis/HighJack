@@ -23,7 +23,7 @@ import (
 func wsTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	log := slog.New(slog.DiscardHandler)
-	h := NewHandler(log, 30000, match.NewRegistry(log, nil), nil)
+	h := NewHandler(log, 30000, match.NewRegistry(log, nil), nil, true)
 	mux := http.NewServeMux()
 	h.Register(mux)
 	srv := httptest.NewServer(mux)
@@ -190,5 +190,65 @@ func TestMalformedFrameGetsStructuredErrorNotClose(t *testing.T) {
 	pong := receive(t, conn)
 	if pong["type"] != "pong" {
 		t.Fatalf("connection should survive malformed frames; got %v", pong)
+	}
+}
+
+// --- origin enforcement ----------------------------------------------------
+
+// The allow-list previously had no test at all, and the behaviour it governs was
+// inverted: an empty list set InsecureSkipVerify in *every* environment, so a
+// production deployment that omitted HIGHJACK_ALLOWED_ORIGINS had no origin
+// enforcement, while the architecture notes claimed the opposite.
+func TestWebSocketOriginIsEnforcedOutsideDevelopment(t *testing.T) {
+	cases := []struct {
+		name       string
+		origins    []string
+		devMode    bool
+		origin     string
+		wantStatus int
+	}{
+		{"production refuses an unlisted origin", nil, false, "https://evil.example", http.StatusForbidden},
+		{"production allows an originless client", nil, false, "", 0}, // non-browser: no Origin
+		{"development tolerates any origin", nil, true, "https://localhost:5173", 0},
+		{"an allow-listed origin is accepted", []string{"https://ok.example"}, false, "https://ok.example", 0},
+		{"an unlisted origin is refused against a list", []string{"https://ok.example"}, false, "https://evil.example", http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			log := slog.New(slog.DiscardHandler)
+			registry := match.NewRegistry(log, nil)
+			h := NewHandler(log, 30000, registry, tc.origins, tc.devMode)
+			mux := http.NewServeMux()
+			h.Register(mux)
+			ts := httptest.NewServer(mux)
+			defer ts.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+			opts := &websocket.DialOptions{}
+			if tc.origin != "" {
+				opts.HTTPHeader = http.Header{"Origin": []string{tc.origin}}
+			}
+			conn, resp, err := websocket.Dial(ctx, wsURL, opts)
+			if tc.wantStatus != 0 {
+				if err == nil {
+					_ = conn.Close(websocket.StatusNormalClosure, "")
+					t.Fatalf("expected the handshake to be refused with %d", tc.wantStatus)
+				}
+				if resp == nil || resp.StatusCode != tc.wantStatus {
+					got := 0
+					if resp != nil {
+						got = resp.StatusCode
+					}
+					t.Fatalf("status = %d, want %d", got, tc.wantStatus)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("handshake refused: %v", err)
+			}
+			_ = conn.Close(websocket.StatusNormalClosure, "")
+		})
 	}
 }

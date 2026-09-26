@@ -13,6 +13,44 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.2',
+    date: '2026-09-26',
+    title: 'Multiplayer integrity and durability',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Seats and authorization',
+        tone: 'gold',
+        items: [
+          'Claiming a seat is refused on the socket. It previously minted a player with no reconnect token that could never be bound or removed, while consuming a seat — repeating it filled the match permanently',
+          'A seat claim is now a real transition: state, events, snapshot and the player row commit in one transaction, and it is published to the table immediately',
+          'A seat claim that cannot be committed consumes nothing, so an interrupted request no longer leaves a seat nothing can release',
+        ],
+      },
+      {
+        label: 'Delivery and recovery',
+        tone: 'teal',
+        items: [
+          'A transition is delivered as one batched frame, so two transitions can no longer interleave on a single connection and leave a peer with the wrong turn and the wrong ownership',
+          'A new connection receives nothing until its snapshot has been written, so it can never apply a transition the snapshot does not contain',
+          'A commit that reports an error is reconciled against the stored state instead of being rolled back in memory. The old behaviour left memory a tick behind, and every later action then failed on a duplicate key, bricking the match',
+          'Migrations are applied at boot and readiness checks the schema, so a server can no longer report itself ready against a database it cannot write to',
+          'The server keeps idle connections alive, which it advertised but never did: an idle lobby or a long think used to be disconnected after 90 seconds',
+        ],
+      },
+      {
+        label: 'Hardening',
+        tone: 'teal',
+        items: [
+          'Live matches and rate-limiter keys are both bounded and swept, closing an unauthenticated path to unbounded memory',
+          'Outside development, an unconfigured origin allow-list now refuses browser origins instead of accepting any',
+          'The match seed is no longer broadcast to clients; it stays in the durable event payload for replay',
+          'Reconnect tokens are compared in constant time',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.1',
     date: '2026-09-26',
     title: 'Stabilization — evidence and engine correctness',

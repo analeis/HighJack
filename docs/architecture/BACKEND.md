@@ -112,13 +112,17 @@ Match ── engine (pure)     Apply(state, actor, action)
   database commit, which is a known limitation tracked in the audit as
   PRS-3 and fixed in v0.2.2.
 - **Broadcast failure** never blocks the game loop: a dead sink is
-  dropped, and the client reconnects via snapshot. A transition is
-  published as its events plus an authoritative ack snapshot; a repeated
-  action sequence is answered with the ack only, never re-published, so a
-  retry cannot double-apply an economic change on a peer.
+  dropped, and the client reconnects via snapshot. A repeated action sequence
+  is answered with the ack only, never re-published, so a retry cannot
+  double-apply an economic change on a peer.
 - **Restart policy**: leftover matches are moved to `interrupted` at boot.
-  v0.2 does not restore live matches across process restarts; see
-  [GAME_DESIGN.md](../game/GAME_DESIGN.md).
+  Migrations are applied at boot, and readiness checks the schema as well as
+  connectivity, so a server cannot report itself ready against a database it
+  cannot write to. v0.2 does not restore live matches across process restarts;
+  see [GAME_DESIGN.md](../game/GAME_DESIGN.md).
+- **Bounded resources**: the live-match registry and the per-session rate
+  limiter are both bounded and swept, so an unauthenticated caller cannot grow
+  process memory without limit.
 
 ## CORS and origins (v0.2)
 

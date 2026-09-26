@@ -67,6 +67,27 @@ func run() error {
 			}
 		}()
 		log.Info("database connected")
+
+		// Apply migrations at boot. Without this, a server started against an
+		// empty database reported "database connected" and answered /ready with
+		// 200, then failed every write with a missing-relation error. Refusing to
+		// start is the honest outcome: the operator asked for a database, and a
+		// database without a schema is not one.
+		dir := os.Getenv("HIGHJACK_MIGRATIONS_DIR")
+		if dir == "" {
+			dir = "server/migrations"
+		}
+		migrateCtx, cancelMigrate := context.WithTimeout(context.Background(), 60*time.Second)
+		applied, err := store.Migrate(migrateCtx, dir)
+		cancelMigrate()
+		if err != nil {
+			return fmt.Errorf("apply migrations: %w", err)
+		}
+		if len(applied) > 0 {
+			log.Info("applied migrations", "count", len(applied))
+		} else {
+			log.Info("schema already current")
+		}
 	} else {
 		log.Info("no database configured; persistence disabled (HIGHJACK_DATABASE_URL unset)")
 	}
@@ -75,20 +96,31 @@ func run() error {
 		if store == nil {
 			return nil // no dependencies to check yet
 		}
-		return store.Ping(ctx)
+		// A ping proves the socket is open, not that the schema is there. Check the
+		// schema too, so a database that lost its tables takes the instance out of
+		// rotation instead of failing every request.
+		if err := store.Ping(ctx); err != nil {
+			return err
+		}
+		return store.CheckSchema(ctx)
 	}
 
 	// Live matches are not restored across process restarts in v0.2: any
 	// match left active by a previous process is marked interrupted at
 	// boot instead of being silently resumed from partial data.
 	bootCtx, cancelBoot := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelBoot()
 	registry := match.NewRegistry(log, store)
-	registry.MarkInterruptedFlags(bootCtx)
-	cancelBoot()
+	// A failure here is logged, not fatal: marking leftovers interrupted is a
+	// safety measure, and refusing to start because of it would turn a cosmetic
+	// problem into an outage. Readiness still reports the schema's health.
+	if err := registry.MarkInterruptedFlags(bootCtx); err != nil {
+		log.Error("failed to mark interrupted matches", "error", err.Error())
+	}
 
 	server := api.New(cfg, log, readiness)
 	server.MountMatches(registry)
-	realtimeHandler := realtime.NewHandler(log, cfg.HeartbeatMs, registry, cfg.AllowedOrigins)
+	realtimeHandler := realtime.NewHandler(log, cfg.HeartbeatMs, registry, cfg.AllowedOrigins, cfg.DevMode())
 	server.MountRealtime(realtimeHandler)
 
 	// Signal-driven lifecycle: serve until SIGINT/SIGTERM, then drain.

@@ -3,7 +3,6 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/analeis/highjack/server/internal/game"
 )
@@ -28,16 +27,22 @@ func DecodeGameAction(payload json.RawMessage) (game.Action, *ProtocolError) {
 
 	switch game.ActionType(typ) {
 	case game.ActionPlayerJoin:
-		var body struct {
-			DisplayName string `json:"displayName"`
+		// Refused at the transport boundary, and deliberately not merely
+		// unsupported. The engine's join handler derives the new player's identity
+		// from the state, ignoring the actor, so a player_join arriving on an
+		// already-bound socket would mint a player that has no reconnect token and
+		// can never be bound or removed — while consuming one of the match's
+		// seats. Because it is unauthenticated and cannot be undone, repeating it
+		// would fill the match permanently.
+		//
+		// Seats are minted by the lobby API (POST /matches/{id}/players), which is
+		// the only path that also issues the token. ActionPlayerJoin stays in the
+		// action union because it is part of the engine's internal contract, but it
+		// is not a wire action a client may send.
+		return nil, &ProtocolError{
+			Code: CodeNotPermitted,
+			Msg:  "player_join is not accepted on the socket; claim a seat through POST /matches/{matchId}/players",
 		}
-		if err := json.Unmarshal(payload, &body); err != nil {
-			return nil, &ProtocolError{CodeMalformedMessage, "player_join has an invalid payload"}
-		}
-		if strings.TrimSpace(body.DisplayName) == "" {
-			return nil, &ProtocolError{CodeMalformedMessage, "player_join requires a non-empty \"displayName\""}
-		}
-		return game.PlayerJoinAction{DisplayName: body.DisplayName}, nil
 	case game.ActionPlayerLeave:
 		return game.PlayerLeaveAction{}, nil
 	case game.ActionPlayerReady:

@@ -30,7 +30,11 @@ import (
 const (
 	handshakeReadTimeout = 10 * time.Second
 	ioTimeout            = 5 * time.Second
-	readIdleTimeout      = 90 * time.Second // clients must ping within this window
+	readIdleTimeout      = 90 * time.Second // a healthy connection resets this on every frame
+	// defaultHeartbeat is used when the configured value is not a usable interval.
+	defaultHeartbeat = 30 * time.Second
+	// pingTimeout bounds a single keepalive ping.
+	pingTimeout = 10 * time.Second
 	// maxFrameBytes bounds a single inbound frame (v0.2 decision: explicit
 	// 64 KiB limit; oversize frames close the connection).
 	maxFrameBytes = 64 * 1024
@@ -41,6 +45,8 @@ const (
 
 // Handler serves the /ws endpoint. Fields are read-only after construction.
 type Handler struct {
+	// devMode permits the origin check to be skipped when no allow-list is set.
+	devMode     bool
 	log         *slog.Logger
 	heartbeatMs int
 	registry    *match.Registry
@@ -48,7 +54,20 @@ type Handler struct {
 	origins     []string
 }
 
-func NewHandler(log *slog.Logger, heartbeatMs int, registry *match.Registry, allowedOrigins []string) *Handler {
+// NewHandler builds the transport.
+//
+// devMode decides what an empty origin allow-list means. It used to mean "accept
+// any origin" unconditionally, in every environment, because the flag was set
+// without reference to the environment: a production deployment that omitted
+// HIGHJACK_ALLOWED_ORIGINS had no origin enforcement at all, while the
+// architecture notes claimed an unlisted origin could reach neither the lobby nor
+// the socket. Outside development an empty list is now an error rather than a
+// permissive default.
+func NewHandler(log *slog.Logger, heartbeatMs int, registry *match.Registry, allowedOrigins []string, devMode bool) *Handler {
+	if len(allowedOrigins) == 0 && !devMode {
+		log.Warn("no origin allow-list configured and not in development; " +
+			"browser clients will be refused. Set HIGHJACK_ALLOWED_ORIGINS.")
+	}
 	// 20 actions per 10s sliding window per session (v0.2 decision).
 	return &Handler{
 		log:         log,
@@ -56,12 +75,50 @@ func NewHandler(log *slog.Logger, heartbeatMs int, registry *match.Registry, all
 		registry:    registry,
 		limiter:     match.NewRateLimiter(20, 10*time.Second),
 		origins:     allowedOrigins,
+		devMode:     devMode,
 	}
 }
 
 // Register mounts the WebSocket route on mux.
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ws", h.serveWS)
+}
+
+// startHeartbeat pings a connection on the advertised cadence and returns a
+// function that stops it. A ping failure means the peer is gone, so the reader
+// loop is unblocked by closing the connection rather than by a shared flag.
+func (h *Handler) startHeartbeat(conn *websocket.Conn) func() {
+	interval := time.Duration(h.heartbeatMs) * time.Millisecond
+	if interval <= 0 {
+		interval = defaultHeartbeat
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				pingCtx, pingCancel := context.WithTimeout(ctx, pingTimeout)
+				err := conn.Ping(pingCtx)
+				pingCancel()
+				if err != nil {
+					// The peer is unreachable. Closing makes the reader loop return,
+					// so the connection is torn down instead of lingering.
+					_ = conn.Close(websocket.StatusNormalClosure, "")
+					return
+				}
+			}
+		}
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
 }
 
 func (h *Handler) serveWS(w http.ResponseWriter, r *http.Request) {
@@ -74,10 +131,27 @@ func (h *Handler) serveWS(w http.ResponseWriter, r *http.Request) {
 	// Origin checking: same-origin (or no Origin header) is always allowed;
 	// cross-origin is allowed only for explicitly configured origins.
 	accept := &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled}
-	if len(h.origins) > 0 {
+	// A request with no Origin header is not a browser and has no origin to
+	// verify, so it is never subject to the allow-list. This distinction matters:
+	// refusing it would break every non-browser client (the integration suite, a
+	// server-to-server caller) in order to defend against a browser.
+	origin := r.Header.Get("Origin")
+	switch {
+	case origin == "":
+		// Nothing to check.
+	case len(h.origins) > 0:
 		accept.OriginPatterns = h.origins
-	} else {
-		accept.InsecureSkipVerify = true // dev only: no configured allow-list
+	case h.devMode:
+		// Development convenience only, and only because the operator asked for it
+		// by not restricting the environment. This is the *only* place origin
+		// verification may be skipped.
+		accept.InsecureSkipVerify = true
+	default:
+		// A browser from an origin we cannot verify. Refusing is the safe default:
+		// the operator has not said which origins are trusted, so none are.
+		h.log.Warn("refused websocket origin", "origin", origin)
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
 	}
 	conn, err := websocket.Accept(w, r, accept)
 	if err != nil {
@@ -97,6 +171,18 @@ func (h *Handler) serveWS(w http.ResponseWriter, r *http.Request) {
 	if bound != nil {
 		defer func() { bound.Disconnect(session) }()
 	}
+
+	// Keepalive. The read deadline is 90s and every frame — including an
+	// application-level ping — resets it, so a client that never sends anything is
+	// disconnected after 90s even though the connection is perfectly healthy. That
+	// matters most exactly when it hurts: a lobby waiting for a second player, or a
+	// turn someone is thinking about. The server advertises heartbeatMs in the
+	// welcome and then never used it, so the contract existed only on paper.
+	//
+	// A protocol-level ping is the right mechanism: it cannot be confused with an
+	// application ping, and it keeps intermediaries from idling the connection out.
+	stopPing := h.startHeartbeat(conn)
+	defer stopPing()
 
 	for {
 		data, readOK := h.readFrame(conn)
@@ -222,21 +308,19 @@ func (h *Handler) handshake(conn *websocket.Conn, c *connSink, session string) (
 		return nil, true
 	}
 
-	// Authoritative snapshot is always sent; catch-up is best-effort and
-	// never replaces the snapshot.
-	snap := bound.Snapshot()
-	resync := false
-	if hello.ResumeFromTick != nil {
-		cursor := uint64(*hello.ResumeFromTick)
-		if events, ok := bound.Since(cursor); ok && len(events) > 0 {
-			c.sendCatchup(events, snap.Tick)
-		} else if cursor > 0 && cursor < snap.Tick {
-			// Cursor too old or unverified: tell the client to resync from
-			// the snapshot rather than pretend catch-up succeeded.
-			resync = true
-		}
+	// The snapshot, the catch-up range and the resync verdict are taken together
+	// under one lock acquisition, so they describe one point in time. The session
+	// is still closed to publications at this point, so nothing can be written to
+	// this socket between the two frames.
+	snap, catchup, resync := bound.Resume(hello.ResumeFromTick)
+	if len(catchup) > 0 {
+		c.sendCatchup(catchup, snap.Tick)
 	}
 	c.sendSnapshot(snap, bound.Config(), 1, resync)
+	// Only now may transitions reach this connection. Doing it earlier would let a
+	// client apply a transition the snapshot does not contain, and the snapshot
+	// would then overwrite it — losing the transition with no signal.
+	bound.MarkReady(session)
 	return bound, true
 }
 

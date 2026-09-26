@@ -116,8 +116,51 @@ export interface CatchupMessage extends EnvelopeBase {
   readonly cursor: number;
 }
 
+/**
+ * One authoritative transition: every event the engine produced for a single
+ * accepted action, delivered together.
+ *
+ * Delivery used to be one frame per event, which let two transitions interleave
+ * on a peer's socket, so a client could observe the second transition's first
+ * event before the first transition's last. A batch makes the transition the
+ * unit the engine already treats it as, and the tick is its identity.
+ */
+export interface TransitionMessage extends EnvelopeBase {
+  readonly v: ProtocolMajor;
+  readonly type: 'transition';
+  /** The engine tick every event in this batch belongs to. */
+  readonly tick: number;
+  readonly events: readonly { readonly tick: number; readonly event: GameEvent }[];
+}
+
 export type ServerMessage =
-  WelcomeMessage | PongMessage | EventMessage | ErrorMessage | SnapshotMessage | CatchupMessage;
+  | WelcomeMessage
+  | PongMessage
+  | EventMessage
+  | TransitionMessage
+  | ErrorMessage
+  | AckMessage
+  | SnapshotMessage
+  | CatchupMessage;
+
+/**
+ * Acknowledgement of an accepted action.
+ *
+ * The snapshot is the *post-action* authoritative state, so a client that lost
+ * the acknowledgement can retry and still converge without guessing: the replayed
+ * ack carries the same snapshot and the transport does not republish the events.
+ */
+export interface AckMessage extends EnvelopeBase {
+  readonly v: ProtocolMajor;
+  readonly type: 'ack';
+  /** The `seq` this acknowledges. */
+  readonly ackSeq: number;
+  /** The `seq` the server expects next. */
+  readonly nextSeq: number;
+  /** Engine tick of the acknowledged transition. */
+  readonly tick: number;
+  readonly snapshot: GameSnapshot;
+}
 
 // ---- runtime guards --------------------------------------------------------
 
@@ -190,6 +233,34 @@ export function isEventMessage(value: unknown): value is EventMessage {
   return v['type'] === 'event' && typeof v['tick'] === 'number' && isGameEvent(v['event']);
 }
 
+export function isTransitionMessage(value: unknown): value is TransitionMessage {
+  if (!isEnvelope(value)) return false;
+  const v = value as Record<string, unknown>;
+  if (v['type'] !== 'transition' || !Array.isArray(v['events'])) return false;
+  if (typeof v['tick'] !== 'number' || !Number.isSafeInteger(v['tick'])) return false;
+  for (const item of v['events'] as unknown[]) {
+    if (typeof item !== 'object' || item === null) return false;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec['tick'] !== 'number' || !Number.isSafeInteger(rec['tick'])) return false;
+    if (!isGameEvent(rec['event'])) return false;
+  }
+  return true;
+}
+
+export function isAckMessage(value: unknown): value is AckMessage {
+  if (!isEnvelope(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    v['type'] === 'ack' &&
+    typeof v['ackSeq'] === 'number' &&
+    Number.isSafeInteger(v['ackSeq']) &&
+    typeof v['nextSeq'] === 'number' &&
+    Number.isSafeInteger(v['nextSeq']) &&
+    typeof v['tick'] === 'number' &&
+    isGameSnapshot(v['snapshot'])
+  );
+}
+
 export function isErrorMessage(value: unknown): value is ErrorMessage {
   if (!isEnvelope(value)) return false;
   const v = value as Record<string, unknown>;
@@ -203,7 +274,9 @@ export function isServerMessage(value: unknown): value is ServerMessage {
     isWelcomeMessage(value) ||
     isPongMessage(value) ||
     isEventMessage(value) ||
+    isTransitionMessage(value) ||
     isErrorMessage(value) ||
+    isAckMessage(value) ||
     isSnapshotMessage(value) ||
     isCatchupMessage(value)
   );

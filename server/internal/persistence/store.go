@@ -148,6 +148,26 @@ func (s *Store) CommitTransition(ctx context.Context, id game.GameID, state *gam
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	if err := s.insertEventsTx(ctx, tx, id, events); err != nil {
+		return err
+	}
+	if err := s.upsertMatchRowTx(ctx, tx, id, state); err != nil {
+		return err
+	}
+	if err := s.upsertSnapshotTx(ctx, tx, id, stateDoc, state.Tick); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit transition: %w", err)
+	}
+	return nil
+}
+
+// insertEventsTx appends a transition's events to the durable log. The `seq`
+// column is the event's index *within* its transition, so the primary key
+// (match_id, tick, seq) is what makes a repeated tick a hard error rather than a
+// silent duplicate.
+func (s *Store) insertEventsTx(ctx context.Context, tx pgx.Tx, id game.GameID, events []game.Event) error {
 	for i, ev := range events {
 		payload, err := game.MarshalEvent(ev)
 		if err != nil {
@@ -160,6 +180,11 @@ func (s *Store) CommitTransition(ctx context.Context, id game.GameID, state *gam
 			return fmt.Errorf("insert event %s: %w", ev.Type(), err)
 		}
 	}
+	return nil
+}
+
+// upsertMatchRowTx writes the live turn pointers and the durable cursor.
+func (s *Store) upsertMatchRowTx(ctx context.Context, tx pgx.Tx, id game.GameID, state *game.GameState) error {
 	if _, err := tx.Exec(ctx,
 		`UPDATE games SET status = $2, current_seat = $3, current_round = $4, turn_phase = $5,
 		                  doubles_streak = $6, award_extra_roll = $7, cursor = $8
@@ -168,14 +193,16 @@ func (s *Store) CommitTransition(ctx context.Context, id game.GameID, state *gam
 		string(state.Turn.Phase), state.Turn.DoublesStreak, state.Turn.AwardExtraRoll, state.Tick); err != nil {
 		return fmt.Errorf("update game: %w", err)
 	}
+	return nil
+}
+
+// upsertSnapshotTx replaces the authoritative snapshot and its cursor.
+func (s *Store) upsertSnapshotTx(ctx context.Context, tx pgx.Tx, id game.GameID, stateDoc []byte, cursor uint64) error {
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO match_snapshots (match_id, state, cursor) VALUES ($1, $2, $3)
 		 ON CONFLICT (match_id) DO UPDATE SET state = EXCLUDED.state, cursor = EXCLUDED.cursor, written_at = now()`,
-		string(id), string(stateDoc), state.Tick); err != nil {
+		string(id), string(stateDoc), cursor); err != nil {
 		return fmt.Errorf("upsert snapshot: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit transition: %w", err)
 	}
 	return nil
 }
@@ -237,18 +264,38 @@ func (s *Store) LoadMatch(ctx context.Context, id game.GameID) (*MatchRow, error
 
 // SavePlayer upserts a player's membership row including the hashed
 // reconnect token.
+// SavePlayer writes a seat and its token outside any transition. It is retained
+// for administrative and migration use; new seats go through CommitJoin, which
+// writes the player row and the transition in one transaction.
 func (s *Store) SavePlayer(ctx context.Context, matchID game.GameID, player game.Player, tokenHash string) error {
 	if s == nil {
 		return errors.New("persistence: store is not configured")
 	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin save player: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := s.upsertPlayerTx(ctx, tx, matchID, player, tokenHash); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit save player: %w", err)
+	}
+	return nil
+}
+
+// upsertPlayerTx writes the user and the seat. Both live in the caller's
+// transaction so a seat and its transition are committed or discarded together.
+func (s *Store) upsertPlayerTx(ctx context.Context, tx pgx.Tx, matchID game.GameID, player game.Player, tokenHash string) error {
 	userID := string(player.ID)
-	if _, err := s.pool.Exec(ctx,
+	if _, err := tx.Exec(ctx,
 		`INSERT INTO users (id, display_name) VALUES ($1, $2)
 		 ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name`,
 		userID, player.Name); err != nil {
 		return fmt.Errorf("upsert user: %w", err)
 	}
-	if _, err := s.pool.Exec(ctx,
+	if _, err := tx.Exec(ctx,
 		`INSERT INTO game_players (game_id, user_id, seat, money, status, position, token_hash)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (game_id, seat) DO UPDATE
@@ -301,3 +348,77 @@ var (
 	ErrNoMatch  = errors.New("match not found")
 	ErrNoPlayer = errors.New("player not found")
 )
+
+// CommitJoin durably records a seat claim: the transition (events, games row and
+// snapshot) and the player row with its token hash, in one transaction.
+//
+// A join used to write only the player row, which left the match's own state
+// unable to explain its own event log. Splitting the two writes into one
+// transaction means a crash can produce neither or both, never a player that the
+// snapshot does not contain.
+func (s *Store) CommitJoin(
+	ctx context.Context,
+	id game.GameID,
+	state *game.GameState,
+	events []game.Event,
+	player game.Player,
+	tokenHash string,
+) error {
+	stateDoc, err := game.MarshalGameState(state)
+	if err != nil {
+		return fmt.Errorf("marshal join state: %w", err)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin join: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := s.insertEventsTx(ctx, tx, id, events); err != nil {
+		return err
+	}
+	if err := s.upsertMatchRowTx(ctx, tx, id, state); err != nil {
+		return err
+	}
+	if err := s.upsertSnapshotTx(ctx, tx, id, stateDoc, state.Tick); err != nil {
+		return err
+	}
+	if err := s.upsertPlayerTx(ctx, tx, id, player, tokenHash); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit join: %w", err)
+	}
+	return nil
+}
+
+// CheckSchema reports whether the tables this build needs are present.
+//
+// A ping only proves the socket is open. A server whose database lost its tables
+// would otherwise report itself ready and then fail every request, which is the
+// worst possible shape for an orchestrator: traffic keeps being routed at an
+// instance that cannot serve any of it.
+func (s *Store) CheckSchema(ctx context.Context) error {
+	if s == nil {
+		return nil
+	}
+	required := []string{
+		"users", "games", "game_configs", "match_snapshots", "match_events", "game_players",
+	}
+	var missing []string
+	for _, table := range required {
+		var n int
+		if err := s.pool.QueryRow(ctx,
+			`SELECT count(*) FROM information_schema.tables
+			  WHERE table_schema = current_schema() AND table_name = $1`, table).Scan(&n); err != nil {
+			return fmt.Errorf("schema check: %w", err)
+		}
+		if n == 0 {
+			missing = append(missing, table)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("schema is missing tables: %v", missing)
+	}
+	return nil
+}

@@ -26,7 +26,10 @@ func TestDecodeGameActionFromSharedFixtures(t *testing.T) {
 		fixture string
 		want    game.ActionType
 	}{
-		{"actions/player_join.json", game.ActionPlayerJoin},
+		// player_join is deliberately absent: it is an engine action type but not a
+		// wire action. Seats are minted by the lobby API, which is also the only
+		// path that issues a reconnect token, so the socket refuses it. See
+		// TestPlayerJoinIsRefusedOnTheWire.
 		{"actions/player_leave.json", game.ActionPlayerLeave},
 		{"actions/player_ready.json", game.ActionPlayerReady},
 		{"actions/game_start.json", game.ActionGameStart},
@@ -48,15 +51,35 @@ func TestDecodeGameActionFromSharedFixtures(t *testing.T) {
 	}
 }
 
-func TestDecodeGameActionPayloads(t *testing.T) {
-	join, perr := DecodeGameAction(json.RawMessage(`{"type":"player_join","displayName":"Ace"}`))
-	if perr != nil {
-		t.Fatalf("join rejected: %+v", perr)
+// A player_join action frame must be refused, whatever its payload. The engine's
+// join handler derives the new player's identity from state and ignores the
+// actor, so accepting one on an already-bound socket would mint a player with no
+// reconnect token that can never be bound or removed, while consuming a seat. It
+// is unauthenticated and irreversible, so repeating it fills the match for good.
+func TestPlayerJoinIsRefusedOnTheWire(t *testing.T) {
+	for _, raw := range []string{
+		`{"type":"player_join","displayName":"Ace"}`,
+		`{"type":"player_join"}`,
+		`{"type":"player_join","displayName":"  "}`,
+		`{"type":"player_join","displayName":"Ace","extra":1}`,
+	} {
+		action, perr := DecodeGameAction(json.RawMessage(raw))
+		if perr == nil {
+			t.Fatalf("%s was accepted as %#v; a socket must never mint a player", raw, action)
+		}
+		if perr.Code != CodeNotPermitted {
+			t.Fatalf("%s: code = %s, want not_permitted", raw, perr.Code)
+		}
 	}
-	if got := join.(game.PlayerJoinAction).DisplayName; got != "Ace" {
-		t.Fatalf("displayName = %q", got)
+	// The shared fixture for the historical shape is refused too, so the wire
+	// contract cannot quietly drift back to accepting it.
+	action, perr := DecodeGameAction(readFixture(t, "actions/player_join.json"))
+	if perr == nil {
+		t.Fatalf("the player_join fixture was accepted as %#v", action)
 	}
+}
 
+func TestDecodeGameActionPayloads(t *testing.T) {
 	ready, perr := DecodeGameAction(json.RawMessage(`{"type":"player_ready","ready":true}`))
 	if perr != nil {
 		t.Fatalf("ready rejected: %+v", perr)
@@ -76,8 +99,10 @@ func TestDecodeGameActionRejectsMalformedAndUnknown(t *testing.T) {
 		{"array", `[1]`, CodeMalformedMessage},
 		{"missing type", `{"displayName":"Ace"}`, CodeMalformedMessage},
 		{"type not string", `{"type":5}`, CodeMalformedMessage},
-		{"join without name", `{"type":"player_join"}`, CodeMalformedMessage},
-		{"join blank name", `{"type":"player_join","displayName":"  "}`, CodeMalformedMessage},
+		// A player_join is refused as not-permitted regardless of payload, so the
+		// payload is never inspected; see TestPlayerJoinIsRefusedOnTheWire.
+		{"join", `{"type":"player_join"}`, CodeNotPermitted},
+		{"join blank name", `{"type":"player_join","displayName":"  "}`, CodeNotPermitted},
 		{"ready without flag", `{"type":"player_ready"}`, CodeMalformedMessage},
 		{"unknown type", `{"type":"teleport"}`, CodeUnknownMessageType},
 	}

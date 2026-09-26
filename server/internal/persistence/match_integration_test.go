@@ -2,6 +2,8 @@ package persistence
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -209,5 +211,72 @@ func TestMarkInterruptedFlags(t *testing.T) {
 	}
 	if row.State.Phase != game.PhaseInterrupted || !row.Interrupted {
 		t.Fatalf("match should be marked interrupted: %+v", row.State)
+	}
+}
+
+// --- schema readiness ------------------------------------------------------
+
+// A ping only proves the socket is open. A server whose database has no tables
+// must not report itself ready, or an orchestrator keeps routing traffic at an
+// instance that cannot serve any of it.
+func TestCheckSchemaFailsOnAnEmptyDatabase(t *testing.T) {
+	store := integrationDBUnmigrated(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := store.CheckSchema(ctx); err == nil {
+		t.Fatal("an unmigrated database must not pass the schema check")
+	}
+
+	if _, err := store.Migrate(ctx, "../../migrations"); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		t.Fatalf("a migrated database must pass the schema check: %v", err)
+	}
+}
+
+// Migrations must leave the database untouched when one of them fails, so a bad
+// release cannot half-apply.
+func TestFailedMigrationLeavesNoRecord(t *testing.T) {
+	store := integrationDBUnmigrated(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Point the runner at a directory containing one good and one broken file.
+	dir := t.TempDir()
+	good := "CREATE TABLE mig_probe (id int primary key);"
+	broken := "CREATE TABLE mig_broken (id int primary key); INSERT INTO no_such_table VALUES (1);"
+	for name, body := range map[string]string{
+		"0001_ok.sql":     good,
+		"0002_broken.sql": broken,
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := store.Migrate(ctx, dir); err == nil {
+		t.Fatal("expected the broken migration to fail")
+	}
+
+	// The first migration is recorded; the failed one is not, and its table is
+	// absent because its transaction rolled back.
+	var recorded int
+	if err := store.pool.QueryRow(ctx,
+		`SELECT count(*) FROM schema_migrations WHERE version = 2`).Scan(&recorded); err != nil {
+		t.Fatal(err)
+	}
+	if recorded != 0 {
+		t.Fatal("a failed migration must not be recorded as applied")
+	}
+	var brokenTables int
+	if err := store.pool.QueryRow(ctx,
+		`SELECT count(*) FROM information_schema.tables
+		  WHERE table_schema = current_schema() AND table_name = 'mig_broken'`).Scan(&brokenTables); err != nil {
+		t.Fatal(err)
+	}
+	if brokenTables != 0 {
+		t.Fatal("a failed migration must not leave its tables behind")
 	}
 }

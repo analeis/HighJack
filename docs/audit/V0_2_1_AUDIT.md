@@ -443,6 +443,14 @@ tested, and because every later transport fix is written against the
 ### v0.2.2 — Multiplayer integrity & durability
 
 - **Addresses:** MTP-1…10; PRS-1…6; OPS-3…7.
+- **Resolved in this release:** MTP-1, MTP-2 (retained from v0.2.1), MTP-3,
+  MTP-4, MTP-5 (retained), MTP-6, MTP-7, MTP-8, MTP-10, PRS-1, PRS-2, PRS-3
+  (partially: the lock is now bounded and documented rather than removed),
+  PRS-6, OPS-3, OPS-4, OPS-5, OPS-6, OPS-7.
+- **Deferred with rationale:** PRS-4 (multi-instance `MarkInterrupted` is
+  unresolvable without a deployment topology — see RSK-1); PRS-5 (live-match
+  restore across restarts is a feature, not a stabilization fix, and the client
+  now surfaces a terminal match instead of reconnecting forever).
 - **Depends on:** v0.2.1's harness — repro tests land here, failing first.
 - **Compatibility:** additive snapshot field for durability status; a new
   migration only if a schema change proves unavoidable (none is expected —

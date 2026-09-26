@@ -122,7 +122,17 @@ export class GameConnection {
         if (events.length > 0) this.handlers.onEvents(events);
         break;
       }
+      case 'transition': {
+        // One frame per authoritative transition. Applied as a batch so a
+        // transition cannot be interleaved with another, which is what the
+        // server now guarantees by construction.
+        const events = (msg['events'] as { tick: number; event: GameEvent }[] | undefined) ?? [];
+        if (events.length > 0) this.handlers.onEvents(events);
+        break;
+      }
       case 'event': {
+        // Retained for compatibility with a server that still sends one event per
+        // frame. The batched form above is what v0.2.2 emits.
         const tick = Number(msg['tick'] ?? 0);
         const event = msg['event'] as GameEvent;
         if (event) this.handlers.onEvents([{ tick, event }]);
