@@ -6,8 +6,9 @@
  * them. Runtime guards validate the shapes a client receives; the engine
  * remains the sole authority over the values.
  */
-import type { Money, PlayerId, Seat } from './ids.ts';
+import { ACTION_TYPES, type ActionType } from './actions.ts';
 import type { BoardSpace, SpaceKind } from './config.ts';
+import type { Money, PlayerId, Seat } from './ids.ts';
 
 export type PlayerStatus = 'active' | 'eliminated' | 'disconnected';
 
@@ -49,6 +50,22 @@ export interface GameSnapshot {
   readonly winnerId: PlayerId | null;
   readonly endReason: string;
   readonly configHash: string;
+  /**
+   * The per-recipient half: which player this frame is for, and what the engine
+   * would accept from them right now.
+   *
+   * Optional because a snapshot is also a shared projection; the transport
+   * populates it for the connection it is writing to. A client that does not
+   * receive it falls back to deriving legality, which is what it had to do before.
+   */
+  readonly you?: ViewerState;
+}
+
+/** Recipient-specific state: identity plus the actions currently permitted. */
+export interface ViewerState {
+  readonly playerId: PlayerId;
+  /** Action types the engine would accept from this player right now. */
+  readonly legalActions: readonly ActionType[];
 }
 
 export type SpaceKindValue = SpaceKind;
@@ -131,6 +148,27 @@ export function isGameSnapshot(value: unknown): value is GameSnapshot {
     isSnapshotTurn(value['turn']) &&
     (winner === null || typeof winner === 'string') &&
     typeof value['endReason'] === 'string' &&
-    typeof value['configHash'] === 'string'
+    typeof value['configHash'] === 'string' &&
+    // `you` is optional for forward compatibility: a server that does not send it
+    // still produces a valid snapshot, and the client falls back to deriving.
+    (value['you'] === undefined || isViewerState(value['you']))
+  );
+}
+
+/**
+ * Guard for the per-recipient block.
+ *
+ * `legalActions` is checked against the known action types rather than merely
+ * checked as an array of strings: an unrecognised action is a contract drift
+ * between the two implementations, and silently rendering an unknown button is how
+ * that drift would reach a player.
+ */
+export function isViewerState(value: unknown): value is ViewerState {
+  if (!isRecord(value)) return false;
+  const actions = value['legalActions'];
+  if (!Array.isArray(actions)) return false;
+  if (typeof value['playerId'] !== 'string' || value['playerId'].length === 0) return false;
+  return (actions as unknown[]).every(
+    (a) => typeof a === 'string' && (ACTION_TYPES as readonly string[]).includes(a),
   );
 }

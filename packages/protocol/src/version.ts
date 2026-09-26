@@ -5,13 +5,19 @@
  * compatibility contract: clients and servers with the same major version
  * can communicate. Minor/patch bumps must be backwards compatible.
  *
+ * 1.2.0 added the per-recipient `you` block on a snapshot (the player id and the
+ * action types the engine would accept from them) and the batched `transition`
+ * frame. Both are additive: an older client ignores `you` and still reads `event`
+ * frames, and a newer client falls back to deriving legality when a server does
+ * not send `you`. The major version is unchanged.
+ *
  * SCHEMA_VERSION is a monotonically increasing integer identifying the
  * revision of individual message payload schemas. It is embedded in
  * fixtures and used by compatibility tests on both the TypeScript and Go
  * sides of the boundary.
  */
 
-export const PROTOCOL_VERSION = '1.1.0';
+export const PROTOCOL_VERSION = '1.2.0';
 
 /** Integer protocol major version carried by every message envelope (`v`). */
 export const PROTOCOL_MAJOR_VERSION = 1;

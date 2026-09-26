@@ -36,6 +36,16 @@
   coverage.
 - No snapshot tests of markup; assert what a user or screen reader gets.
 
+## Browser harness
+
+The Playwright harness never reuses an existing **game server** or **game
+preview**: both are started fresh, because a leftover server from an earlier build
+answers `/health` happily while running entirely different rules. That is not
+hypothetical — a stale v0.2.0 binary was serving the game suite for two
+certified releases, and every game-path assertion was verifying pre-audit code.
+The website preview is still reused locally; it is static content and carries no
+assertions about backend behaviour.
+
 ## Backend conventions
 
 - Table-driven tests; every domain error path covered.

@@ -95,6 +95,7 @@ function harness(): Harness {
     onWelcome: () => {},
     onSnapshot: (s) => snapshots.push(s),
     onEvents: (e) => events.push(...e),
+    onLegalActions: () => {},
     onActionResult: (seq, ok, code) =>
       results.push(code === undefined ? { seq, ok } : { seq, ok, code }),
   });

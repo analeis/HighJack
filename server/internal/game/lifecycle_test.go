@@ -147,16 +147,27 @@ func TestStartRequiresHostAllReadyAndWithinRange(t *testing.T) {
 	}
 }
 
-func TestReadyChangeWithoutDifferenceEmitsNothing(t *testing.T) {
+// A redundant toggle is refused, not accepted as a no-op. Accepting it advanced
+// the tick and cost a durable commit while emitting nothing, so the event log
+// carried a gap that no event explained — and "accepted" stopped meaning "changed
+// something", which is what the legal-action projection assumes.
+func TestReadyChangeWithoutDifferenceIsRejected(t *testing.T) {
 	e, state := testEngine(t, DefaultConfig())
 	ids, state := joinAndReady(t, e, state, "A")
-	tickBefore := state.Tick
-	state, events := mustApply(t, e, state, ids[0], PlayerReadyAction{Ready: true})
-	if len(events) != 0 {
-		t.Fatalf("no-op ready toggle must emit no events, got %+v", events)
+	before := state.Clone()
+
+	next, events, err := e.Apply(state, ids[0], PlayerReadyAction{Ready: true})
+	if err == nil {
+		t.Fatal("a redundant ready toggle must be rejected")
 	}
-	if state.Tick != tickBefore+1 {
-		t.Fatalf("tick must advance exactly once per applied action: %d → %d", tickBefore, state.Tick)
+	if next != nil {
+		t.Fatal("a rejected action must not return a new state")
+	}
+	if len(events) != 0 {
+		t.Fatalf("a rejected action must emit nothing, got %+v", events)
+	}
+	if state.Tick != before.Tick {
+		t.Fatalf("a rejected action advanced the tick: %d → %d", before.Tick, state.Tick)
 	}
 }
 

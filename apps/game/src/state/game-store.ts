@@ -9,7 +9,13 @@
  * rather than drifting.
  */
 import { createSignal } from 'solid-js';
-import type { MatchPhase, GameConfig, GameEvent, GameSnapshot } from '@highjack/protocol';
+import type {
+  ActionType,
+  MatchPhase,
+  GameConfig,
+  GameEvent,
+  GameSnapshot,
+} from '@highjack/protocol';
 import type { ConnectionStatus } from '../net/connection.ts';
 
 export interface UiPlayer {
@@ -54,6 +60,11 @@ export interface GameView {
    */
   phase: MatchPhase;
   tick: number;
+  /**
+   * The action types the engine would accept from this player right now, as
+   * reported by the server. The dock renders these; it does not re-derive them.
+   */
+  legalActions: readonly ActionType[];
   players: UiPlayer[];
   spaces: UiSpace[];
   turn: UiTurn;
@@ -80,8 +91,11 @@ const [reducedMotion, setReducedMotion] = createSignal(
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
 );
 
-function toView(snapshot: GameSnapshot, config: GameConfig | null): GameView {
-  const prev = view();
+function toView(
+  snapshot: GameSnapshot,
+  config: GameConfig | null,
+  prev: GameView | null = null,
+): GameView {
   return {
     matchId: snapshot.matchId,
     phase: snapshot.phase,
@@ -121,8 +135,47 @@ function toView(snapshot: GameSnapshot, config: GameConfig | null): GameView {
     // previous snapshot.
     playerId: localPlayerId(),
     lastRoll: prev?.lastRoll ?? null,
+    // Absent `you` means an older server: fall back to deriving, which is what
+    // this client had to do before, rather than showing a dead dock.
+    legalActions: snapshot.you?.legalActions ?? derivedLegalActions(snapshot, localPlayerId()),
     config,
   };
+}
+
+/**
+ * Fallback legality for a server that does not send `you`.
+ *
+ * This duplicates the engine's rules, and it is only a compatibility path for a
+ * protocol 1.1 server. It exists so a newer client against an older server still
+ * has a working dock; for a current server it is never called, so it is not a
+ * second source of truth.
+ */
+function derivedLegalActions(snapshot: GameSnapshot, playerId: string): readonly ActionType[] {
+  if (!playerId) return [];
+  const me = snapshot.players.find((p) => p.playerId === playerId);
+  if (!me) return [];
+  if (snapshot.phase === 'lobby') {
+    return me.isHost
+      ? ['player_ready', 'game_start', 'player_leave']
+      : ['player_ready', 'player_leave'];
+  }
+  if (snapshot.phase !== 'playing' || me.status !== 'active') return ['player_leave'];
+  if (me.seat !== snapshot.turn.currentSeat) return ['player_leave'];
+  switch (snapshot.turn.phase) {
+    case 'await_roll':
+      return ['roll_dice', 'player_leave'];
+    case 'turn_over':
+      return ['end_turn', 'player_leave'];
+    case 'await_buy_decision': {
+      const space = snapshot.spaces[me.position];
+      if (!space || space.kind !== 'property' || space.owned) return ['player_leave'];
+      return me.money >= space.price
+        ? ['buy_property', 'decline_buy', 'player_leave']
+        : ['decline_buy', 'player_leave'];
+    }
+    default:
+      return ['player_leave'];
+  }
 }
 
 /** Installs an authoritative snapshot. The only wholesale state setter. */
@@ -132,32 +185,95 @@ export function applySnapshot(
   nextSeq: number,
   resync: boolean,
 ): void {
-  setView(toView(snapshot, config));
-  setCursor(snapshot.tick);
+  setView((prev) => {
+    // A snapshot older than what we hold must never overwrite it. The server
+    // publishes a transition's events and then acks the action, and a peer's
+    // transition can land between those two writes, so the ack's snapshot can
+    // genuinely predate state already on screen. Accepting it rewound money,
+    // ownership and the turn pointer with nothing to indicate it had happened.
+    if (prev && snapshot.tick < prev.tick) return prev;
+    return toView(snapshot, config, prev);
+  });
+  setCursor((c) => Math.max(c, snapshot.tick));
   setResynced(resync);
   void nextSeq;
 }
 
+/**
+ * Applied ticks.
+ *
+ * A transition arrives as one batch whose events all share a tick, so the tick is
+ * the transition's identity on the wire and the sound dedup key.
+ */
+let appliedTicks = new Set<number>();
+
+/**
+ * Forget which ticks have been applied.
+ *
+ * Test-only, so each case starts from a known dedup state; a leaked set would make
+ * one test's transition look already-applied in the next.
+ */
+export function resetAppliedTicks(): void {
+  appliedTicks = new Set<number>();
+}
+
+function markApplied(tick: number): void {
+  appliedTicks.add(tick);
+  // Bounded by size only. Pruning by "the view has already reached this tick"
+  // looks like an optimisation and is exactly wrong: the tick a view is *at* is
+  // the one most likely to be re-delivered, because the acting client receives
+  // its own transition's events before the acknowledgement's snapshot arrives.
+  // Dropping that entry is the same as having no dedup at all.
+  if (appliedTicks.size > 4096) {
+    appliedTicks = new Set([...appliedTicks].slice(-2048));
+  }
+}
+
 /** Applies authoritative events through the pure reducer. */
+/**
+ * Applies authoritative events.
+ *
+ * A tick is applied at most once. The server documents at-least-once delivery and
+ * names the tick as the dedup key, but the client implemented no dedup at all, so
+ * the first re-delivery charged a rent twice or marked a property bought twice.
+ */
+/**
+ * Replace the legal actions the engine reported for this connection.
+ *
+ * Separate from `applySnapshot` because legality changes when *anyone* acts, not
+ * only when this player does: a second player readying is what enables the host's
+ * Start, and no snapshot is sent for another player's action.
+ */
+export function applyLegalActions(actions: readonly ActionType[]): void {
+  setView((prev) => (prev ? { ...prev, legalActions: actions } : prev));
+}
+
 export function applyEvents(events: readonly { tick: number; event: GameEvent }[]): void {
-  setView((prev) => {
-    if (!prev) return prev;
-    let next: GameView = {
-      ...prev,
-      players: prev.players.map((p) => ({ ...p })),
-      spaces: prev.spaces.map((s) => ({ ...s })),
-      turn: { ...prev.turn },
-    };
-    let tick = prev.tick;
-    for (const { tick: t, event } of events) {
-      tick = Math.max(tick, t);
-      next = reduceEvent(next, event);
-    }
-    next.tick = tick;
-    return next;
-  });
-  const last = events[events.length - 1];
-  if (last) setCursor(last.tick);
+  if (events.length === 0) return;
+  // A transition arrives as one batch whose events all share a tick, so the first
+  // entry's tick is the batch's identity.
+  const batchTick = events[0]!.tick;
+
+  if (!appliedTicks.has(batchTick)) {
+    setView((prev) => {
+      if (!prev) return prev;
+      let next: GameView = {
+        ...prev,
+        players: prev.players.map((p) => ({ ...p })),
+        spaces: prev.spaces.map((s) => ({ ...s })),
+        turn: { ...prev.turn },
+      };
+      let at = prev.tick;
+      for (const { tick: t, event } of events) {
+        at = Math.max(at, t);
+        next = reduceEvent(next, event);
+      }
+      next.tick = at;
+      return next;
+    });
+  }
+  markApplied(batchTick);
+  setCursor((c) => Math.max(c, batchTick));
 }
 
 function reduceEvent(state: GameView, event: GameEvent): GameView {
@@ -266,31 +382,16 @@ export function setLocalPlayer(playerId: string): void {
   setView((prev) => (prev ? { ...prev, playerId } : prev));
 }
 
-/** Presentation-only helpers (never authoritative). */
-export function isMyTurn(state: GameView | null): boolean {
-  if (!state || state.phase !== 'playing') return false;
-  const me = state.players.find((p) => p.id === state.playerId);
-  return me !== undefined && me.status === 'active' && me.seat === state.turn.currentSeat;
-}
-
-export function canRoll(state: GameView | null): boolean {
-  return isMyTurn(state) && state?.turn.phase === 'await_roll';
-}
-
-export function canBuy(state: GameView | null): boolean {
-  if (!isMyTurn(state) || state?.turn.phase !== 'await_buy_decision') return false;
-  const me = state.players.find((p) => p.id === state.playerId);
-  if (!me) return false;
-  const space = state.spaces[me.position];
-  return (
-    space !== undefined && space.kind === 'property' && !space.owned && me.money >= space.price
-  );
-}
-
-export function canEndTurn(state: GameView | null): boolean {
-  return isMyTurn(state) && state?.turn.phase === 'turn_over';
-}
-
+/**
+ * Presentation-only helpers. These describe *what to display*, never what is
+ * permitted: legality comes from the snapshot's `you.legalActions`.
+ *
+ * The `canBuy` / `canRoll` / `isMyTurn` family that used to live here was deleted
+ * deliberately. Each was a second copy of an engine predicate, and the copies had
+ * already drifted: `canBuy` gated Decline, which the engine does not gate, so a
+ * player who could not afford a property had no legal move at all while the server
+ * was waiting for one. See `you.legalActions` in GameView.
+ */
 export function currentPlayer(state: GameView | null): UiPlayer | null {
   if (!state) return null;
   return state.players.find((p) => p.seat === state.turn.currentSeat) ?? null;
@@ -321,4 +422,20 @@ export const gameStore = {
   setFps,
   setStageReady,
   setReducedMotion,
+  /**
+   * Return the store to its initial state.
+   *
+   * Tests need this because the store is a module-level singleton, and a leaked
+   * view or dedup set between cases would let one test's state satisfy another's
+   * assertions. Production never calls it.
+   */
+  reset: () => {
+    setView(null);
+    setCursor(0);
+    setResynced(false);
+    setLastError('');
+    setPendingAction(false);
+    setStatus('idle');
+    setStatusDetail('');
+  },
 };

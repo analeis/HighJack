@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"reflect"
 	"sync"
 	"time"
 
@@ -86,7 +87,7 @@ func DomainError(err error) protocol.ErrorCode {
 	case errors.Is(err, game.ErrNotEnoughPlayers):
 		return protocol.CodeNotEnoughPlayers
 	case errors.Is(err, game.ErrNotAllReady), errors.Is(err, game.ErrInvalidName),
-		errors.Is(err, game.ErrUnknownAction):
+		errors.Is(err, game.ErrUnknownAction), errors.Is(err, game.ErrNoChange):
 		return protocol.CodeInvalidAction
 	default:
 		return protocol.CodeInternalError
@@ -151,8 +152,36 @@ type Registry struct {
 // NewRegistry builds an empty registry. store may be nil: matches then run
 // in memory only (development default, as in v0.1) and docs record that
 // limitation.
+// NewRegistry builds a registry.
+//
+// The store is normalised here so that "no persistence" is a genuinely nil
+// interface. Passing a typed nil `*persistence.Store` leaves the interface
+// non-nil, and every `store != nil` guard in this package then passes, so the
+// runtime calls a method on a nil receiver. That is not hypothetical: it made
+// `POST /matches` fail with 500 whenever the server ran without a database, which
+// is the normal local development mode. Normalising in one place means no caller
+// — including the tests — can reintroduce it.
 func NewRegistry(log *slog.Logger, store Store) *Registry {
-	return &Registry{matches: make(map[game.GameID]*Match), store: store, log: log}
+	r := &Registry{matches: make(map[game.GameID]*Match), log: log}
+	if !isNilStore(store) {
+		r.store = store
+	}
+	return r
+}
+
+// isNilStore reports whether a Store is absent, including the typed-nil case that
+// a plain `== nil` comparison misses.
+func isNilStore(s Store) bool {
+	if s == nil {
+		return true
+	}
+	v := reflect.ValueOf(s)
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 // MarkInterruptedFlags runs at boot: any match left active by a previous
@@ -240,6 +269,19 @@ func (r *Registry) Get(id game.GameID) *Match {
 func (m *Match) ID() game.GameID { return m.id }
 
 // Snapshot returns the authoritative state under the match lock.
+// SnapshotFor returns the authoritative snapshot as this player should see it,
+// including the legal-action set the engine computes for them.
+//
+// Both halves are read under one lock acquisition, so the shared state and the
+// per-player legality can never describe different moments — a client that acted
+// on a stale legal-action list would send an action the engine has already
+// stopped accepting.
+func (m *Match) SnapshotFor(playerID game.PlayerID) protocol.GameSnapshot {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return protocol.WithViewer(protocol.NewGameSnapshot(m.state), m.state, m.cfg, playerID)
+}
+
 func (m *Match) Snapshot() protocol.GameSnapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -484,7 +526,9 @@ func (m *Match) ApplyAction(ctx context.Context, sessionID string, seq int64, ac
 	}
 
 	envelopes := m.commitLocked(events, next)
-	snap := protocol.NewGameSnapshot(next)
+	// The ack goes only to the acting client, so its snapshot is projected for that
+	// player and carries the legal actions they may take next.
+	snap := protocol.WithViewer(protocol.NewGameSnapshot(next), next, m.cfg, s.player)
 	s.lastSeq = seq
 	s.lastAck = ActionResult{Events: envelopes, Snapshot: snap, NextSeq: seq + 1}
 	s.haveAck = true
@@ -552,9 +596,15 @@ func (m *Match) trimHistoryLocked() {
 // publications for a session until its snapshot frame is written, closes the
 // window.
 func (m *Match) Resume(cursor *int64) (protocol.GameSnapshot, []EventEnvelope, bool) {
+	return m.ResumeFor(cursor, "")
+}
+
+// ResumeFor is Resume with the recipient's identity, so the snapshot handed to a
+// binding client carries that player's legal actions.
+func (m *Match) ResumeFor(cursor *int64, playerID game.PlayerID) (protocol.GameSnapshot, []EventEnvelope, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	snap := protocol.NewGameSnapshot(m.state)
+	snap := protocol.WithViewer(protocol.NewGameSnapshot(m.state), m.state, m.cfg, playerID)
 	if cursor == nil {
 		return snap, nil, false
 	}
@@ -638,18 +688,55 @@ func (m *Match) Broadcast(events []EventEnvelope, exceptSeq int64) {
 	m.fanoutMu.Lock()
 	defer m.fanoutMu.Unlock()
 
+	// Collect sinks *and* each recipient's legal actions under one acquisition, so
+	// the two describe the same instant. The action set is per-recipient, which is
+	// why a transition cannot be a single shared frame any more: a shared frame
+	// cannot tell two players apart, and a client whose legal set is refreshed only
+	// on a snapshot goes stale the moment anyone else acts — the host's dock stayed
+	// disabled after the second player readied, with no error anywhere.
+	type recipient struct {
+		sink   Sink
+		player game.PlayerID
+	}
 	m.mu.Lock()
-	sinks := make([]Sink, 0, len(m.sessions))
+	recipients := make([]recipient, 0, len(m.sessions))
+	legal := map[game.PlayerID][]string{}
 	for _, s := range m.sessions {
-		if s.bound && s.connected && s.sink != nil && s.ready {
-			sinks = append(sinks, s.sink)
+		if !s.bound || !s.connected || s.sink == nil || !s.ready {
+			continue
+		}
+		recipients = append(recipients, recipient{sink: s.sink, player: s.player})
+		if _, done := legal[s.player]; !done {
+			actions := game.LegalActions(m.state, m.cfg, s.player)
+			names := make([]string, 0, len(actions))
+			for _, a := range actions {
+				names = append(names, string(a))
+			}
+			legal[s.player] = names
 		}
 	}
 	m.mu.Unlock()
 
-	for _, sink := range sinks {
-		sink.Send(frame)
+	if len(recipients) == 0 {
+		return
 	}
+	for _, r := range recipients {
+		r.sink.Send(withViewerActions(frame, r.player, legal[r.player]))
+	}
+}
+
+// withViewerActions returns a copy of a transition frame stamped with the
+// recipient's legal actions, matching the shape a snapshot already uses.
+//
+// A copy, not a mutation of the shared frame: every recipient gets a different
+// answer, and a sink is free to hold the value rather than marshal it inline.
+func withViewerActions(frame map[string]any, player game.PlayerID, actions []string) map[string]any {
+	out := make(map[string]any, len(frame)+1)
+	for k, v := range frame {
+		out[k] = v
+	}
+	out["you"] = map[string]any{"playerId": string(player), "legalActions": actions}
+	return out
 }
 
 // transitionFrame encodes a transition's events as one `transition` frame.
@@ -657,7 +744,7 @@ func (m *Match) Broadcast(events []EventEnvelope, exceptSeq int64) {
 // Every event in a transition shares one tick, because the engine stamps a whole
 // transition with the tick it produced. The tick is therefore the transition's
 // identity on the wire, and a client can apply the batch in one step.
-func transitionFrame(events []EventEnvelope) (any, bool) {
+func transitionFrame(events []EventEnvelope) (map[string]any, bool) {
 	// The batch is []any rather than a typed slice so that a consumer inspecting
 	// the frame in-process — the transport tests do exactly that — sees the same
 	// shape the JSON produces.
@@ -831,6 +918,16 @@ func nextTickOf(s *game.GameState) uint64 { return s.Tick }
 // A session is not published to until its handshake snapshot has been written,
 // so a client can never observe a transition that is ahead of the state it was
 // given. Must be called after the snapshot frame is on the wire.
+// PlayerFor returns the player a session is bound to, or "" when unbound.
+func (m *Match) PlayerFor(sessionID string) game.PlayerID {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s := m.sessions[sessionID]; s != nil && s.bound {
+		return s.player
+	}
+	return ""
+}
+
 func (m *Match) MarkReady(sessionID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

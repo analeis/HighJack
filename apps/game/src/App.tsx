@@ -1,21 +1,25 @@
-import { createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { Badge, Button, Money, StatusDot } from '@highjack/ui';
 import type { ActionType, GameConfig, GameSnapshot } from '@highjack/protocol';
 import { createBoardStage, type BoardStage } from './engine/board-stage.ts';
 import {
   applyEvents,
+  applyLegalActions,
   applySnapshot,
-  canBuy,
-  canEndTurn,
-  canRoll,
   currentPlayer,
   gameStore,
-  isMyTurn,
   myHoldings,
   setLocalPlayer,
 } from './state/game-store.ts';
-import { createMatch, GameConnection, joinMatch, type ConnectionStatus } from './net/connection.ts';
+import {
+  GameConnection,
+  createMatch,
+  joinMatch,
+  readStoredSeat,
+  rememberSeat,
+  type ConnectionStatus,
+} from './net/connection.ts';
 
 /**
  * HighJack game client.
@@ -82,6 +86,10 @@ export function App(): JSX.Element {
       applySnapshot(snapshot, config, nextSeq, resync);
       syncStage();
     },
+    onLegalActions: (actions: readonly ActionType[]) => {
+      applyLegalActions(actions);
+      syncStage();
+    },
     onEvents: (
       events: readonly {
         tick: number;
@@ -111,16 +119,31 @@ export function App(): JSX.Element {
     },
   };
 
+  /**
+   * Claim a seat and connect.
+   *
+   * The seat is persisted so a reload rejoins the same table instead of orphaning
+   * it. The match id was previously written into the query string and never read
+   * back, and the token was never stored at all — so a refresh created a *new*
+   * match and left the player with a dead one. That made the advertised two-player
+   * flow unreachable through the product: the only way in was a raw WebSocket in
+   * the test suite.
+   */
+  const openSeat = async (matchId: string, name: string): Promise<void> => {
+    const seat = await joinMatch(SERVER_URL, matchId, name);
+    setLocalPlayer(seat.playerId);
+    rememberSeat(matchId, seat.token, seat.playerId);
+    connection = new GameConnection(WS_URL, matchId, seat.token, handlers);
+    connection.connect();
+    history.replaceState(null, '', `?match=${encodeURIComponent(matchId)}`);
+  };
+
   const enterMatch = async (): Promise<void> => {
     setEntering(true);
     gameStore.setLastError('');
     try {
       const created = await createMatch(SERVER_URL);
-      const seat = await joinMatch(SERVER_URL, created.matchId, displayName() || 'Player');
-      setLocalPlayer(seat.playerId);
-      connection = new GameConnection(WS_URL, created.matchId, seat.token, handlers);
-      connection.connect();
-      history.replaceState(null, '', `?match=${created.matchId}`);
+      await openSeat(created.matchId, displayName() || 'Player');
     } catch (err) {
       gameStore.setLastError(err instanceof Error ? err.message : 'could not join');
     } finally {
@@ -128,12 +151,67 @@ export function App(): JSX.Element {
     }
   };
 
+  const joinExisting = async (matchId: string): Promise<void> => {
+    setEntering(true);
+    gameStore.setLastError('');
+    try {
+      await openSeat(matchId.trim(), displayName() || 'Player');
+    } catch (err) {
+      gameStore.setLastError(err instanceof Error ? err.message : 'could not join that match');
+    } finally {
+      setEntering(false);
+    }
+  };
+
+  // A stored seat, or a match id in the URL, means this browser already belongs
+  // to a table. Rejoin it rather than offering to create another.
+  onMount(() => {
+    const stored = readStoredSeat();
+    const fromUrl = new URLSearchParams(window.location.search).get('match');
+    const matchId = stored?.matchId ?? fromUrl;
+    if (!matchId) return;
+    if (stored) {
+      setLocalPlayer(stored.playerId);
+      connection = new GameConnection(WS_URL, stored.matchId, stored.token, handlers);
+      connection.connect();
+      return;
+    }
+    // Someone shared a link: claim a seat at their table.
+    void joinExisting(matchId);
+  });
+
   const act = async (type: ActionType, extra: Record<string, unknown> = {}): Promise<void> => {
     if (!connection || gameStore.pendingAction()) return;
+    // Never act on a socket that is not open. The send used to be attempted
+    // anyway and its failure ignored, so the click vanished with no feedback.
+    if (gameStore.status() !== 'connected') {
+      gameStore.setLastError('not connected — reconnecting');
+      return;
+    }
     gameStore.setPendingAction(true);
     gameStore.setLastError('');
-    await connection.send(type, extra);
+    const sent = await connection.send(type, extra);
+    if (!sent) {
+      // The action never reached the server, so nothing is in flight. Clearing
+      // here is what stops one dropped connection from wedging the dock: the flag
+      // used to be cleared only by an acknowledgement, and a socket that closes
+      // mid-action never sends one, leaving every button disabled behind a
+      // permanent "waiting for server…" until a reload — which then discarded the
+      // player's seat.
+      gameStore.setPendingAction(false);
+      gameStore.setLastError('action could not be sent');
+    }
   };
+
+  // A connection that drops leaves nothing in flight, so the pending flag must not
+  // survive it. Clearing on status change rather than on close covers a failed
+  // send, a refused reconnect and a deliberate teardown alike.
+  createEffect(() => {
+    const status = gameStore.status();
+    if (status === 'reconnecting' || status === 'disconnected' || status === 'error') {
+      gameStore.setPendingAction(false);
+    }
+  });
 
   return (
     <div class="flex h-dvh flex-col overflow-hidden bg-felt-950">
@@ -141,7 +219,13 @@ export function App(): JSX.Element {
       <Show
         when={gameStore.view()}
         fallback={
-          <Lobby name={displayName()} setName={setName} onEnter={enterMatch} busy={entering()} />
+          <Lobby
+            name={displayName()}
+            setName={setName}
+            onEnter={enterMatch}
+            onJoin={joinExisting}
+            busy={entering()}
+          />
         }
       >
         {(view) => (
@@ -238,8 +322,10 @@ function Lobby(props: {
   name: string;
   setName: (v: string) => void;
   onEnter: () => void;
+  onJoin: (matchId: string) => void;
   busy: boolean;
 }): JSX.Element {
+  const [matchId, setMatchId] = createSignal('');
   return (
     <main class="flex flex-1 items-center justify-center overflow-y-auto p-6">
       <div class="w-full max-w-md rounded-xl border border-line-subtle bg-felt-900/60 p-6 shadow-raised">
@@ -261,8 +347,36 @@ function Lobby(props: {
           onInput={(e) => props.setName(e.currentTarget.value)}
         />
         <Button onClick={props.onEnter} disabled={props.busy} class="w-full">
-          {props.busy ? 'Creating match…' : 'Create & join'}
+          {props.busy ? 'Creating match…' : 'Create a table'}
         </Button>
+
+        <div class="my-4 flex items-center gap-3 text-xs uppercase tracking-widest text-muted-500">
+          <span class="h-px flex-1 bg-line-subtle" />
+          or
+          <span class="h-px flex-1 bg-line-subtle" />
+        </div>
+
+        {/* Joining an existing table. The client could create a match but had no
+            way to join one, so the advertised second player had to be simulated
+            outside the product. */}
+        <label class="mb-1 block text-xs uppercase tracking-widest text-muted-400" for="join-match">
+          Match id
+        </label>
+        <div class="flex gap-2">
+          <input
+            id="join-match"
+            class="w-full rounded-md border border-line-subtle bg-felt-950 px-3 py-2 font-mono text-sm text-cream-100 outline-none focus:border-gold-500"
+            placeholder="m_…"
+            value={matchId()}
+            onInput={(e) => setMatchId(e.currentTarget.value)}
+          />
+          <Button
+            onClick={() => props.onJoin(matchId())}
+            disabled={props.busy || matchId().trim() === ''}
+          >
+            Join
+          </Button>
+        </div>
         <Show when={gameStore.lastError()}>
           {(msg) => (
             <p role="alert" class="mt-3 text-sm text-crimson-400">
@@ -415,88 +529,142 @@ function ActionDock(props: {
   const me = () => state().players.find((p) => p.id === state().playerId) ?? null;
   const space = () => (me() ? state().spaces[me()!.position] : undefined);
   const pending = () => gameStore.pendingAction();
+  const turnPlayer = () => currentPlayer(state());
+  const mySpaces = () => myHoldings(state());
+  /**
+   * Whether the engine would accept this action from this player right now.
+   *
+   * Read from the snapshot's per-recipient `you.legalActions` rather than derived
+   * locally: the client used to re-implement affordability, turn ownership and
+   * start eligibility, and those copies drifted from the engine's rules.
+   */
+  const allowed = (action: ActionType): boolean => (state()?.legalActions ?? []).includes(action);
   const ended = () => state().phase === 'ended';
 
   return (
-    <nav
-      aria-label="Match actions"
-      class="z-10 flex flex-wrap items-center justify-center gap-2 border-t border-line-subtle bg-felt-900/90 px-4 py-3"
-    >
-      <Show when={ended()}>
-        <p role="status" class="mr-2 text-sm text-gold-400">
-          {state().winnerId
-            ? `${state().players.find((p) => p.id === state().winnerId)?.name ?? 'Winner'} wins (${state().endReason})`
-            : `match ended — ${state().endReason}`}
-        </p>
-      </Show>
-
-      <ActionButton
-        label="Ready"
-        hint="mark yourself ready"
-        enabled={state().phase === 'lobby' && (me()?.ready ?? false) === false && !pending()}
-        onClick={() => props.onAct('player_ready', { ready: true })}
-      />
-      <ActionButton
-        label="Start"
-        hint="only the host can start, once everyone is ready"
-        enabled={state().phase === 'lobby' && (me()?.isHost ?? false) && !pending()}
-        onClick={() => props.onAct('game_start')}
-      />
-      <Show when={state().lastRoll}>
-        {(roll) => (
-          <span
-            class="mr-1 font-display text-sm font-bold text-cream-100"
-            aria-label="last dice roll"
-            data-testid="last-roll"
-          >
-            {roll().die1} + {roll().die2} = {roll().die1 + roll().die2}
-          </span>
-        )}
-      </Show>
-      <ActionButton
-        label="Roll"
-        hint="roll two dice and move"
-        enabled={canRoll(state()) && !pending()}
-        onClick={() => props.onAct('roll_dice')}
-      />
-      <ActionButton
-        label="Buy"
-        hint={
-          space()?.kind === 'property'
-            ? `buy ${space()?.name} for ${space()?.price}`
-            : 'no property to buy'
-        }
-        enabled={canBuy(state()) && !pending()}
-        onClick={() => props.onAct('buy_property')}
-      />
-      <ActionButton
-        label="Decline"
-        hint="skip this property (not an auction)"
-        enabled={canBuy(state()) && !pending()}
-        onClick={() => props.onAct('decline_buy')}
-      />
-      <ActionButton
-        label="End turn"
-        hint="pass the turn to the next player"
-        enabled={canEndTurn(state()) && !pending()}
-        onClick={() => props.onAct('end_turn')}
-      />
-      <Show when={pending()}>
-        <span role="status" class="ml-1 font-mono text-xs text-muted-400">
-          waiting for server…
+    <>
+      {/* The full match-information panel is `hidden` below `md`, which left a
+          phone player with no chip balance, no indication of whose turn it was,
+          no round counter and no player list — while being asked to decide whether
+          to buy a property whose only price hint was a `title` attribute iOS does
+          not show on tap. This strip carries the facts a player cannot play
+          without, and is the mobile counterpart of the panel rather than a
+          second source of truth: everything in it is read from the same view. */}
+      <section
+        aria-label="Match status"
+        class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line-subtle bg-felt-900/90 px-4 py-2 text-xs md:hidden"
+      >
+        <span class="text-muted-400">
+          Chips <strong class="font-mono text-cream-100">{me()?.money ?? 0}</strong>
         </span>
-      </Show>
-      <Show when={gameStore.lastError()}>
-        {(msg) => (
-          <p role="alert" class="w-full text-center text-sm text-crimson-400">
-            {msg()}
+        <span class="text-muted-400">
+          Turn{' '}
+          <strong class="text-cream-100">
+            {turnPlayer()?.name ?? '—'}
+            {turnPlayer() && turnPlayer()?.id === me()?.id ? ' (you)' : ''}
+          </strong>
+        </span>
+        <span class="text-muted-400">
+          Round <strong class="font-mono text-cream-100">{state().turn.round}</strong>
+        </span>
+        <span class="text-muted-400">
+          {state().phase === 'lobby'
+            ? me()?.ready
+              ? 'Ready'
+              : 'Not ready'
+            : `${state().players.filter((p) => p.status === 'active').length} in`}
+        </span>
+        <Show when={mySpaces().length > 0}>
+          <span class="text-muted-400">
+            Holdings <strong class="font-mono text-cream-100">{mySpaces().length}</strong>
+          </span>
+        </Show>
+      </section>
+      <nav
+        aria-label="Match actions"
+        class="z-10 flex flex-wrap items-center justify-center gap-2 border-t border-line-subtle bg-felt-900/90 px-4 py-3"
+      >
+        <Show when={ended()}>
+          <p role="status" class="mr-2 text-sm text-gold-400">
+            {state().winnerId
+              ? `${state().players.find((p) => p.id === state().winnerId)?.name ?? 'Winner'} wins (${state().endReason})`
+              : `match ended — ${state().endReason}`}
           </p>
-        )}
-      </Show>
-      <Show when={!isMyTurn(state()) && state().phase === 'playing' && !ended()}>
-        <span class="w-full text-center text-xs text-muted-500">waiting for your turn…</span>
-      </Show>
-    </nav>
+        </Show>
+
+        {/* A real toggle, not a one-way latch. The engine accepts the toggle in
+          both directions, and it used to be one-way in the UI: a player who
+          inherited the host role after the host left could not withdraw, and every
+          board control was disabled for them, so the lobby was stuck until a
+          reload. */}
+        <ActionButton
+          label={me()?.ready ? 'Not ready' : 'Ready'}
+          hint={me()?.ready ? 'withdraw your readiness' : 'mark yourself ready'}
+          enabled={allowed('player_ready') && !pending()}
+          onClick={() => props.onAct('player_ready', { ready: !(me()?.ready ?? false) })}
+        />
+        <ActionButton
+          label="Start"
+          hint="only the host can start, once everyone is ready"
+          enabled={allowed('game_start') && !pending()}
+          onClick={() => props.onAct('game_start')}
+        />
+        <Show when={state().lastRoll}>
+          {(roll) => (
+            <span
+              class="mr-1 font-display text-sm font-bold text-cream-100"
+              aria-label="last dice roll"
+              data-testid="last-roll"
+            >
+              {roll().die1} + {roll().die2} = {roll().die1 + roll().die2}
+            </span>
+          )}
+        </Show>
+        <ActionButton
+          label="Roll"
+          hint="roll two dice and move"
+          enabled={allowed('roll_dice') && !pending()}
+          onClick={() => props.onAct('roll_dice')}
+        />
+        <ActionButton
+          label="Buy"
+          hint={
+            space()?.kind === 'property'
+              ? `buy ${space()?.name} for ${space()?.price}`
+              : 'no property to buy'
+          }
+          enabled={allowed('buy_property') && !pending()}
+          onClick={() => props.onAct('buy_property')}
+        />
+        <ActionButton
+          label="Decline"
+          hint="skip this property (not an auction)"
+          enabled={allowed('decline_buy') && !pending()}
+          onClick={() => props.onAct('decline_buy')}
+        />
+        <ActionButton
+          label="End turn"
+          hint="pass the turn to the next player"
+          enabled={allowed('end_turn') && !pending()}
+          onClick={() => props.onAct('end_turn')}
+        />
+        <Show when={pending()}>
+          <span role="status" class="ml-1 font-mono text-xs text-muted-400">
+            waiting for server…
+          </span>
+        </Show>
+        <Show when={gameStore.lastError()}>
+          {(msg) => (
+            <p role="alert" class="w-full text-center text-sm text-crimson-400">
+              {msg()}
+            </p>
+          )}
+        </Show>
+        <Show when={!allowed('roll_dice') && state().phase === 'playing' && !ended()}>
+          <span class="w-full text-center text-xs text-muted-500">waiting for your turn…</span>
+        </Show>
+      </nav>
+    </>
   );
 }
 

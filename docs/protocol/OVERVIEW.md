@@ -16,10 +16,12 @@ hash must be byte-identical (tested with `fixtures/config/canonical_hash_case.js
 
 ## Versioning
 
-- `PROTOCOL_VERSION = "1.1.0"` — semver. **Major = wire compatibility.**
-  Clients and servers with the same major interoperate. v0.2 added the
+- `PROTOCOL_VERSION = "1.2.0"` — semver. **Major = wire compatibility.**
+  Clients and servers with the same major interoperate. 1.1.0 added the
   board-loop vocabulary, `hello` match binding, `ack`, and the
-  snapshot/catchup envelopes: additive, so only the minor moved.
+  snapshot/catchup envelopes. 1.2.0 added the per-recipient `you` block on a
+  snapshot and the batched `transition` frame. Both are additive, so only the
+  minor moved.
 - Every envelope carries `v: 1` (major as integer) so a mismatch is
   rejected before payload parsing.
 - `SCHEMA_VERSION = 1` — monotonic revision of payload schemas, embedded in
@@ -85,7 +87,26 @@ forge a property id or an amount.
 
 `ack` carrying a snapshot is what makes "an ack is proof of acceptance"
 true for the client: the UI renders server state, never its own guess.
-Delivery of `event` is at-least-once; the engine tick is the dedup key.
+
+A transition is delivered as **one batched frame per recipient**, not one frame
+per event, so a transition's events cannot interleave with another transition's on
+a shared connection. Every event in a transition shares one tick, which makes the
+tick the transition's identity on the wire and therefore the client's dedup key;
+delivery is at-least-once.
+
+### Legality is server-owned
+
+`snapshot.you` and `transition.you` carry the action types the engine would
+accept from _that_ recipient, right now. They are per-recipient because legality
+is relative to an actor, and a shared frame cannot serve two players. They ride
+on the transition rather than only the snapshot because legality changes when
+_anyone_ acts: a second player readying is what unblocks the host's Start, and no
+snapshot is sent for another player's action.
+
+A client must not re-derive this. Doing so is what produced a Start the server
+refused, a Decline the server accepted, and a turn with every control disabled
+and no error. A client that receives no `you` block — a 1.1 server — may derive a
+fallback, and that fallback is a compatibility path, not a second source of truth.
 
 ## Error codes
 

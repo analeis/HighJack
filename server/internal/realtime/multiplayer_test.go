@@ -970,6 +970,82 @@ func TestAlternatingActionsKeepBothClientsConverged(t *testing.T) {
 	}
 }
 
+// The bind snapshot must carry the recipient's legal actions. If it does not, the
+// client silently falls back to deriving legality locally, which is the drift this
+// projection exists to remove — and the failure is invisible: the dock still works,
+// it is just occasionally wrong.
+func TestBindSnapshotCarriesViewerLegalActions(t *testing.T) {
+	ts := newTestServer(t)
+	created := ts.post(t, "/matches", nil)
+	matchID, _ := created["matchId"].(string)
+
+	for _, name := range []string{"Ace", "Bit"} {
+		joined := ts.post(t, "/matches/"+matchID+"/players",
+			map[string]any{"displayName": name})
+		token, _ := joined["token"].(string)
+		playerID, _ := joined["playerId"].(string)
+
+		c := dialClient(t, ts, matchID, token, nil)
+		snap := c.pullSnapshot() // the bind snapshot, before anything has happened
+
+		you, ok := snap["you"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s bind snapshot carried no viewer block: %v", name, snap)
+		}
+		if you["playerId"] != playerID {
+			t.Fatalf("%s viewer block names %v, want %v", name, you["playerId"], playerID)
+		}
+		actions, ok := you["legalActions"].([]any)
+		if !ok || len(actions) == 0 {
+			t.Fatalf("%s viewer block has no legalActions: %v", name, you)
+		}
+		// Still in the lobby: ready and leave are permitted, start is not.
+		permitted := map[string]bool{}
+		for _, a := range actions {
+			permitted[fmt.Sprint(a)] = true
+		}
+		if !permitted["player_ready"] {
+			t.Fatalf("%s was not offered the ready action: %v", name, actions)
+		}
+		if permitted["game_start"] {
+			t.Fatalf("%s was offered Start with only one player at the table: %v", name, actions)
+		}
+	}
+}
+
+// The ack must carry the viewer block too: it is what re-gates the dock after
+// every accepted action.
+func TestAckSnapshotCarriesViewerLegalActions(t *testing.T) {
+	tab := startedMatch(t)
+	// Ace opened the table and therefore holds the turn, so its roll is the action
+	// whose acknowledgement re-gates the dock.
+	res := tab.byName["Ace"].action("roll_dice")
+	if res["type"] != "ack" {
+		t.Fatalf("roll was refused: %v", res)
+	}
+	ackSnap, _ := res["snapshot"].(map[string]any)
+	if ackSnap == nil {
+		t.Fatalf("ack carried no snapshot: %v", res)
+	}
+	you, ok := ackSnap["you"].(map[string]any)
+	if !ok {
+		t.Fatalf("the ack snapshot carried no viewer block: %v", ackSnap)
+	}
+	permitted := map[string]bool{}
+	actions, _ := you["legalActions"].([]any)
+	for _, a := range actions {
+		permitted[fmt.Sprint(a)] = true
+	}
+	if len(permitted) == 0 {
+		t.Fatalf("the ack advertised no legal actions at all: %v", actions)
+	}
+	// The roll consumed the turn, so the roll itself must no longer be offered
+	// while a buy decision or the end of the turn is.
+	if permitted["roll_dice"] {
+		t.Fatalf("the roll is still offered after it was taken: %v", actions)
+	}
+}
+
 // A token minted by one match must not bind to another, and an unknown match
 // must be refused.
 func TestCrossMatchTokenIsRejected(t *testing.T) {

@@ -123,6 +123,10 @@ Match ── engine (pure)     Apply(state, actor, action)
 - **Bounded resources**: the live-match registry and the per-session rate
   limiter are both bounded and swept, so an unauthenticated caller cannot grow
   process memory without limit.
+- **No persistence is a real state**: `NewRegistry` normalises a nil store to a
+  nil interface. A typed nil pointer in an interface is not nil, so the guards
+  would pass and the runtime would call a method on a nil receiver — which made
+  match creation fail outright when the server ran without a database.
 
 ## CORS and origins (v0.2)
 

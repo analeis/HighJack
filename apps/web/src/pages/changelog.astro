@@ -13,6 +13,42 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.3',
+    date: '2026-09-26',
+    title: 'Client correctness and a playable experience',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The client no longer decides the rules',
+        tone: 'gold',
+        items: [
+          "The engine now computes which actions a player may take and sends it with every snapshot and every transition, so the interface renders the server's answer instead of re-deriving affordability, turn ownership and start eligibility",
+          'A redundant ready toggle is refused rather than accepted as a silent no-op that still advanced the tick and still cost a write',
+          'Decline stays available when a property is unaffordable. Gating it on affordability made a legal action unreachable and could strand a turn with every control dead',
+          'The ready control is a real toggle, so a player who inherits the host role can withdraw',
+        ],
+      },
+      {
+        label: 'Playable',
+        tone: 'teal',
+        items: [
+          'A dropped connection no longer wedges the table: the pending action is released, the buttons recover, and a click while offline says so instead of vanishing',
+          'Players can join an existing table by match id, and a reload rejoins the same table instead of orphaning it',
+          'A phone player can finally see their chips, whose turn it is, the round and their holdings. The information panel was hidden on small screens',
+        ],
+      },
+      {
+        label: 'Correct merge, real verification',
+        tone: 'teal',
+        items: [
+          'An older snapshot can no longer rewind a newer view, and a re-delivered transition is applied once instead of charging rent twice',
+          'The two-client browser test is now two real browser clients driving the real interface, replacing a raw WebSocket that never rendered a dock',
+          'The browser harness never reuses an existing game server or preview. A leftover server from an earlier build was answering /health while running entirely different rules, which is how a broken release was certified twice',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.2',
     date: '2026-09-26',
     title: 'Multiplayer integrity and durability',

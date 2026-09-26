@@ -76,12 +76,16 @@ var (
 	// not that the table is full. Both mapped to the same code, so the client
 	// rendered "match is full" for the most common new-player action.
 	ErrNotEnoughPlayers = fmt.Errorf("not enough players to start")
-	ErrAlreadyStarted   = fmt.Errorf("match has already started")
-	ErrNotAllReady      = fmt.Errorf("not all players are ready")
-	ErrInvalidName      = fmt.Errorf("display name is invalid")
-	ErrPlayerNotInGame  = fmt.Errorf("player is not part of this match")
-	ErrNoPlayers        = fmt.Errorf("match has no players")
-	ErrNotYourTurn      = fmt.Errorf("it is not the actor's turn")
+	// ErrNoChange is returned when an action is well-formed and permitted but
+	// would alter nothing. Rejecting it keeps "accepted" meaning "changed
+	// something", so a transition never advances the tick without an event.
+	ErrNoChange        = fmt.Errorf("action would change nothing")
+	ErrAlreadyStarted  = fmt.Errorf("match has already started")
+	ErrNotAllReady     = fmt.Errorf("not all players are ready")
+	ErrInvalidName     = fmt.Errorf("display name is invalid")
+	ErrPlayerNotInGame = fmt.Errorf("player is not part of this match")
+	ErrNoPlayers       = fmt.Errorf("match has no players")
+	ErrNotYourTurn     = fmt.Errorf("it is not the actor's turn")
 )
 
 // Ruleset is the pluggable behavior layer of the engine: it binds each

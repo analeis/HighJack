@@ -166,12 +166,20 @@ func (r LifecycleRuleset) ready(state *GameState, actor PlayerID, a PlayerReadyA
 		return nil, nil, ErrPlayerNotInGame
 	}
 
+	// A redundant toggle is rejected rather than accepted as a silent no-op.
+	//
+	// It used to be accepted, which meant an action that changed nothing still
+	// advanced the tick and still cost a durable commit — the event log then
+	// carried a gap that no event explained. It also made the action *accepted*
+	// while the legal-action projection reported it as unavailable, so the two
+	// could not both be right.
+	player2 := state.PlayerByID(actor)
+	if player2.Ready == a.Ready {
+		return nil, nil, ErrNoChange
+	}
+
 	next := state.Clone()
 	p := next.PlayerByID(actor)
-	if p.Ready == a.Ready {
-		// No transition, no event: events correspond to actual changes only.
-		return next, nil, nil
-	}
 	p.Ready = a.Ready
 	events := []Event{&PlayerReadyChangedEvent{PlayerID: actor, Ready: a.Ready}}
 	return next, events, nil
@@ -185,17 +193,16 @@ func (r LifecycleRuleset) start(state *GameState, cfg *GameConfig, actor PlayerI
 	if host == nil || host.ID != actor {
 		return nil, nil, ErrNotPermitted
 	}
+	// The same predicate LegalActions uses, so what the client is told is
+	// permitted and what the engine accepts cannot drift apart.
 	active := state.ActivePlayers()
-	if len(active) > cfg.PlayerCount.Max {
+	switch {
+	case len(active) > cfg.PlayerCount.Max:
 		return nil, nil, ErrGameFull
-	}
-	if len(active) < cfg.PlayerCount.Min {
+	case len(active) < cfg.PlayerCount.Min:
 		return nil, nil, ErrNotEnoughPlayers
-	}
-	for _, p := range active {
-		if !p.Ready {
-			return nil, nil, ErrNotAllReady
-		}
+	case !canStart(state, cfg):
+		return nil, nil, ErrNotAllReady
 	}
 
 	rootSeed, err := parseStateSeed(state)

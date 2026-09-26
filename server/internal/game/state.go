@@ -5,6 +5,11 @@ import (
 	"slices"
 )
 
+// PositionInBounds reports whether the player's position indexes a real space.
+// Callers that read Board.Spaces[p.Position] must check this first; a position
+// from a corrupt snapshot would otherwise panic mid-transition.
+func (p Player) PositionInBounds(n int) bool { return p.Position >= 0 && p.Position < n }
+
 // Player is a participant in a match. Position is the board-space index;
 // meaningful only while PhasePlaying.
 type Player struct {

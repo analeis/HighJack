@@ -460,9 +460,33 @@ tested, and because every later transport fix is written against the
   registry, or process memory; every documented recovery guarantee is either
   proven by test or corrected in the docs.
 
+### Correction to the record (found during v0.2.3)
+
+Writing v0.2.3's browser test exposed a **P0 regression introduced in v0.2.1**:
+`Match.store` was changed from a concrete `*persistence.Store` to a `Store`
+interface, and a typed nil pointer stored in an interface is _not_ nil. Every
+`store != nil` guard in the match package therefore passed when no database was
+configured, and `POST /matches` returned **500** — so the game could not create a
+match at all in the normal local development mode.
+
+It survived two certified releases for two compounding reasons:
+
+1. Every Go test injects a fake store, so the nil case was never exercised.
+2. `reuseExistingServer: !process.env.CI` reused whatever server already held
+   port 8080. Locally that was a **v0.2.0 binary**, so the browser gate was
+   verifying the pre-audit code and reporting success. The certification was real
+   for its gates and wrong about the tree it was testing.
+
+This is audit finding C-35 promoted from low to high, and it is the strongest
+argument for the tree-identity work in v0.2.1: a report that names the tree cannot
+protect against a stale _server_, so the harness itself had to stop reusing one.
+Fixed in v0.2.3 by normalising the store in `NewRegistry`, by an end-to-end
+`POST /matches` assertion in the browser suite, and by never reusing the game
+server or the game preview in the Playwright harness.
+
 ### v0.2.3 — Client correctness & playable experience
 
-- **Addresses:** CLT-1…9, CLT-13…16; OPS-8.
+- **Addresses:** CLT-1…9, CLT-13…16; OPS-8; and the P0 store regression above.
 - **Protocol:** additive `legalActions: ActionType[]` on the snapshot;
   `PROTOCOL_VERSION` 1.1.0 → **1.2.0** (major stays 1, schema stays 1,
   backward compatible — an older client ignores the field, a newer client

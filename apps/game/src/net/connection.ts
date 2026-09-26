@@ -32,6 +32,14 @@ export interface NetHandlers {
   onWelcome(session: string): void;
   onSnapshot(snapshot: GameSnapshot, config: GameConfig, nextSeq: number, resync: boolean): void;
   onEvents(events: readonly { tick: number; event: GameEvent }[]): void;
+  /**
+   * The engine's current legal actions for this connection.
+   *
+   * Delivered on every transition, not only on a snapshot, because the legality
+   * of *this* player can change when *someone else* acts — a second player
+   * readying is what unblocks the host's Start.
+   */
+  onLegalActions(actions: readonly ActionType[]): void;
   /** Called with the authoritative state the action produced (on success). */
   onActionResult(
     seq: number,
@@ -123,11 +131,19 @@ export class GameConnection {
         break;
       }
       case 'transition': {
-        // One frame per authoritative transition. Applied as a batch so a
-        // transition cannot be interleaved with another, which is what the
-        // server now guarantees by construction.
+        // One frame per authoritative transition, per recipient. Applied as a batch
+        // so a transition cannot be interleaved with another, which is what the
+        // server guarantees by construction.
         const events = (msg['events'] as { tick: number; event: GameEvent }[] | undefined) ?? [];
         if (events.length > 0) this.handlers.onEvents(events);
+        // The frame also carries *this* recipient's legal actions. Without it the
+        // dock only refreshed on a snapshot, so it went stale the moment another
+        // player acted — a host whose second player had just readied still saw a
+        // disabled Start, with nothing to indicate why.
+        const you = msg['you'] as { legalActions?: ActionType[] } | undefined;
+        if (you && Array.isArray(you.legalActions)) {
+          this.handlers.onLegalActions(you.legalActions);
+        }
         break;
       }
       case 'event': {
@@ -251,4 +267,63 @@ export async function joinMatch(
   });
   if (!res.ok) throw new Error(`join failed (${res.status})`);
   return (await res.json()) as JoinedSeat;
+}
+
+/**
+ * A seat this browser holds at a private table.
+ *
+ * The token is a bearer credential, so it is stored under its own key and scoped
+ * to the match id rather than bundled into general client state. It is never the
+ * match's root seed, which stays server-side.
+ */
+export interface StoredSeat {
+  readonly matchId: string;
+  readonly token: string;
+  readonly playerId: string;
+}
+
+const SEAT_KEY = 'highjack.seat.v1';
+
+type Storage = Pick<globalThis.Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+function storage(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    // Blocked by browser settings. Not fatal: the seat simply will not survive a
+    // reload, and the player can rejoin by match id.
+    return null;
+  }
+}
+
+/** Persist a seat so a reload rejoins the same table. */
+export function rememberSeat(matchId: string, token: string, playerId: string): void {
+  storage()?.setItem(SEAT_KEY, JSON.stringify({ matchId, token, playerId }));
+}
+
+/** Read the stored seat, or null. A malformed or partial value is discarded. */
+export function readStoredSeat(): StoredSeat | null {
+  const raw = storage()?.getItem(SEAT_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredSeat>;
+    if (
+      typeof parsed.matchId !== 'string' ||
+      typeof parsed.token !== 'string' ||
+      typeof parsed.playerId !== 'string' ||
+      parsed.matchId === '' ||
+      parsed.token === '' ||
+      parsed.playerId === ''
+    ) {
+      return null;
+    }
+    return { matchId: parsed.matchId, token: parsed.token, playerId: parsed.playerId };
+  } catch {
+    return null;
+  }
+}
+
+/** Forget the stored seat, e.g. once a match has ended for good. */
+export function forgetSeat(): void {
+  storage()?.removeItem(SEAT_KEY);
 }

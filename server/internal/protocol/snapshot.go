@@ -50,6 +50,39 @@ type GameSnapshot struct {
 	WinnerID   *string          `json:"winnerId"`
 	EndReason  string           `json:"endReason"`
 	ConfigHash string           `json:"configHash"`
+	// You is the per-recipient part of the snapshot: which player this frame is
+	// for, and what the engine would accept from them right now.
+	//
+	// It has to be per-connection rather than part of the shared state, because
+	// legality is relative to an actor. The alternative was the client re-deriving
+	// affordability, turn ownership and start eligibility with its own copies of
+	// the engine's predicates, and those copies drifted: the UI offered a Start
+	// the server rejected and disabled a Decline the server accepted.
+	You *ViewerState `json:"you,omitempty"`
+}
+
+// ViewerState is the recipient-specific half of a snapshot.
+type ViewerState struct {
+	PlayerID string `json:"playerId"`
+	// LegalActions are the action types the engine would accept right now, in a
+	// stable order. A client renders these; it does not decide them.
+	LegalActions []string `json:"legalActions"`
+}
+
+// WithViewer attaches the recipient-specific view. The engine projection and the
+// legal-action projection are computed together, at the same instant, so the two
+// can never describe different moments.
+func WithViewer(snap GameSnapshot, state *game.GameState, cfg *game.GameConfig, playerID game.PlayerID) GameSnapshot {
+	if playerID == "" {
+		return snap
+	}
+	actions := game.LegalActions(state, cfg, playerID)
+	names := make([]string, 0, len(actions))
+	for _, a := range actions {
+		names = append(names, string(a))
+	}
+	snap.You = &ViewerState{PlayerID: string(playerID), LegalActions: names}
+	return snap
 }
 
 // NewGameSnapshot projects authoritative engine state into the client

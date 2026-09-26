@@ -44,7 +44,8 @@ export default defineConfig({
       command:
         'cd ../game && bun run preview --host 127.0.0.1 --port 5173 --strictPort; tail -f /dev/null',
       url: 'http://127.0.0.1:5173',
-      reuseExistingServer: !process.env.CI,
+      // See the note above: a stale preview is worse than a slow start.
+      reuseExistingServer: false,
       timeout: 60_000,
     },
     // The real Go server backs the game UI: the same binary the release
@@ -56,7 +57,11 @@ export default defineConfig({
       command:
         'cd ../.. && go run ./server/cmd/highjack 2>/tmp/highjack-e2e-server.log; tail -f /dev/null',
       url: 'http://127.0.0.1:8080/health',
-      reuseExistingServer: !process.env.CI,
+      // The game server is the oracle for every assertion in the game suite. A
+      // `go run` process left over from an earlier build answers /health happily
+      // while running entirely different rules, so a green run would certify
+      // nothing. Always start a fresh one.
+      reuseExistingServer: false,
       timeout: 120_000,
       env: {
         HIGHJACK_ENV: 'test',

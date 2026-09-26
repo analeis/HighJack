@@ -10,7 +10,7 @@ package protocol
 
 // ProtocolVersion follows semver; major must match clients exactly.
 // v0.2 adds board-loop vocabulary (additive: minor bump, same major).
-const ProtocolVersion = "1.1.0"
+const ProtocolVersion = "1.2.0"
 
 // ProtocolMajorVersion is stamped on every message envelope as "v".
 const ProtocolMajorVersion = 1

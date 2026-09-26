@@ -1225,3 +1225,98 @@ func TestTokenLookupIsExactAndRejectsMutations(t *testing.T) {
 		t.Fatal("an empty stored hash matched an empty token")
 	}
 }
+
+// The per-recipient legal actions must be correct on the wire, not merely in the
+// engine. The host must not be told it may start until the engine would actually
+// accept the start.
+func TestSnapshotCarriesPerPlayerLegalActions(t *testing.T) {
+	f := newFixture(t)
+	bindReady(t, f, "s1", f.tok1, &recordingSink{})
+	bindReady(t, f, "s2", f.tok2, &recordingSink{})
+	ctx := context.Background()
+
+	has := func(snap protocol.GameSnapshot, want game.ActionType) bool {
+		if snap.You == nil {
+			t.Fatal("snapshot carried no viewer block; the client would fall back to " +
+				"deriving legality, which is the bug this projection exists to remove")
+		}
+		if snap.You.PlayerID == "" {
+			t.Fatal("viewer block has no player id")
+		}
+		for _, a := range snap.You.LegalActions {
+			if a == string(want) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// One ready, one not: the host must not be offered Start.
+	if _, err := f.m.ApplyAction(ctx, "s1", 1, game.PlayerReadyAction{Ready: true}); err != nil {
+		t.Fatalf("ready: %v", err)
+	}
+	hostSnap := f.m.SnapshotFor(f.p1)
+	if has(hostSnap, game.ActionGameStart) {
+		t.Fatal("the host was told it may start before everyone is ready")
+	}
+
+	// Second player readies: now it is permitted.
+	if _, err := f.m.ApplyAction(ctx, "s2", 1, game.PlayerReadyAction{Ready: true}); err != nil {
+		t.Fatalf("ready p2: %v", err)
+	}
+	if !has(f.m.SnapshotFor(f.p1), game.ActionGameStart) {
+		t.Fatal("the host was not offered Start even though everyone is ready")
+	}
+
+	// The non-host is never offered it.
+	if has(f.m.SnapshotFor(f.p2), game.ActionGameStart) {
+		t.Fatal("a non-host was offered Start")
+	}
+
+	// Mid-match the seat holder is offered the board action and the peer is not.
+	if _, err := f.m.ApplyAction(ctx, "s1", 2, game.GameStartAction{}); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if !has(f.m.SnapshotFor(f.p1), game.ActionRollDice) {
+		t.Fatal("the seat holder was not offered the roll")
+	}
+	if has(f.m.SnapshotFor(f.p2), game.ActionRollDice) {
+		t.Fatal("the other player was offered a roll it cannot take")
+	}
+}
+
+// A registry built without persistence must behave as though it has none.
+//
+// Passing a typed nil *persistence.Store into the Store interface leaves the
+// interface non-nil, so every `store != nil` guard passes and the runtime calls a
+// method on a nil receiver. That made POST /matches fail with 500 whenever the
+// server ran without a database — the normal local development mode — and it was
+// invisible locally because the browser harness silently reused an older server
+// binary. The regression is caught here instead.
+func TestRegistryWithoutStoreBehavesAsUnconfigured(t *testing.T) {
+	var absent *persistence.Store // the typed nil a caller naturally passes
+
+	// Guard the precondition: this really is a non-nil interface.
+	var asInterface Store = absent
+	if asInterface == nil {
+		t.Fatal("precondition broken: a typed nil pointer should produce a non-nil interface")
+	}
+
+	reg := NewRegistry(testLogger(), asInterface)
+	if reg.store != nil {
+		t.Fatal("a typed nil store must be normalised to a nil interface")
+	}
+
+	// The observable consequence: creating a match must succeed, not 500.
+	m, err := reg.Create(context.Background(), game.DefaultConfig())
+	if err != nil {
+		t.Fatalf("create without persistence: %v", err)
+	}
+	if _, _, err := m.Join(context.Background(), "Ace"); err != nil {
+		t.Fatalf("join without persistence: %v", err)
+	}
+	// And the boot-time interrupted sweep must be a no-op rather than an error.
+	if err := reg.MarkInterruptedFlags(context.Background()); err != nil {
+		t.Fatalf("mark interrupted without persistence: %v", err)
+	}
+}

@@ -312,7 +312,7 @@ func (h *Handler) handshake(conn *websocket.Conn, c *connSink, session string) (
 	// under one lock acquisition, so they describe one point in time. The session
 	// is still closed to publications at this point, so nothing can be written to
 	// this socket between the two frames.
-	snap, catchup, resync := bound.Resume(hello.ResumeFromTick)
+	snap, catchup, resync := bound.ResumeFor(hello.ResumeFromTick, bound.PlayerFor(session))
 	if len(catchup) > 0 {
 		c.sendCatchup(catchup, snap.Tick)
 	}
