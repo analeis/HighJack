@@ -6,18 +6,22 @@
 
 ## Map
 
-| Layer                    | Tool                                      | Location                                           | Runs in `go test ./...` / vitest?                   |
-| ------------------------ | ----------------------------------------- | -------------------------------------------------- | --------------------------------------------------- |
-| Engine domain (Go)       | `go test`                                 | `server/internal/game/*_test.go`                   | yes (hermetic)                                      |
-| HTTP endpoints (Go)      | `httptest`                                | `server/internal/api/api_test.go`                  | yes                                                 |
-| WebSocket seam (Go)      | real dial over loopback                   | `server/internal/realtime/handler_test.go`         | yes                                                 |
-| Protocol decode (Go)     | fixtures                                  | `server/internal/realtime/protocol_compat_test.go` | yes                                                 |
-| Migrations parsing (Go)  | `go test`                                 | `server/internal/persistence/migrate_test.go`      | yes                                                 |
-| Database round-trip (Go) | pgx against live PG                       | `server/internal/persistence/integration_test.go`  | **skipped unless** `HIGHJACK_TEST_DATABASE_URL` set |
-| Protocol + config (TS)   | Vitest                                    | `packages/protocol/test`                           | yes                                                 |
-| UI primitives (TS)       | Vitest + @solidjs/testing-library + jsdom | `packages/ui/test`                                 | yes                                                 |
-| Shell store (TS)         | Vitest                                    | `apps/game/test`                                   | yes                                                 |
-| Website e2e + a11y       | Playwright + axe                          | `apps/web/e2e`                                     | via `bun run test:e2e` / certify only               |
+| Layer                    | Tool                                      | Location                                                | Runs in `go test ./...` / vitest?                   |
+| ------------------------ | ----------------------------------------- | ------------------------------------------------------- | --------------------------------------------------- |
+| Engine domain (Go)       | `go test`                                 | `server/internal/game/*_test.go`                        | yes (hermetic)                                      |
+| HTTP endpoints (Go)      | `httptest`                                | `server/internal/api/api_test.go`                       | yes                                                 |
+| WebSocket seam (Go)      | real dial over loopback                   | `server/internal/realtime/handler_test.go`              | yes                                                 |
+| Multiplayer match (Go)   | two real WebSocket clients                | `server/internal/realtime/multiplayer_test.go`          | yes                                                 |
+| Match runtime (Go)       | `go test`                                 | `server/internal/match/match_test.go`                   | yes                                                 |
+| Protocol decode (Go)     | fixtures                                  | `server/internal/realtime/protocol_compat_test.go`      | yes                                                 |
+| Migrations parsing (Go)  | `go test`                                 | `server/internal/persistence/migrate_test.go`           | yes                                                 |
+| Database round-trip (Go) | pgx against live PG                       | `server/internal/persistence/integration_test.go`       | **skipped unless** `HIGHJACK_TEST_DATABASE_URL` set |
+| Match persistence (Go)   | pgx against live PG                       | `server/internal/persistence/match_integration_test.go` | **skipped unless** `HIGHJACK_TEST_DATABASE_URL` set |
+| Protocol + config (TS)   | Vitest                                    | `packages/protocol/test`                                | yes                                                 |
+| UI primitives (TS)       | Vitest + @solidjs/testing-library + jsdom | `packages/ui/test`                                      | yes                                                 |
+| Game client store + net  | Vitest                                    | `apps/game/test`                                        | yes                                                 |
+| Website e2e + a11y       | Playwright + axe                          | `apps/web/e2e`                                          | via `bun run test:e2e` / certify only               |
+| Game UI e2e              | Playwright against the **real Go server** | `apps/web/e2e/game.spec.ts`                             | via `bun run test:e2e` / certify only               |
 
 ## Frontend unit conventions
 
@@ -82,6 +86,27 @@ Roadmap for future suites (in priority order):
   ```
 
   Tests skip loudly when unset; they never fail CI by being skipped.
+
+  Without Docker, a throwaway local cluster works just as well:
+
+  ```sh
+  export PGDATA=/tmp/highjack-pg SOCKDIR=/tmp/highjack-sock
+  mkdir -p "$SOCKDIR"
+  initdb -D "$PGDATA" -U highjack --auth=trust
+  pg_ctl -D "$PGDATA" -o "-p 5433 -c unix_socket_directories=$SOCKDIR" -l /tmp/pg.log start
+  createdb -h 127.0.0.1 -p 5433 -U highjack highjack_test
+  export HIGHJACK_TEST_DATABASE_URL="postgres://highjack@127.0.0.1:5433/highjack_test?sslmode=disable"
+  go test ./server/...
+  ```
+
+  `pg_ctl` writes its lock file under the socket directory, so on machines
+  where `/var/run/postgresql` is not writable the custom
+  `unix_socket_directories` is required. CI uses the same port (5433) for
+  the same reason.
+
+  These suites are load-bearing, not decorative: they are what caught the
+  pre-match `turn_phase` constraint violation and the missing
+  interrupted-status handling that unit tests with fakes cannot see.
 
 - **Protocol compatibility**: shared fixtures under
   `packages/protocol/fixtures/` are consumed by both Go and TS suites.

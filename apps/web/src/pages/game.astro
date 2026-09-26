@@ -77,12 +77,13 @@ New state → everyone sees the same truth</code></pre>
   >
     <h2 class="m-0 flex flex-wrap items-center gap-3 font-display text-lg font-bold text-gold-400">
       Current status
-      <Badge tone="gold">Shell only</Badge>
+      <Badge tone="gold">Playable</Badge>
     </h2>
     <p class="mt-2 mb-0 text-sm leading-relaxed text-cream-300">
-      What exists today: this website, the game-client shell (application chrome over a live render
-      stage), the engine skeleton with real lifecycle rules, the wire protocol, and the Go backend.
-      Board gameplay begins with the next milestone. Run the shell locally with:
+      What exists today: the full board loop — create a private match, share the id, and two to
+      twelve players roll, buy, decline, and pay rent against a server-authoritative engine. The
+      client is a SolidJS app over a GPU-rendered PixiJS stage; it renders authoritative snapshots
+      and never computes the outcome itself. Run it locally with:
       <code class="ml-1 rounded bg-felt-950 px-2 py-1 font-mono text-xs text-gold-400">
         bun run dev:game
       </code>
@@ -110,7 +111,7 @@ New state → everyone sees the same truth</code></pre>
         </span>
         <span class="text-sm text-muted-400">
           <strong class="text-cream-100">First table</strong> — core board loop: movement, property,
-          rent, bankruptcy.
+          rent, bankruptcy. Shipped.
         </span>
       </li>
       <li class="flex items-start gap-4 rounded-lg border border-line-subtle bg-surface-raised p-4">

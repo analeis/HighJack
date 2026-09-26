@@ -6,7 +6,8 @@
  */
 
 export type SystemStatus =
-  | 'modeled' // exists in config/protocol/engine foundations today
+  | 'playable' // fully implemented and playable end to end today
+  | 'modeled' // exists in config/protocol/engine foundations, but no gameplay yet
   | 'in-development' // actively being built next
   | 'planned'; // designed-for, not started
 
@@ -24,10 +25,10 @@ export const SYSTEMS: readonly GameSystem[] = [
   {
     id: 'economy',
     name: 'Property & Economy',
-    tagline: 'Buy, develop, collect',
+    tagline: 'Buy, hold, collect rent',
     description:
-      'The economic backbone: property acquisition, development, and rent pressure. Tunable starting wealth and payout curves per match.',
-    status: 'planned',
+      'The playable economic backbone: buy properties, pay rent to the owner, pay tax to the bank. No debt — miss a payment and your holdings revert to the bank. Development levels are reserved for a later release.',
+    status: 'playable',
     configurable: false,
   },
   {
@@ -98,14 +99,16 @@ export const SYSTEMS: readonly GameSystem[] = [
     name: 'Victory Conditions',
     tagline: 'Decide how it ends',
     description:
-      'Last player standing, first to target wealth, or best score when the round limit hits. Chosen per match.',
-    status: 'modeled',
+      'Last player standing, first to target wealth, or best net worth when the round limit hits. Evaluated by the server after every move. Chosen per match.',
+    status: 'playable',
     configurable: false,
   },
 ];
 
 export function statusLabel(status: SystemStatus): string {
   switch (status) {
+    case 'playable':
+      return 'Playable';
     case 'modeled':
       return 'Modeled';
     case 'in-development':

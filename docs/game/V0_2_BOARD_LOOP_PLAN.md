@@ -1,8 +1,10 @@
 # v0.2 Board Loop — Design & Implementation Plan
 
-> Status: **plan, not implementation**. Nothing below is built. Mechanics
-> marked _(proposal)_ are defaults for review, not decisions; architecture
-> marked _(invariant)_ carries v0.1.0 forward unchanged.
+> Status: **implemented and certified as v0.2.0**. This plan was written
+> before coding; where a proposal was adopted, rejected, or amended, the
+> outcome is recorded in [V0_2_DECISIONS.md](./V0_2_DECISIONS.md) and the
+> shipped behavior is described in [GAME_DESIGN.md](./GAME_DESIGN.md).
+> Statements below are kept as the original design intent.
 
 ## 1. Goal
 
@@ -210,12 +212,18 @@ Fill the realtime seam without redesigning it:
 5. Integration tests → docs sync (GAME_DESIGN.md decided/directional
    lines move) → certify.
 
-## 13. Open questions (decide before/with 4.1, not during 9–10)
+## 13. Open questions — RESOLVED
 
-1. Exact 24-space board contents and numbers (proposal in §5 is a
-   starting bid).
-2. Doubles rule: extra roll vs nothing in v0.2.
-3. Net-worth definition for wealth victories.
-4. Insolvency strictness: instant elimination (proposal) vs
-   mortgage/negotiation hooks (deferred complexity — recommend defer).
-5. Reconnect window and missed-event retention bounds.
+All five were resolved in [V0_2_DECISIONS.md](./V0_2_DECISIONS.md)
+before dependent systems were built:
+
+1. **Board contents** — the 24-space board in §5 was adopted with concrete
+   ids, groups, prices, rents, and taxes; it is configuration data.
+2. **Doubles** — extra roll, with a streak cap after which the turn
+   passes (`propertyRules`).
+3. **Net worth** — money + purchase price of holdings (no resale exists).
+4. **Insolvency** — instant elimination, no debt, no mortgages.
+5. **Reconnect** — token identity, always-sent snapshot, bounded event
+   retention with snapshot fallback, explicit seq idempotency.
+
+The implemented behavior is described in [GAME_DESIGN.md](./GAME_DESIGN.md).

@@ -1,6 +1,6 @@
 ---
-// One system tile. Status badges are explicit: Modeled / In development /
-// Planned — the site never implies shipped gameplay.
+// One system tile. Status badges are explicit: Playable / Modeled /
+// In development / Planned — the site never implies shipped gameplay.
 import { Badge } from '@highjack/ui';
 import { statusLabel, type GameSystem } from '../data/systems';
 
@@ -15,11 +15,13 @@ const { system } = Astro.props;
     <h3 class="m-0 font-display text-lg font-bold text-cream-100">{system.name}</h3>
     <Badge
       tone={
-        system.status === 'modeled'
-          ? 'teal'
-          : system.status === 'in-development'
-            ? 'gold'
-            : 'neutral'
+        system.status === 'playable'
+          ? 'gold'
+          : system.status === 'modeled'
+            ? 'teal'
+            : system.status === 'in-development'
+              ? 'gold'
+              : 'neutral'
       }
     >
       {statusLabel(system.status)}

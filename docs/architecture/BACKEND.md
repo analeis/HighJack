@@ -1,8 +1,9 @@
 # Backend Architecture
 
-> Status: v0.1.0 Foundation. The HTTP surface, realtime seam, configuration,
-> logging, and persistence infrastructure exist and are tested. Lobby/game
-> orchestration, authentication, and full multiplayer are future work.
+> Status: v0.2.0 Board Loop. The HTTP surface, realtime transport,
+> configuration, logging, persistence, and the authoritative match runtime
+> exist and are tested. Private multiplayer matches are playable end to end.
+> Account authentication is still not implemented.
 
 ## Shape
 
@@ -17,7 +18,8 @@ server/
     ├── logging/           structured slog setup
     ├── protocol/          Go mirror of @highjack/protocol (wire contract)
     ├── game/              authoritative engine boundary (see GAME_ENGINE.md)
-    ├── realtime/          WebSocket transport seam
+    ├── match/             live match runtime: registry, dispatch, broadcast
+    ├── realtime/          WebSocket transport + session/token binding
     ├── persistence/       PostgreSQL pool + SQL migration runner
     └── version/           build metadata (ldflags-injected)
 ```
@@ -28,12 +30,15 @@ internal.
 
 ## HTTP surface
 
-| Route          | Purpose                                                                                                                                         |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /health`  | Liveness — process is up. Never inspects dependencies.                                                                                          |
-| `GET /ready`   | Readiness — 200 when all configured dependencies pass their checks, 503 with a stable reason code otherwise. Internal error detail never leaks. |
-| `GET /version` | Build info: name, version, commit, Go version, protocol/schema versions.                                                                        |
-| `GET /ws`      | WebSocket seam (below).                                                                                                                         |
+| Route                        | Purpose                                                                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                | Liveness — process is up. Never inspects dependencies.                                                                                          |
+| `GET /ready`                 | Readiness — 200 when all configured dependencies pass their checks, 503 with a stable reason code otherwise. Internal error detail never leaks. |
+| `GET /version`               | Build info: name, version, commit, Go version, protocol/schema versions.                                                                        |
+| `POST /matches`              | Create a private match. Optional config is validated; the caller never supplies a seed. Returns id + player token.                              |
+| `POST /matches/{id}/players` | Claim a seat. Returns the player id and a reconnect token (shown exactly once).                                                                 |
+| `GET /matches/{id}`          | Authoritative snapshot for a match (lobby join screen and resync).                                                                              |
+| `GET /ws`                    | WebSocket seam (below).                                                                                                                         |
 
 ### Middleware chain (in order)
 
@@ -67,19 +72,56 @@ mutable state, no hidden reads. Invalid configuration refuses to boot.
 ## Realtime seam
 
 ```
-WebSocket → Connection → Message Decoder → Protocol → (future) Game/Lobby Handler
+WebSocket → Connection → Message Decoder → match runtime → Engine → broadcast
 ```
-
-v0.1 implements transport honestly:
 
 1. Client must send `hello` first; anything else gets
    `error{code:"malformed_message"}`.
 2. Wrong protocol major version → `unsupported_version`.
 3. `ping` → `pong{nonce}`.
-4. Game actions → structured `not_supported` error carrying `ackSeq`.
+4. `hello` with `matchId` + `token` binds the connection to a player;
+   with `resumeFromTick` it also replays retained events.
 
-It never masquerades as gameplay. The decoder lives in `internal/protocol`
-and is fixture-tested against `packages/protocol/fixtures/messages/`.
+The actor for an action is always the connection binding. The decoder
+lives in `internal/protocol` and is fixture-tested against
+`packages/protocol/fixtures/messages/`. Integration tests drive two real
+WebSocket clients through a real match.
+
+## Match runtime (v0.2)
+
+`internal/match` owns live matches. The engine stays pure; this package
+serializes access around it.
+
+```
+Match ── engine (pure)     Apply(state, actor, action)
+      ── mutex             one transition at a time per match
+      ── state             authoritative GameState
+      ── history ring      1024 events, drives catch-up
+      ── sessions          session ↔ player bindings
+```
+
+- **Registry** holds matches by id. Creation mints an unguessable
+  `m_`-prefixed id and a 256-bit root seed.
+- **Dispatch order** is fixed: validate session → validate envelope →
+  resolve actor → validate sequence → serialize → `Engine.Apply` → persist
+  → publish events → ack. Nothing is broadcast that is not durable.
+- **Locking**: the per-match mutex is never held across a network write
+  or a database call. Sinks are collected under the lock and written after
+  releasing it, so one slow client cannot stall the match.
+- **Broadcast failure** never blocks the game loop: a dead sink is
+  dropped, and the client reconnects via snapshot.
+- **Restart policy**: leftover matches are moved to `interrupted` at boot.
+  v0.2 does not restore live matches across process restarts; see
+  [GAME_DESIGN.md](../game/GAME_DESIGN.md).
+
+## CORS and origins (v0.2)
+
+The lobby and the WebSocket share one explicit allow-list,
+`HIGHJACK_ALLOWED_ORIGINS` (comma-separated `scheme://host`; empty means
+same-origin only). Configured origins are echoed exactly with
+`Vary: Origin`; preflight is answered `204`. The WebSocket handshake
+applies the same list. This replaced the previous wildcard origin, so a
+browser on an unlisted origin can call neither the lobby nor the socket.
 
 ## Observability
 
@@ -88,17 +130,26 @@ Structured JSON logs on stdout with stable fields: `time`, `level`,
 
 Path for the future: metrics/tracing should hook into the middleware chain
 and the engine's event stream; no Prometheus/OpenTelemetry stack is
-deployed at this stage by design. CORS is intentionally not opened from the
-API server; browser clients will talk to it through the edge/proxy, where
-origin policy belongs.
+deployed at this stage by design. The API's CORS behavior is an explicit
+allow-list (see **CORS and origins**), not an open policy.
 
 ## Authentication boundary
 
-Authentication is **not implemented** and nothing fakes it. Its future home
-is a dedicated `internal/auth` package providing connection identity to the
-realtime layer (which currently derives no identity — actions receive
-`not_supported`). Protocol envelopes already avoid trusting client-supplied
-identity, so introducing auth later does not require wire changes.
+**Accounts are not implemented** and nothing fakes them. What v0.2 does
+have is per-match identity:
+
+- Claiming a seat mints a 256-bit reconnect token, returned exactly once.
+- Only its sha256 is stored, so a database leak does not yield usable
+  tokens. Tokens are never logged.
+- A token authenticates **within one match only** (enforced by a test).
+- Connection → player binding happens at `hello`; after that the server
+  ignores any client-supplied identity entirely.
+
+The one deliberate gap: a token is a bearer credential. There is no rate
+limit on `POST /matches/{id}/players` beyond the global HTTP limits, so
+brute-forcing is impractical (256-bit space) but unbounded. A real auth
+package would own seat creation, which is a clean seam: the lobby API
+already mints every token in one place.
 
 ## Persistence
 

@@ -16,8 +16,10 @@ hash must be byte-identical (tested with `fixtures/config/canonical_hash_case.js
 
 ## Versioning
 
-- `PROTOCOL_VERSION = "1.0.0"` — semver. **Major = wire compatibility.**
-  Clients and servers with the same major interoperate.
+- `PROTOCOL_VERSION = "1.1.0"` — semver. **Major = wire compatibility.**
+  Clients and servers with the same major interoperate. v0.2 added the
+  board-loop vocabulary, `hello` match binding, `ack`, and the
+  snapshot/catchup envelopes: additive, so only the minor moved.
 - Every envelope carries `v: 1` (major as integer) so a mismatch is
   rejected before payload parsing.
 - `SCHEMA_VERSION = 1` — monotonic revision of payload schemas, embedded in
@@ -54,18 +56,55 @@ Design notes:
 
 ## Action & event vocabulary (v0.1)
 
-Actions: `player_join`, `player_leave`, `player_ready`, `game_start`.
-Events: `player_joined`, `player_left`, `player_ready_changed`,
-`game_started`, `player_eliminated`, `game_ended`.
+Actions: `player_join`, `player_leave`, `player_ready`, `game_start`,
+`roll_dice`, `buy_property`, `decline_buy`, `end_turn`.
 
-This is the real lifecycle set implemented by the engine's lifecycle
-ruleset. Future systems extend both unions additively.
+Events: `player_joined`, `player_left`, `player_ready_changed`,
+`game_started`, `player_eliminated`, `game_ended`, `dice_rolled`,
+`property_bought`, `buy_declined`, `rent_paid`, `bank_transfer`,
+`player_bankrupt`, `turn_advanced`.
+
+This is the real vocabulary implemented by the engine. Future systems
+extend both unions additively.
+
+Board actions carry **no payload**: the authoritative turn state already
+identifies the roller, the space, and the decision, so a client cannot
+forge a property id or an amount.
+
+## Server → client envelopes (v0.2)
+
+| Type       | Meaning                                                                |
+| ---------- | ---------------------------------------------------------------------- |
+| `welcome`  | handshake accepted; carries the session and, when bound, the match id  |
+| `pong`     | ping answered with the same nonce                                      |
+| `event`    | one authoritative event with the engine tick that produced it          |
+| `ack`      | action accepted; carries the **post-action authoritative snapshot**    |
+| `error`    | structured rejection with a stable code (and `ackSeq` when applicable) |
+| `snapshot` | full authoritative state; sent on bind, reconnect, and on request      |
+| `catchup`  | retained events after a client cursor, when that cursor is still valid |
+
+`ack` carrying a snapshot is what makes "an ack is proof of acceptance"
+true for the client: the UI renders server state, never its own guess.
+Delivery of `event` is at-least-once; the engine tick is the dedup key.
 
 ## Error codes
 
 `malformed_message`, `unsupported_version`, `unknown_message_type`,
 `invalid_action`, `not_permitted`, `out_of_phase`, `game_full`,
 `already_started`, `rate_limited`, `not_supported`, `internal_error`.
+
+## Recovery and identity (v0.2)
+
+- `hello` may carry `matchId`, `token`, and `resumeFromTick`. The token is
+  the player's reconnect credential; the server stores only its sha256.
+- The actor for every action is the session binding. A payload can never
+  name a different player.
+- After a bind the server **always** sends a full snapshot. Missed events
+  follow only when the supplied cursor is inside the retained window
+  (1024 events per match); otherwise `resync: true` tells the client to
+  trust the snapshot rather than assume a complete history.
+- Action `seq` is per-connection and monotonic. A repeated last `seq`
+  replays the cached ack; an older `seq` is rejected as stale.
 
 ## GameConfig on the wire
 
