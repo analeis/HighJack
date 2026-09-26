@@ -4,7 +4,23 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 )
+
+// sortedKeys returns a map's keys in sorted order, for deterministic iteration.
+//
+// Go randomizes map iteration. Ranging a decoded JSON object directly made the
+// order of "unknown field" issues — and so the whole rendered ValidationError —
+// differ between two identical requests. Every other list the package produces
+// is slice-ordered; this keeps the last one deterministic too.
+func sortedKeys(obj map[string]any) []string {
+	keys := make([]string, 0, len(obj))
+	for key := range obj {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
+}
 
 // Generic shape validation mirrors validateStructure in
 // packages/protocol/src/config.ts so both sides report equivalent issues
@@ -28,7 +44,7 @@ func validateGenericShape(root any) []ValidationIssue {
 		"randomEvents": true, "victory": true,
 		"board": true, "propertyRules": true,
 	}
-	for key := range obj {
+	for _, key := range sortedKeys(obj) {
 		if !known[key] {
 			add(key, "unknown field %q", key)
 		}
@@ -61,7 +77,7 @@ func validateGenericShape(root any) []ValidationIssue {
 		} else if n, err := max.Int64(); err != nil || int(n) > MaxPlayersCeiling {
 			add("playerCount.max", "must be ≤ %d", MaxPlayersCeiling)
 		}
-		for key := range pc {
+		for _, key := range sortedKeys(pc) {
 			if key != "min" && key != "max" {
 				add("playerCount."+key, "unknown field %q", key)
 			}
@@ -98,7 +114,7 @@ func validateGenericShape(root any) []ValidationIssue {
 				add(name+".enabled", "must be a boolean")
 			}
 		}
-		for key := range toggleObj {
+		for _, key := range sortedKeys(toggleObj) {
 			if key != "enabled" {
 				add(name+"."+key, "unknown field %q", key)
 			}
@@ -119,7 +135,7 @@ func validateGenericShape(root any) []ValidationIssue {
 				issues = append(issues, ValidationIssue{Kind: KindStructural, Path: "gambling." + flag, Message: "missing required field"})
 			}
 		}
-		for key := range gamb {
+		for _, key := range sortedKeys(gamb) {
 			if key != "enabled" && key != "poker" && key != "blackjack" && key != "casino" {
 				add("gambling."+key, "unknown field %q", key)
 			}
@@ -146,7 +162,7 @@ func validateGenericShape(root any) []ValidationIssue {
 		default:
 			add("randomEvents.intervalTicks", "must be an integer")
 		}
-		for key := range re {
+		for _, key := range sortedKeys(re) {
 			if key != "enabled" && key != "intervalTicks" {
 				add("randomEvents."+key, "unknown field %q", key)
 			}
@@ -184,7 +200,7 @@ func validateGenericShape(root any) []ValidationIssue {
 		default:
 			add("victory.roundLimit", "must be an integer")
 		}
-		for key := range vic {
+		for _, key := range sortedKeys(vic) {
 			if key != "type" && key != "targetWealth" && key != "roundLimit" {
 				add("victory."+key, "unknown field %q", key)
 			}
@@ -196,7 +212,7 @@ func validateGenericShape(root any) []ValidationIssue {
 	if !present {
 		add("board", "must be an object")
 	} else {
-		for key := range board {
+		for _, key := range sortedKeys(board) {
 			if key != "spaces" {
 				add("board."+key, "unknown field %q", key)
 			}
@@ -222,8 +238,12 @@ func validateGenericShape(root any) []ValidationIssue {
 		add("propertyRules", "must be an object")
 	} else {
 		if v, exists := pr["passingGoBonus"]; exists {
-			if n, err := asInt(v); err != nil || n < 0 {
+			n, err := asInt(v)
+			switch {
+			case err != nil || n < 0:
 				add("propertyRules.passingGoBonus", "must be a non-negative integer")
+			case n > MaxPassingGoBonus:
+				add("propertyRules.passingGoBonus", "must not exceed %d", MaxPassingGoBonus)
 			}
 		} else {
 			add("propertyRules.passingGoBonus", "missing required field")
@@ -236,13 +256,17 @@ func validateGenericShape(root any) []ValidationIssue {
 			add("propertyRules.doublesExtraRoll", "missing required field")
 		}
 		if v, exists := pr["maxDoublesStreak"]; exists {
-			if n, err := asInt(v); err != nil || n < 0 {
+			n, err := asInt(v)
+			switch {
+			case err != nil || n < 0:
 				add("propertyRules.maxDoublesStreak", "must be a non-negative integer")
+			case n > MaxDoublesStreakCeiling:
+				add("propertyRules.maxDoublesStreak", "must not exceed %d", MaxDoublesStreakCeiling)
 			}
 		} else {
 			add("propertyRules.maxDoublesStreak", "missing required field")
 		}
-		for key := range pr {
+		for _, key := range sortedKeys(pr) {
 			if key != "passingGoBonus" && key != "doublesExtraRoll" && key != "maxDoublesStreak" {
 				add("propertyRules."+key, "unknown field %q", key)
 			}
@@ -273,7 +297,7 @@ func shapeSpace(path string, sp map[string]any, add func(path, format string, ar
 			add(path+"."+f, "missing required field")
 		}
 	}
-	for key := range sp {
+	for _, key := range sortedKeys(sp) {
 		switch key {
 		case "id", "kind", "name", "group", "price", "rent", "amount":
 		default:

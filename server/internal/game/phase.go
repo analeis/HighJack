@@ -67,3 +67,16 @@ func (p Phase) canTransitionTo(next Phase) error {
 	}
 	return fmt.Errorf("illegal phase transition %q → %q", p, next)
 }
+
+// AllPhases returns every match phase. It exists for the cross-language parity
+// test in internal/protocol: a phase added here without widening the TypeScript
+// union makes an authoritative snapshot fail its own type guard.
+func AllPhases() []Phase {
+	return []Phase{PhaseLobby, PhasePlaying, PhaseEnded, PhaseInterrupted}
+}
+
+// AllTurnPhases returns every turn phase, excluding the legitimate empty value
+// that represents "no turn yet" before a match starts.
+func AllTurnPhases() []TurnPhase {
+	return []TurnPhase{TurnAwaitRoll, TurnAwaitBuyDecision, TurnOver}
+}

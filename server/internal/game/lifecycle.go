@@ -46,7 +46,11 @@ func (r LifecycleRuleset) join(state *GameState, cfg *GameConfig, a PlayerJoinAc
 		return nil, nil, ErrGameFull
 	}
 
-	matchSeed := Split(mustParseSeed(state.RootSeedHex), "match")
+	rootSeed, err := parseStateSeed(state)
+	if err != nil {
+		return nil, nil, err
+	}
+	matchSeed := Split(rootSeed, "match")
 	seat := state.NextSeat()
 
 	next := state.Clone()
@@ -72,7 +76,10 @@ func (r LifecycleRuleset) join(state *GameState, cfg *GameConfig, a PlayerJoinAc
 }
 
 func (r LifecycleRuleset) leave(state *GameState, actor PlayerID) (*GameState, []Event, error) {
-	if state.Phase == PhaseEnded {
+	// Every terminal phase, not just Ended. PhaseInterrupted is terminal and is
+	// never resumed, so mutating a roster in it would edit a match that is
+	// already over.
+	if state.Phase.Terminal() {
 		return nil, nil, ErrOutOfPhase
 	}
 	if state.PlayerByID(actor) == nil {
@@ -105,11 +112,24 @@ func (r LifecycleRuleset) leave(state *GameState, actor PlayerID) (*GameState, [
 	} else { // PhasePlaying: leaving mid-match eliminates the leaver.
 		for i := range next.Players {
 			if next.Players[i].ID == actor && next.Players[i].Status == PlayerActive {
+				// Holdings revert to the bank on every elimination, not just on
+				// bankruptcy. A player who leaves while owning property would
+				// otherwise leave it permanently owned by an eliminated player:
+				// unpurchasable, because buy and decline both reject an owned
+				// space, and rent-free, because a payer skips an inactive owner.
+				released := releaseHoldings(next, actor)
 				next.Players[i].Status = PlayerEliminated
-				consequences = append(consequences, &PlayerEliminatedEvent{
-					PlayerID: actor,
-					Cause:    "voluntary_leave",
-				})
+				consequences = append(consequences,
+					&PlayerBankruptEvent{
+						PlayerID:       actor,
+						Cause:          "voluntary_leave",
+						ReleasedSpaces: released,
+					},
+					&PlayerEliminatedEvent{
+						PlayerID: actor,
+						Cause:    "voluntary_leave",
+					},
+				)
 			}
 		}
 		endEvents, err := maybeEndForInsufficientPlayers(next)
@@ -166,8 +186,11 @@ func (r LifecycleRuleset) start(state *GameState, cfg *GameConfig, actor PlayerI
 		return nil, nil, ErrNotPermitted
 	}
 	active := state.ActivePlayers()
-	if len(active) < cfg.PlayerCount.Min || len(active) > cfg.PlayerCount.Max {
+	if len(active) > cfg.PlayerCount.Max {
 		return nil, nil, ErrGameFull
+	}
+	if len(active) < cfg.PlayerCount.Min {
+		return nil, nil, ErrNotEnoughPlayers
 	}
 	for _, p := range active {
 		if !p.Ready {
@@ -175,7 +198,11 @@ func (r LifecycleRuleset) start(state *GameState, cfg *GameConfig, actor PlayerI
 		}
 	}
 
-	matchSeed := Split(mustParseSeed(state.RootSeedHex), "match")
+	rootSeed, err := parseStateSeed(state)
+	if err != nil {
+		return nil, nil, err
+	}
+	matchSeed := Split(rootSeed, "match")
 	hash, err := cfg.Hash()
 	if err != nil {
 		return nil, nil, fmt.Errorf("hash config for start: %w", err)
@@ -226,12 +253,17 @@ func maybeEndForInsufficientPlayers(state *GameState) ([]Event, error) {
 	return []Event{&GameEndedEvent{WinnerID: state.WinnerID, Reason: state.EndReason}}, nil
 }
 
-// mustParseSeed is used on seeds the engine itself serialized; failure
-// indicates corrupted state rather than user input.
-func mustParseSeed(hexed string) Seed {
-	s, err := ParseSeed(hexed)
+// parseStateSeed reads the root seed out of a state.
+//
+// This returns an error rather than panicking. The field is optional on the
+// wire, so a snapshot written by a build that predates it unmarshals
+// successfully and would then panic on the next join or start — in the middle of
+// a request, on the goroutine that holds the match lock, which wedges the match
+// permanently. Corrupt input must be an error the caller can report.
+func parseStateSeed(state *GameState) (Seed, error) {
+	s, err := ParseSeed(state.RootSeedHex)
 	if err != nil {
-		panic(fmt.Sprintf("game: corrupted seed in state: %v", err))
+		return Seed{}, fmt.Errorf("game: state has no usable root seed: %w", err)
 	}
-	return s
+	return s, nil
 }

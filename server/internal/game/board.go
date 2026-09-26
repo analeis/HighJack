@@ -112,16 +112,18 @@ func NetWorth(state *GameState, id PlayerID) Money {
 // richestActive returns the active player with the highest net worth,
 // breaking ties by lowest seat so victory is deterministic.
 func richestActive(state *GameState) *Player {
+	// Scanned in seat order, not slice order. The documented rule is "highest
+	// net worth, ties to the lowest seat", and the two orders diverge as soon as
+	// a lobby seat is reused: a player who leaves frees their seat, and the next
+	// joiner takes the lowest free seat, which is not necessarily their position
+	// in the slice. Scanning the slice awarded a tie to the wrong player.
 	var best *Player
 	var bestWorth Money
-	for i := range state.Players {
-		p := &state.Players[i]
-		if !p.Active() {
-			continue
-		}
+	for _, p := range state.ActivePlayers() {
 		w := NetWorth(state, p.ID)
 		if best == nil || w > bestWorth {
-			best, bestWorth = p, w
+			winner := p
+			best, bestWorth = &winner, w
 		}
 	}
 	return best

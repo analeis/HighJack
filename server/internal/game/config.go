@@ -35,6 +35,18 @@ const (
 	MaxSpacePrice  = 1_000_000
 	MaxSpaceRent   = 100_000
 	MaxTaxAmount   = 1_000_000
+
+	// MaxPassingGoBonus bounds the per-crossing start bonus. Money is int64 and
+	// the credit is `bonus * passes`, so a bonus without a ceiling can overflow
+	// a balance negative on a single roll. The ceiling is deliberately far above
+	// any plausible value (200 is the default) and exists only to keep every
+	// money field in the same bounded range as the others.
+	MaxPassingGoBonus = 1_000_000
+
+	// MaxDoublesStreakCeiling bounds consecutive doubles. A streak cap is what
+	// stops one player rolling forever; without a ceiling a config could permit
+	// an unbounded run of turns inside a single turn.
+	MaxDoublesStreakCeiling = 16
 )
 
 type PlayerCountRange struct {
@@ -226,4 +238,10 @@ func (c *GameConfig) Hash() (string, error) {
 	}
 	sum := sha256.Sum256(canonical)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// AllSpaceKinds returns every space kind on the wire. It exists for the
+// cross-language parity test in internal/protocol.
+func AllSpaceKinds() []SpaceKind {
+	return []SpaceKind{SpaceGo, SpaceProperty, SpaceTax, SpaceNeutral}
 }

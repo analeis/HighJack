@@ -162,8 +162,15 @@ func (h *Handler) handleAction(conn *websocket.Conn, c *connSink, session string
 	if result.Err != nil {
 		return c.sendErrorWithAck(a.Seq, result.DomainCode, result.Err.Error())
 	}
-	// Publish authoritative events to every bound connection in the match.
-	m.Broadcast(result.Events, a.Seq)
+	// Publish authoritative events to every bound connection in the match — but
+	// only for a transition that was just applied. A replayed result is an
+	// acknowledgement of work already published; re-broadcasting it would
+	// deliver the same economic events to every peer a second time, and clients
+	// that fold a repeated rent_paid would charge it twice. The ack still
+	// carries the authoritative snapshot, so a retrying client stays correct.
+	if !result.Replayed {
+		m.Broadcast(result.Events, a.Seq)
+	}
 	return c.sendAck(a.Seq, result.NextSeq, result.Snapshot)
 }
 

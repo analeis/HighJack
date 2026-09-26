@@ -143,6 +143,10 @@ type PlayerBankruptEvent struct {
 	Cause      string   `json:"cause"`
 	CreditorID PlayerID `json:"creditorId,omitempty"`
 	AmountOwed Money    `json:"amountOwed"`
+	// ReleasedSpaces lists the board spaces that reverted to the bank. Without
+	// it the bank absorbs property value with no event naming it, so the log
+	// cannot explain the post-state and a replay cannot reconstruct ownership.
+	ReleasedSpaces []string `json:"releasedSpaces,omitempty"`
 }
 
 func (PlayerBankruptEvent) Type() EventType { return EventPlayerBankrupt }
@@ -154,3 +158,23 @@ type TurnAdvancedEvent struct {
 }
 
 func (TurnAdvancedEvent) Type() EventType { return EventTurnAdvanced }
+
+// AllEventTypes returns every event type on the wire. It exists for the
+// cross-language parity test in internal/protocol.
+func AllEventTypes() []EventType {
+	return []EventType{
+		EventPlayerJoined,
+		EventPlayerLeft,
+		EventPlayerReadyChanged,
+		EventGameStarted,
+		EventPlayerEliminated,
+		EventGameEnded,
+		EventDiceRolled,
+		EventBankTransfer,
+		EventPropertyBought,
+		EventBuyDeclined,
+		EventRentPaid,
+		EventPlayerBankrupt,
+		EventTurnAdvanced,
+	}
+}

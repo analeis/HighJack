@@ -17,11 +17,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/analeis/highjack/server/internal/game"
-	"github.com/analeis/highjack/server/internal/persistence"
 	"github.com/analeis/highjack/server/internal/protocol"
 )
 
@@ -34,6 +34,22 @@ const historyCap = 1024
 // block indefinitely on a slow consumer.
 type Sink interface {
 	Send(msg any) bool
+}
+
+// Store is the persistence surface the runtime depends on.
+//
+// Deliberately narrow. A fake cannot prove SQL, transactions, or constraints —
+// that is what the PostgreSQL integration suite is for — but it *can* prove the
+// properties that live in this package: that a failed commit leaves no
+// in-memory trace, that a failed join leaves no seat behind, and that an
+// indeterminate commit is reconciled rather than trusted. Those are exactly
+// the invariants that were untestable while the runtime held a concrete
+// *persistence.Store.
+type Store interface {
+	CreateMatch(ctx context.Context, id game.GameID, cfg *game.GameConfig, state *game.GameState, seedHex string) error
+	SavePlayer(ctx context.Context, matchID game.GameID, player game.Player, tokenHash string) error
+	CommitTransition(ctx context.Context, id game.GameID, state *game.GameState, events []game.Event) error
+	MarkInterrupted(ctx context.Context) (int64, error)
 }
 
 // EventEnvelope pairs an event with the tick that produced it, matching
@@ -53,6 +69,8 @@ func DomainError(err error) protocol.ErrorCode {
 		return protocol.CodeOutOfPhase
 	case errors.Is(err, game.ErrGameFull):
 		return protocol.CodeGameFull
+	case errors.Is(err, game.ErrNotEnoughPlayers):
+		return protocol.CodeNotEnoughPlayers
 	case errors.Is(err, game.ErrNotAllReady), errors.Is(err, game.ErrInvalidName),
 		errors.Is(err, game.ErrUnknownAction):
 		return protocol.CodeInvalidAction
@@ -80,7 +98,7 @@ type Match struct {
 	sessions map[string]*session
 	players  map[game.PlayerID]string // player id → hashed token
 
-	store *persistence.Store
+	store Store
 	log   *slog.Logger
 }
 
@@ -93,7 +111,7 @@ type session struct {
 	// lastSeq is the per-connection action watermark. Repeating the last
 	// sequence replays the cached ack; anything older is stale.
 	lastSeq   int64
-	lastAck   any
+	lastAck   ActionResult
 	haveAck   bool
 	connected bool
 }
@@ -102,14 +120,14 @@ type session struct {
 type Registry struct {
 	mu      sync.RWMutex
 	matches map[game.GameID]*Match
-	store   *persistence.Store
+	store   Store
 	log     *slog.Logger
 }
 
 // NewRegistry builds an empty registry. store may be nil: matches then run
 // in memory only (development default, as in v0.1) and docs record that
 // limitation.
-func NewRegistry(log *slog.Logger, store *persistence.Store) *Registry {
+func NewRegistry(log *slog.Logger, store Store) *Registry {
 	return &Registry{matches: make(map[game.GameID]*Match), store: store, log: log}
 }
 
@@ -218,18 +236,23 @@ func (m *Match) Join(ctx context.Context, displayName string) (game.PlayerID, st
 	}
 	tokenHash := hashToken(token)
 
-	m.state = next
-	m.appendHistory(events)
-	m.players[joined.PlayerID] = tokenHash
+	// Persist first. A join that cannot be stored must leave nothing behind: the
+	// caller is an unauthenticated HTTP endpoint whose context dies the moment
+	// the client hangs up, and a seat consumed by a player whose token was then
+	// discarded could never be released, because leaving requires a bindable
+	// actor. Four aborted requests would fill the match for good.
+	joinedPlayer := next.PlayerByID(joined.PlayerID)
+	if joinedPlayer == nil {
+		return "", "", errors.New("match: joined player missing from state")
+	}
 	if m.store != nil {
-		p := m.state.PlayerByID(joined.PlayerID)
-		if p == nil {
-			return "", "", errors.New("match: joined player missing from state")
-		}
-		if err := m.store.SavePlayer(ctx, m.id, *p, tokenHash); err != nil {
+		if err := m.store.SavePlayer(ctx, m.id, *joinedPlayer, tokenHash); err != nil {
 			return "", "", fmt.Errorf("persist player: %w", err)
 		}
 	}
+	m.state = next
+	m.appendHistory(events)
+	m.players[joined.PlayerID] = tokenHash
 	return joined.PlayerID, token, nil
 }
 
@@ -282,10 +305,18 @@ func (m *Match) playersByTokenLocked(tokenHash string) (game.PlayerID, bool) {
 func (m *Match) Disconnect(sessionID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if s := m.sessions[sessionID]; s != nil {
-		s.connected = false
-		s.sink = nil
+	s := m.sessions[sessionID]
+	if s == nil {
+		return
 	}
+	s.connected = false
+	s.sink = nil
+	// Drop the session rather than leaving a bound-but-dead entry. Session ids
+	// are minted per connection and never reused, so nothing can be waiting on
+	// this one, and keeping it would (a) leave a bound identity that can still
+	// reach ApplyAction, and (b) retain the sink and the cached snapshot — which
+	// holds every space and player — for the life of the match.
+	delete(m.sessions, sessionID)
 }
 
 // ---- actions ----------------------------------------------------------------
@@ -297,6 +328,12 @@ type ActionResult struct {
 	NextSeq    int64
 	DomainCode protocol.ErrorCode
 	Err        error
+	// Replayed marks a result served from the idempotency cache rather than
+	// newly applied. The transition already happened and was already
+	// published, so a replayed result must never be broadcast again: doing so
+	// re-delivered the same economic events to every peer, and clients that
+	// folded them a second time charged rent twice.
+	Replayed bool
 }
 
 // ApplyAction serializes one action from a bound session.
@@ -307,40 +344,54 @@ type ActionResult struct {
 // in-memory state is rolled back to the last durable state, so a lost
 // write is never broadcast.
 func (m *Match) ApplyAction(ctx context.Context, sessionID string, seq int64, action game.Action) (ActionResult, error) {
+	// Deferred, so no return path — including a panic from a corrupt state
+	// reaching the engine — can leave the match locked forever. With manual
+	// unlocks, any newly added early return or a panic silently converted one
+	// bad request into a permanently wedged match.
 	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	s := m.sessions[sessionID]
 	if s == nil || !s.bound {
-		m.mu.Unlock()
 		return ActionResult{DomainCode: protocol.CodeNotPermitted}, ErrUnboundSession
 	}
+	// Sequence numbers are 1-based and must leave room for the next-sequence
+	// hint. Zero is a fresh watermark's zero value; MaxInt64 would overflow that
+	// hint to a negative number and make every later sequence look stale, which
+	// bricks the seat with a misleading error.
+	if seq < 1 || seq == math.MaxInt64 {
+		return ActionResult{DomainCode: protocol.CodeInvalidAction}, ErrInvalidSequence
+	}
 	// Idempotency: a repeated last seq replays the cached ack; an older
-	// seq is stale.
+	// seq is stale. A replay carries the ack only — the events were published
+	// when the transition was first applied, and re-publishing them would
+	// double-apply the transition on every peer.
 	if seq <= s.lastSeq {
-		var cached ActionResult
-		if s.haveAck && seq == s.lastSeq {
-			cached = s.lastAckValue()
-		} else {
-			m.mu.Unlock()
+		if !s.haveAck || seq != s.lastSeq {
 			return ActionResult{DomainCode: protocol.CodeInvalidAction}, ErrStaleSequence
 		}
-		m.mu.Unlock()
+		cached := s.lastAck
+		cached.Events = nil
+		cached.Replayed = true
 		return cached, nil
 	}
 
 	prev := m.state
 	next, events, err := m.engine.Apply(m.state, s.player, action)
 	if err != nil {
-		m.mu.Unlock()
+		// A domain rejection is recoverable and is reported in the result, not
+		// as a transport error, so the handler can distinguish it from a
+		// durability failure.
 		return ActionResult{DomainCode: DomainError(err), Err: err}, nil
 	}
 
-	// Durability first. On failure the authoritative in-memory state is
-	// restored to the last durable value and nothing is published.
+	// Durability first: state and events become durable together, and only then
+	// is anything published. A failure restores the last durable state so a lost
+	// write is never broadcast, and leaves the sequence watermark untouched so
+	// the client may retry the same sequence.
 	if m.store != nil {
 		if perr := m.store.CommitTransition(ctx, m.id, next, events); perr != nil {
 			m.state = prev
-			m.mu.Unlock()
 			m.log.Error("transition not durable; rolled back",
 				"match", m.id, "error", perr.Error())
 			return ActionResult{DomainCode: protocol.CodeInternalError, Err: perr}, perr
@@ -352,16 +403,10 @@ func (m *Match) ApplyAction(ctx context.Context, sessionID string, seq int64, ac
 	s.lastSeq = seq
 	s.lastAck = ActionResult{Events: envelopes, Snapshot: snap, NextSeq: seq + 1}
 	s.haveAck = true
-	m.mu.Unlock()
 	return ActionResult{Events: envelopes, Snapshot: snap, NextSeq: seq + 1}, nil
 }
 
 // lastAckValue returns the cached acknowledgement for a duplicate seq.
-func (s *session) lastAckValue() ActionResult {
-	cached, _ := s.lastAck.(ActionResult)
-	return cached
-}
-
 // commitLocked advances the authoritative state and history under the
 // lock and returns wire envelopes. The engine has already produced the
 // next state (and its tick); this installs it. Callers hold m.mu.
@@ -380,13 +425,33 @@ func (m *Match) commitLocked(events []game.Event, next *game.GameState) []EventE
 	return envelopes
 }
 
+// appendHistory records a transition's events and enforces the retention
+// window.
+//
+// The window is trimmed on tick boundaries, not on raw event counts: one
+// transition emits several events that all share a tick, so cutting mid-group
+// would retain a *partial* transition. Since() would then serve that partial
+// group as a complete catch-up, and a client would apply a purchase without its
+// payment.
 func (m *Match) appendHistory(events []game.Event) {
 	for _, ev := range events {
 		m.history = append(m.history, EventEnvelope{Tick: ev.Tick(), Event: ev})
 	}
-	if len(m.history) > historyCap {
-		drop := len(m.history) - historyCap
-		m.history = append([]EventEnvelope(nil), m.history[drop:]...)
+	m.trimHistoryLocked()
+}
+
+func (m *Match) trimHistoryLocked() {
+	if len(m.history) <= historyCap {
+		return
+	}
+	drop := len(m.history) - historyCap
+	// Advance past every remaining event of the tick we would otherwise split.
+	boundary := m.history[drop-1].Tick
+	for drop < len(m.history) && m.history[drop].Tick == boundary {
+		drop++
+	}
+	m.history = append([]EventEnvelope(nil), m.history[drop:]...)
+	if len(m.history) > 0 {
 		m.base = m.history[0].Tick
 	}
 }
@@ -404,6 +469,12 @@ func (m *Match) Since(cursor uint64) (events []EventEnvelope, ok bool) {
 		return nil, false
 	}
 	if cursor+1 < m.base {
+		return nil, false
+	}
+	// A cursor the server has never reached means the client's view is ahead of
+	// authoritative state. Reporting success with no events would tell it it is
+	// up to date, so it must be sent back for a snapshot instead.
+	if cursor > m.state.Tick {
 		return nil, false
 	}
 	for _, e := range m.history {
@@ -455,6 +526,11 @@ var (
 	ErrUnauthorized   = errors.New("match: not authorized")
 	ErrUnboundSession = errors.New("match: session is not bound to a player")
 	ErrStaleSequence  = errors.New("match: stale action sequence")
+	// ErrInvalidSequence is a protocol violation rather than a stale replay: the
+	// sequence is outside the representable range, so accepting it would either
+	// be rejected as stale forever (0) or overflow the next-sequence hint and
+	// wedge the session (MaxInt64).
+	ErrInvalidSequence = errors.New("match: action sequence out of range")
 )
 
 func newMatchID() (string, error) { return newID("m_") }

@@ -25,10 +25,15 @@
 
 ## Frontend unit conventions
 
-- Solid components are tested through their accessibility contract:
+- Components in `packages/ui` are tested through their accessibility contract:
   roles, aria states, and keyboard behavior — not implementation details.
-- jsdom environment; `@solidjs/testing-library` with automatic cleanup
-  (`test/setup.ts`).
+  They run under jsdom with `@solidjs/testing-library` and automatic cleanup
+  (`packages/ui/test/setup.ts`).
+- `apps/game` runs under the **node** environment, not jsdom, and has neither
+  `@solidjs/testing-library` nor a setup file. Its tests cover the store and the
+  network layer. **The `App.tsx` UI has no component tests**; its behaviour is
+  covered by the browser suite instead. Do not assume otherwise when adding
+  coverage.
 - No snapshot tests of markup; assert what a user or screen reader gets.
 
 ## Backend conventions

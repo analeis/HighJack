@@ -39,6 +39,22 @@ func UnmarshalGameState(data []byte) (*GameState, error) {
 	if state.Turn.Phase != "" && !state.Turn.Phase.Valid() {
 		return nil, fmt.Errorf("unmarshal state: unknown turn phase %q", state.Turn.Phase)
 	}
+	// Reject states that could not have been produced by the engine. A position
+	// outside the board would otherwise load successfully and then panic on the
+	// next roll, inside a transition, while the caller holds a lock.
+	if n := len(state.Board.Spaces); n > 0 {
+		for _, p := range state.Players {
+			if p.Position < 0 || int(p.Position) >= n {
+				return nil, fmt.Errorf("unmarshal state: player %q position %d is outside the board (%d spaces)",
+					p.ID, p.Position, n)
+			}
+		}
+		for i, sp := range state.Board.Spaces {
+			if sp.Owned && sp.Owner == "" {
+				return nil, fmt.Errorf("unmarshal state: space %d is owned with no owner", i)
+			}
+		}
+	}
 	return &state, nil
 }
 

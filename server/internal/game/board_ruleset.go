@@ -50,6 +50,15 @@ func requireTurn(state *GameState, actor PlayerID, phase TurnPhase) (*Player, er
 	if !p.Active() {
 		return nil, ErrNotPermitted
 	}
+	// The position indexes Board.Spaces directly, and every board action reads
+	// it. A state that reached this point with an out-of-range position — a
+	// corrupt snapshot, say — would panic inside the transition, on the
+	// goroutine holding the match lock, wedging the match permanently. Refusing
+	// here turns that into a reportable error.
+	if p.Position < 0 || int(p.Position) >= len(state.Board.Spaces) {
+		return nil, fmt.Errorf("game: player %q position %d is outside the board (%d spaces)",
+			actor, p.Position, len(state.Board.Spaces))
+	}
 	if p.Seat != state.Turn.CurrentSeat {
 		return nil, ErrNotYourTurn
 	}
@@ -216,19 +225,38 @@ func (r BoardRuleset) resolveLanding(next *GameState, cfg *GameConfig, actor Pla
 // bankrupt eliminates the actor atomically: holdings revert to the bank,
 // the player is eliminated through the lifecycle path, and the turn
 // auto-advances past them (or the match end is left to evaluation).
-func (r BoardRuleset) bankrupt(next *GameState, cfg *GameConfig, actor, creditor PlayerID, owed Money, cause string) (landingOutcome, error) {
-	np := next.PlayerByID(actor)
-	for i := range next.Board.Spaces {
-		if next.Board.Spaces[i].Owned && next.Board.Spaces[i].Owner == actor {
-			next.Board.Spaces[i].Owned = false
-			next.Board.Spaces[i].Owner = ""
-			next.Board.Spaces[i].Level = 0
+// releaseHoldings returns every space owned by a player to the bank, unowned,
+// and reports the space ids so the change is reconstructible from the event log.
+//
+// Both elimination paths must go through here. When only the bankruptcy path
+// swept, a player who left mid-match kept their properties while eliminated:
+// those spaces could never be bought (buy and decline both reject an owned
+// space) and could never charge rent (the payer is skipped when the owner is
+// not active), so they were dead, rent-free and unpurchasable for the rest of
+// the match, with no event recording the change.
+func releaseHoldings(state *GameState, owner PlayerID) []string {
+	var released []string
+	for i := range state.Board.Spaces {
+		if state.Board.Spaces[i].Owned && state.Board.Spaces[i].Owner == owner {
+			state.Board.Spaces[i].Owned = false
+			state.Board.Spaces[i].Owner = ""
+			state.Board.Spaces[i].Level = 0
+			released = append(released, state.Board.Spaces[i].ID)
 		}
 	}
+	return released
+}
+
+func (r BoardRuleset) bankrupt(next *GameState, cfg *GameConfig, actor, creditor PlayerID, owed Money, cause string) (landingOutcome, error) {
+	np := next.PlayerByID(actor)
+	released := releaseHoldings(next, actor)
 	np.Status = PlayerEliminated
 	out := landingOutcome{bankrupt: true}
 	out.events = append(out.events,
-		&PlayerBankruptEvent{PlayerID: actor, Cause: cause, CreditorID: creditor, AmountOwed: owed},
+		&PlayerBankruptEvent{
+			PlayerID: actor, Cause: cause, CreditorID: creditor,
+			AmountOwed: owed, ReleasedSpaces: released,
+		},
 		&PlayerEliminatedEvent{PlayerID: actor, Cause: cause},
 	)
 	if len(next.ActivePlayers()) == 0 {

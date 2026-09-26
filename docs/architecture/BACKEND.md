@@ -80,7 +80,9 @@ WebSocket → Connection → Message Decoder → match runtime → Engine → br
 2. Wrong protocol major version → `unsupported_version`.
 3. `ping` → `pong{nonce}`.
 4. `hello` with `matchId` + `token` binds the connection to a player;
-   with `resumeFromTick` it also replays retained events.
+   with `resumeFromTick` it also replays retained events. The shipped
+   client does not yet send a cursor (audit CLT-9), so catch-up is
+   currently only reachable by a client that supplies one.
 
 The actor for an action is always the connection binding. The decoder
 lives in `internal/protocol` and is fixture-tested against
@@ -105,11 +107,15 @@ Match ── engine (pure)     Apply(state, actor, action)
 - **Dispatch order** is fixed: validate session → validate envelope →
   resolve actor → validate sequence → serialize → `Engine.Apply` → persist
   → publish events → ack. Nothing is broadcast that is not durable.
-- **Locking**: the per-match mutex is never held across a network write
-  or a database call. Sinks are collected under the lock and written after
-  releasing it, so one slow client cannot stall the match.
+- **Locking**: the per-match mutex is released before any network write, so
+  one slow client cannot stall the match. It _is_ still held across the
+  database commit, which is a known limitation tracked in the audit as
+  PRS-3 and fixed in v0.2.2.
 - **Broadcast failure** never blocks the game loop: a dead sink is
-  dropped, and the client reconnects via snapshot.
+  dropped, and the client reconnects via snapshot. A transition is
+  published as its events plus an authoritative ack snapshot; a repeated
+  action sequence is answered with the ack only, never re-published, so a
+  retry cannot double-apply an economic change on a peer.
 - **Restart policy**: leftover matches are moved to `interrupted` at boot.
   v0.2 does not restore live matches across process restarts; see
   [GAME_DESIGN.md](../game/GAME_DESIGN.md).
@@ -141,7 +147,10 @@ have is per-match identity:
 - Claiming a seat mints a 256-bit reconnect token, returned exactly once.
 - Only its sha256 is stored, so a database leak does not yield usable
   tokens. Tokens are never logged.
-- A token authenticates **within one match only** (enforced by a test).
+- A token authenticates **within one match only**, enforced by the
+  in-memory binding table and covered by an integration test. The durable
+  `game_players.token_hash` column and its unique index are written but not
+  read at runtime (audit A-7).
 - Connection → player binding happens at `hello`; after that the server
   ignores any client-supplied identity entirely.
 

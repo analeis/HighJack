@@ -13,6 +13,74 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.1',
+    date: '2026-09-26',
+    title: 'Stabilization — evidence and engine correctness',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Certification integrity',
+        tone: 'gold',
+        items: [
+          'The certification report now identifies the tested tree, not just the last commit, and refuses to certify a dirty tree',
+          'A skipped mandatory gate fails certification; optional gates are recorded as skipped, never as passed',
+          'Dependency audit, Go vulnerability scan and the race detector are now certification gates, not CI-only steps',
+          'CI invokes the same shared gate list instead of restating the commands, and the database gate no longer filters out the tests it exists to run',
+        ],
+      },
+      {
+        label: 'Verification coverage',
+        tone: 'teal',
+        items: [
+          'First tests for the match runtime: authorization, sequence idempotency, broadcast delivery, retention and rate limiting',
+          'The multiplayer integration test now genuinely drives two WebSocket clients through one match, as its header always claimed',
+          'Protocol parity tests assert the TypeScript and Go vocabularies are the same set, in both directions',
+          'Server frame fixtures are compared against bytes the real handler writes, not against a map built inside the test',
+        ],
+      },
+      {
+        label: 'Correctness fixes',
+        tone: 'teal',
+        items: [
+          'Leaving a match now returns your properties to the bank, as bankruptcy already did — previously they stayed owned by an eliminated player, unpurchasable and rent-free',
+          'A retried action is answered without re-publishing its events, so a lost acknowledgement can no longer charge rent twice on every player',
+          'The start bonus and doubles streak are bounded, closing an integer overflow that could drive a balance negative',
+          'Ties in wealth victories are broken by seat as documented, and validation errors are reported in a deterministic order',
+          'A failed join no longer leaves an unusable seat behind, and a corrupt snapshot is rejected instead of panicking mid-match',
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.2.0',
+    date: '2026-09-26',
+    title: 'First table — the board loop',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Playable board loop',
+        tone: 'gold',
+        items: [
+          'A 24-space board as validated, canonical, hashed configuration data rather than hardcoded geometry',
+          'Two-dice rolls, clockwise movement, start bonuses, and landing on owned property, tax or neutral space',
+          'Buy or decline a property, pay rent to the owner, pay tax to the bank',
+          'Doubles grant an extra roll up to a streak cap; the turn then passes',
+          'No debt: a missed mandatory payment is an atomic bankruptcy, holdings return to the bank, and the turn moves on',
+          'Victory by last player standing, target wealth, or a round limit',
+        ],
+      },
+      {
+        label: 'Server & client',
+        tone: 'teal',
+        items: [
+          'Authoritative Go engine: pure, deterministic, and free of clock, I/O and randomness',
+          'Private multiplayer matches over a versioned wire protocol with reconnect tokens stored only as hashes',
+          'SolidJS client over a GPU-rendered PixiJS board that renders server state and computes no dice, rent or ownership itself',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.1.0',
     date: '2026-08-26',
     title: 'Foundation',

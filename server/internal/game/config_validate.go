@@ -155,6 +155,16 @@ func (c *GameConfig) validateStructural() []ValidationIssue {
 	if c.PropertyRules.PassingGoBonus < 0 {
 		add(structural("propertyRules.passingGoBonus", "must not be negative"))
 	}
+	if c.PropertyRules.PassingGoBonus > MaxPassingGoBonus {
+		add(structural("propertyRules.passingGoBonus",
+			"must not exceed %d", MaxPassingGoBonus))
+	}
+	// The streak is what stops one player rolling within a single turn, so it
+	// needs a ceiling as well as a floor.
+	if c.PropertyRules.MaxDoublesStreak > MaxDoublesStreakCeiling {
+		add(structural("propertyRules.maxDoublesStreak",
+			"must not exceed %d", MaxDoublesStreakCeiling))
+	}
 	if c.PropertyRules.MaxDoublesStreak < 0 {
 		add(structural("propertyRules.maxDoublesStreak", "must not be negative"))
 	}
@@ -239,8 +249,12 @@ func (c *GameConfig) validateSemantics() []ValidationIssue {
 			add(semantic("victory.roundLimit", "round limit must be positive for round_limit victory"))
 		}
 	}
-	if c.PropertyRules.DoublesExtraRoll && c.PropertyRules.MaxDoublesStreak < 1 {
-		add(semantic("propertyRules.maxDoublesStreak", "must be at least 1 when doubles grant extra rolls"))
+	if c.PropertyRules.DoublesExtraRoll && c.PropertyRules.MaxDoublesStreak < 2 {
+		// A streak of 1 makes doublesExtraRoll a silent no-op: the first double
+		// resolves the roll and passes the turn, exactly as if the rule were off.
+		// Accepting such a config means the engine quietly ignores a stated
+		// intent, so require a streak that can actually grant an extra roll.
+		add(semantic("propertyRules.maxDoublesStreak", "must be at least 2 when doubles grant extra rolls"))
 	}
 	return issues
 }

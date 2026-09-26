@@ -67,16 +67,21 @@ func (EndTurnAction) Type() ActionType { return ActionEndTurn }
 // they must remain transport-agnostic.
 
 var (
-	ErrUnknownAction   = fmt.Errorf("unknown action type")
-	ErrOutOfPhase      = fmt.Errorf("action not permitted in the current game phase")
-	ErrNotPermitted    = fmt.Errorf("actor is not permitted to perform this action")
-	ErrGameFull        = fmt.Errorf("match is full")
-	ErrAlreadyStarted  = fmt.Errorf("match has already started")
-	ErrNotAllReady     = fmt.Errorf("not all players are ready")
-	ErrInvalidName     = fmt.Errorf("display name is invalid")
-	ErrPlayerNotInGame = fmt.Errorf("player is not part of this match")
-	ErrNoPlayers       = fmt.Errorf("match has no players")
-	ErrNotYourTurn     = fmt.Errorf("it is not the actor's turn")
+	ErrUnknownAction = fmt.Errorf("unknown action type")
+	ErrOutOfPhase    = fmt.Errorf("action not permitted in the current game phase")
+	ErrNotPermitted  = fmt.Errorf("actor is not permitted to perform this action")
+	ErrGameFull      = fmt.Errorf("match is full")
+	// ErrNotEnoughPlayers is deliberately distinct from ErrGameFull: a host who
+	// starts a 2-player match alone needs to be told they are short of players,
+	// not that the table is full. Both mapped to the same code, so the client
+	// rendered "match is full" for the most common new-player action.
+	ErrNotEnoughPlayers = fmt.Errorf("not enough players to start")
+	ErrAlreadyStarted   = fmt.Errorf("match has already started")
+	ErrNotAllReady      = fmt.Errorf("not all players are ready")
+	ErrInvalidName      = fmt.Errorf("display name is invalid")
+	ErrPlayerNotInGame  = fmt.Errorf("player is not part of this match")
+	ErrNoPlayers        = fmt.Errorf("match has no players")
+	ErrNotYourTurn      = fmt.Errorf("it is not the actor's turn")
 )
 
 // Ruleset is the pluggable behavior layer of the engine: it binds each
@@ -91,4 +96,19 @@ type Ruleset interface {
 	//   - emit events that correspond exactly to what changed,
 	//   - advance the tick by exactly one on success (the engine owns this).
 	Handle(state *GameState, cfg *GameConfig, actor PlayerID, action Action, rng Rng) (*GameState, []Event, error)
+}
+
+// AllActionTypes returns every action type on the wire. It exists for the
+// cross-language parity test in internal/protocol.
+func AllActionTypes() []ActionType {
+	return []ActionType{
+		ActionPlayerJoin,
+		ActionPlayerLeave,
+		ActionPlayerReady,
+		ActionGameStart,
+		ActionRollDice,
+		ActionBuyProperty,
+		ActionDeclineBuy,
+		ActionEndTurn,
+	}
 }

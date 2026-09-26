@@ -41,7 +41,7 @@ export interface SnapshotTurn {
 
 export interface GameSnapshot {
   readonly matchId: string;
-  readonly phase: 'lobby' | 'playing' | 'ended';
+  readonly phase: MatchPhase;
   readonly tick: number;
   readonly players: readonly SnapshotPlayer[];
   readonly spaces: readonly SnapshotSpace[];
@@ -63,7 +63,17 @@ function isSafeInt(v: unknown): v is number {
 
 const PLAYER_STATUSES = ['active', 'eliminated', 'disconnected'] as const;
 const TURN_PHASES = ['await_roll', 'await_buy_decision', 'turn_over'] as const;
-const MATCH_PHASES = ['lobby', 'playing', 'ended'] as const;
+/**
+ * Match phases, mirroring the Go engine exactly.
+ *
+ * `interrupted` is the fourth terminal phase: it marks a match left active by a
+ * process that died, which is never resumed. It was missing here while the engine
+ * already emitted it, so an authoritative snapshot carrying it failed this very
+ * type guard. `parity_test.go` now fails if the two lists ever diverge again.
+ */
+const MATCH_PHASES = ['lobby', 'playing', 'ended', 'interrupted'] as const;
+
+export type MatchPhase = (typeof MATCH_PHASES)[number];
 const SPACE_KINDS = ['go', 'property', 'tax', 'neutral'] as const;
 
 export function isSnapshotPlayer(value: unknown): value is SnapshotPlayer {

@@ -57,6 +57,14 @@ type GameState struct {
 // the slices is a true deep copy with no aliasing between states.
 func (s *GameState) Clone() *GameState {
 	out := *s
+	// WinnerID is a pointer, so the struct copy above would share the allocation
+	// with the original *and* with any GameEndedEvent that captured it. One
+	// write through either would rewrite the other, including a persisted
+	// historical event.
+	if s.WinnerID != nil {
+		winner := *s.WinnerID
+		out.WinnerID = &winner
+	}
 	if s.Players != nil {
 		out.Players = make([]Player, len(s.Players))
 		copy(out.Players, s.Players)

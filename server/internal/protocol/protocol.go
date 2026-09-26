@@ -29,8 +29,29 @@ const (
 	CodeNotPermitted       ErrorCode = "not_permitted"
 	CodeOutOfPhase         ErrorCode = "out_of_phase"
 	CodeGameFull           ErrorCode = "game_full"
+	CodeNotEnoughPlayers   ErrorCode = "not_enough_players"
 	CodeAlreadyStarted     ErrorCode = "already_started"
 	CodeRateLimited        ErrorCode = "rate_limited"
 	CodeNotSupported       ErrorCode = "not_supported"
 	CodeInternalError      ErrorCode = "internal_error"
 )
+
+// AllErrorCodes returns every code defined in the wire contract. It exists for
+// the cross-language parity test, which fails when this list and the
+// TypeScript ERROR_CODES array disagree.
+func AllErrorCodes() []ErrorCode {
+	return []ErrorCode{
+		CodeMalformedMessage,
+		CodeUnsupportedVersion,
+		CodeUnknownMessageType,
+		CodeInvalidAction,
+		CodeNotPermitted,
+		CodeOutOfPhase,
+		CodeGameFull,
+		CodeNotEnoughPlayers,
+		CodeAlreadyStarted,
+		CodeRateLimited,
+		CodeNotSupported,
+		CodeInternalError,
+	}
+}

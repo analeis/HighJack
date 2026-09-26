@@ -12,6 +12,7 @@ export const ERROR_CODES = [
   'not_permitted',
   'out_of_phase',
   'game_full',
+  'not_enough_players',
   'already_started',
   'rate_limited',
   'not_supported',

@@ -26,6 +26,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "validate": "bun scripts/validate.ts",
+    "gate": "bun scripts/gate.ts",
     "certify": "bun scripts/certify.ts"
   },
   "devDependencies": {

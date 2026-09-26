@@ -28,36 +28,41 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Every step below invokes a gate defined in scripts/lib/validation-gates.ts
+      # via `bun scripts/gate.ts <name>`. CI deliberately does not restate the
+      # commands: a second copy of the gate list is a second thing to forget to
+      # update, and that is how the database step came to filter out the tests
+      # it was supposed to run (audit OPS-2).
       - name: Dependency audit
-        run: bun audit
+        run: bun scripts/gate.ts audit:deps
 
       - name: Format check
-        run: bunx prettier --check .
+        run: bun scripts/gate.ts format
 
       - name: Lint (TypeScript)
-        run: bunx eslint packages apps
+        run: bun scripts/gate.ts lint:eslint
 
       - name: Typecheck
         run: |
-          bunx tsc --noEmit -p tsconfig.json
-          (cd apps/web && bun run check)
+          bun scripts/gate.ts typecheck:tsc
+          bun scripts/gate.ts typecheck:astro
 
       - name: Unit tests
         run: |
-          (cd packages/protocol && bunx vitest run)
-          (cd packages/ui && bunx vitest run)
-          (cd apps/game && bunx vitest run)
+          bun scripts/gate.ts test:ts
 
-      - name: Build website & game shell
+      - name: Build website & game client
         run: |
-          (cd apps/web && bun run build)
-          (cd apps/game && bun run build)
+          bun scripts/gate.ts build:web
+          bun scripts/gate.ts build:game
 
       - name: Browser verification (Playwright + axe)
         # The Playwright config starts the real Go server and the game
         # client's production preview alongside the website, so the game UI
         # is verified against the authoritative backend, not a mock.
-        run: (cd apps/web && bunx playwright install --with-deps chromium && bunx playwright test)
+        run: |
+          (cd apps/web && bunx playwright install --with-deps chromium)
+          bun scripts/gate.ts verify:browser
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -67,10 +72,10 @@ jobs:
           retention-days: 7
 
   backend:
-    name: Backend — vet, tests, build, container image
+    name: Backend — vet, tests, container image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v6
         with:
@@ -78,20 +83,24 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Formatting (gofmt)
-        run: test -z "$(gofmt -l ./server)" || { gofmt -l ./server; exit 1; }
+        run: bun scripts/gate.ts lint:gofmt
 
       - name: Vet
-        run: go vet ./...
+        run: bun scripts/gate.ts lint:govet
 
       - name: Vulnerability scan
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+        run: bun scripts/gate.ts audit:govuln
 
-      - name: Tests (hermetic)
-        run: go test -race ./...
+      # -count=1 -race: the match runtime and realtime handler are concurrent
+      # by design, and a cached green result is not evidence.
+      - name: Tests (hermetic, race detector)
+        run: bun scripts/gate.ts test:go
 
-      - name: Database migration round-trip
+      - name: Database migration and match persistence
         # Migration correctness needs a real PostgreSQL: an in-memory fake
-        # cannot prove SQL, transactions, or constraints.
+        # cannot prove SQL, transactions, or constraints. The gate runs the
+        # entire persistence package — no -run filter, so it cannot match
+        # zero tests and still exit 0.
         run: |
           docker compose -f infra/docker/docker-compose.dev.yml up -d postgres-test
           for i in $(seq 1 30); do
@@ -99,11 +108,11 @@ jobs:
             sleep 1
           done
           HIGHJACK_TEST_DATABASE_URL="postgres://highjack:highjack@127.0.0.1:5433/highjack_test?sslmode=disable" \
-            go test -count=1 -run 'TestMigrations|TestMatch|TestCommit|TestPlayer' ./server/internal/persistence/...
+            bun scripts/gate.ts test:go:db
           docker compose -f infra/docker/docker-compose.dev.yml down -v
 
       - name: Build binary
-        run: go build -o /tmp/highjack-server ./server/cmd/highjack
+        run: bun scripts/gate.ts build:server
 
       - name: Build container image
         run: docker build -f infra/docker/Dockerfile.server -t highjack-server:ci .
@@ -121,14 +130,17 @@ jobs:
     name: Repository — assets & sanity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.14'
 
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
       - name: Asset validation
-        run: bun scripts/check-assets.ts
+        run: bun scripts/gate.ts assets
 
       - name: Repository sanity
-        run: bun scripts/repo-sanity.ts
+        run: bun scripts/gate.ts repo

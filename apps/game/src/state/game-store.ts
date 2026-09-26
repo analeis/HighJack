@@ -9,7 +9,7 @@
  * rather than drifting.
  */
 import { createSignal } from 'solid-js';
-import type { GameConfig, GameEvent, GameSnapshot } from '@highjack/protocol';
+import type { MatchPhase, GameConfig, GameEvent, GameSnapshot } from '@highjack/protocol';
 import type { ConnectionStatus } from '../net/connection.ts';
 
 export interface UiPlayer {
@@ -46,7 +46,13 @@ export interface UiTurn {
 
 export interface GameView {
   matchId: string;
-  phase: 'lobby' | 'playing' | 'ended';
+  /**
+   * Taken from the shared protocol rather than re-declared. A local copy of this
+   * union is a third place to update whenever a phase is added, and it silently
+   * went stale: the engine could report an interrupted match while this type said
+   * it was impossible.
+   */
+  phase: MatchPhase;
   tick: number;
   players: UiPlayer[];
   spaces: UiSpace[];

@@ -16,14 +16,26 @@ export interface Gate {
   cmd: string[];
   cwd?: string;
   env?: Record<string, string>;
-  /** Skipped (recorded, not failed) when this returns false. */
+  /**
+   * Skipped (recorded, not failed) when this returns true.
+   *
+   * A gate that is skipped while `mandatory` is true (the default) fails the
+   * pipeline, so a mandatory check can never be switched off without both
+   * the report and the exit code saying so. Optional gates exist for
+   * environment-gated coverage (the PostgreSQL suite when no test database is
+   * configured); they are recorded as skipped, never as passed.
+   */
   skip?: () => boolean;
+  /** Defaults to true. Set false only for genuinely environment-gated coverage. */
+  mandatory?: boolean;
 }
 
 export interface GateResult {
   name: string;
   status: 'passed' | 'failed' | 'skipped';
   durationMs: number;
+  /** Whether skipping this gate is tolerated. Mirrors Gate.mandatory. */
+  mandatory: boolean;
 }
 
 function runCommand(cmd: string[], cwd: string): Promise<number> {
@@ -48,9 +60,23 @@ export async function runGates(gates: Gate[], label: string): Promise<GateResult
   const results: GateResult[] = [];
   console.log(`\n${bold(`== ${label} ==`)}`);
   for (const gate of gates) {
+    const mandatory = gate.mandatory ?? true;
     if (gate.skip?.()) {
-      console.log(`${yellow('SKIP')} ${gate.name}`);
-      results.push({ name: gate.name, status: 'skipped', durationMs: 0 });
+      if (mandatory) {
+        console.error(`${red('SKIP')} ${gate.name} ${dim('(mandatory gate cannot be skipped)')}\n`);
+        results.push({ name: gate.name, status: 'failed', durationMs: 0, mandatory });
+        for (const remaining of gates.slice(gates.indexOf(gate) + 1)) {
+          results.push({
+            name: remaining.name,
+            status: 'skipped',
+            durationMs: 0,
+            mandatory: remaining.mandatory ?? true,
+          });
+        }
+        break;
+      }
+      console.log(`${yellow('SKIP')} ${gate.name} ${dim('(optional, precondition unmet)')}`);
+      results.push({ name: gate.name, status: 'skipped', durationMs: 0, mandatory });
       continue;
     }
     const start = performance.now();
@@ -59,13 +85,18 @@ export async function runGates(gates: Gate[], label: string): Promise<GateResult
     const durationMs = Math.round(performance.now() - start);
     if (code === 0) {
       console.log(`${green('OK  ')} ${gate.name} ${dim(`(${durationMs}ms)`)}\n`);
-      results.push({ name: gate.name, status: 'passed', durationMs });
+      results.push({ name: gate.name, status: 'passed', durationMs, mandatory });
     } else {
       console.error(`${red('FAIL')} ${gate.name} ${dim(`(${durationMs}ms, exit ${code})`)}\n`);
-      results.push({ name: gate.name, status: 'failed', durationMs });
+      results.push({ name: gate.name, status: 'failed', durationMs, mandatory });
       // Fail fast: later gates depend on earlier ones being sound.
       for (const remaining of gates.slice(gates.indexOf(gate) + 1)) {
-        results.push({ name: remaining.name, status: 'skipped', durationMs: 0 });
+        results.push({
+          name: remaining.name,
+          status: 'skipped',
+          durationMs: 0,
+          mandatory: remaining.mandatory ?? true,
+        });
       }
       break;
     }
@@ -75,7 +106,10 @@ export async function runGates(gates: Gate[], label: string): Promise<GateResult
 
 export function printSummary(results: GateResult[]): boolean {
   const failed = results.filter((r) => r.status === 'failed');
+  // Only optional gates may be skipped; a mandatory skip is already recorded
+  // as failed by runGates, and is surfaced here for a complete report.
   const skipped = results.filter((r) => r.status === 'skipped');
+  const skippedOptional = skipped.filter((r) => !r.mandatory);
   console.log(bold('\n== summary =='));
   for (const r of results) {
     const mark =
@@ -86,8 +120,13 @@ export function printSummary(results: GateResult[]): boolean {
     console.error(red(`\n${failed.length} gate(s) failed`));
     return false;
   }
-  if (skipped.length > 0) {
-    console.log(yellow(`\n${skipped.length} gate(s) skipped (see above)`));
+  if (skippedOptional.length > 0) {
+    console.log(
+      yellow(
+        `\n${skippedOptional.length} optional gate(s) skipped: ${skippedOptional.map((r) => r.name).join(', ')}`,
+      ),
+    );
+    console.log(yellow('these are recorded as skipped, not passed'));
   }
   console.log(green('\nall required gates passed'));
   return true;
