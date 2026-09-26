@@ -23,7 +23,7 @@ import (
 func wsTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	log := slog.New(slog.DiscardHandler)
-	h := NewHandler(log, 30000, match.NewRegistry(log, nil))
+	h := NewHandler(log, 30000, match.NewRegistry(log, nil), nil)
 	mux := http.NewServeMux()
 	h.Register(mux)
 	srv := httptest.NewServer(mux)

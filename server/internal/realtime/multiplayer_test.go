@@ -42,7 +42,7 @@ func newTestServer(t *testing.T) *testServer {
 	cfg := &config.Config{Addr: ":0", HeartbeatMs: 30000, LogLevel: "error"}
 	srv := api.New(cfg, log, nil)
 	srv.MountMatches(registry)
-	srv.MountRealtime(realtime.NewHandler(log, 30000, registry))
+	srv.MountRealtime(realtime.NewHandler(log, 30000, registry, nil))
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return &testServer{Server: ts, registry: registry}

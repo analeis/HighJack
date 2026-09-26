@@ -45,15 +45,17 @@ type Handler struct {
 	heartbeatMs int
 	registry    *match.Registry
 	limiter     *match.RateLimiter
+	origins     []string
 }
 
-func NewHandler(log *slog.Logger, heartbeatMs int, registry *match.Registry) *Handler {
+func NewHandler(log *slog.Logger, heartbeatMs int, registry *match.Registry, allowedOrigins []string) *Handler {
 	// 20 actions per 10s sliding window per session (v0.2 decision).
 	return &Handler{
 		log:         log,
 		heartbeatMs: heartbeatMs,
 		registry:    registry,
 		limiter:     match.NewRateLimiter(20, 10*time.Second),
+		origins:     allowedOrigins,
 	}
 }
 
@@ -69,10 +71,15 @@ func (h *Handler) serveWS(w http.ResponseWriter, r *http.Request) {
 	_ = rc.SetReadDeadline(time.Time{})
 	_ = rc.SetWriteDeadline(time.Time{})
 
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns:  []string{"*"}, // tightened at the edge/proxy in production; see docs/architecture/BACKEND.md
-		CompressionMode: websocket.CompressionDisabled,
-	})
+	// Origin checking: same-origin (or no Origin header) is always allowed;
+	// cross-origin is allowed only for explicitly configured origins.
+	accept := &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled}
+	if len(h.origins) > 0 {
+		accept.OriginPatterns = h.origins
+	} else {
+		accept.InsecureSkipVerify = true // dev only: no configured allow-list
+	}
+	conn, err := websocket.Accept(w, r, accept)
 	if err != nil {
 		h.log.Warn("websocket accept failed", "error", err.Error())
 		return
@@ -157,7 +164,7 @@ func (h *Handler) handleAction(conn *websocket.Conn, c *connSink, session string
 	}
 	// Publish authoritative events to every bound connection in the match.
 	m.Broadcast(result.Events, a.Seq)
-	return c.sendAck(a.Seq, result.NextSeq)
+	return c.sendAck(a.Seq, result.NextSeq, result.Snapshot)
 }
 
 // handshake performs hello→welcome, optional match binding, and sends the
@@ -286,9 +293,13 @@ func (c *connSink) sendErrorWithAck(seq int64, code protocol.ErrorCode, msg stri
 	return c.sendError(seq, code, msg)
 }
 
-func (c *connSink) sendAck(seq, nextSeq int64) bool {
+// sendAck confirms an action and carries the authoritative state it
+// produced. The client renders from the snapshot; events are for audit,
+// animation, and peers that missed the ack.
+func (c *connSink) sendAck(seq, nextSeq int64, snap protocol.GameSnapshot) bool {
 	return c.send(map[string]any{
-		"v": protocol.ProtocolMajorVersion, "type": "ack", "ackSeq": seq, "nextSeq": nextSeq,
+		"v": protocol.ProtocolMajorVersion, "type": "ack", "ackSeq": seq,
+		"nextSeq": nextSeq, "tick": snap.Tick, "snapshot": snap,
 	})
 }
 

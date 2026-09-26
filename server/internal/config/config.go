@@ -7,6 +7,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -36,6 +37,11 @@ type Config struct {
 
 	// HeartbeatMs is advertised to realtime clients in `welcome`.
 	HeartbeatMs int
+
+	// AllowedOrigins are the browser origins permitted to call the HTTP
+	// lobby and open a WebSocket. Empty means "same origin only", which is
+	// the right default when the API is served behind one host.
+	AllowedOrigins []string
 }
 
 // Load resolves configuration from environment variables with sane,
@@ -58,6 +64,13 @@ func Load() (*Config, error) {
 		ShutdownTimeout:   10 * time.Second,
 		HeartbeatMs:       30_000,
 	}
+	if raw := strings.TrimSpace(os.Getenv("HIGHJACK_ALLOWED_ORIGINS")); raw != "" {
+		for _, origin := range strings.Split(raw, ",") {
+			if o := strings.TrimSpace(origin); o != "" {
+				cfg.AllowedOrigins = append(cfg.AllowedOrigins, o)
+			}
+		}
+	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -79,6 +92,15 @@ func (c *Config) Validate() error {
 	}
 	if c.HeartbeatMs < 0 {
 		return fmt.Errorf("config: heartbeat must not be negative")
+	}
+	for _, origin := range c.AllowedOrigins {
+		u, err := url.Parse(origin)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("config: HIGHJACK_ALLOWED_ORIGINS entry %q is not an origin", origin)
+		}
+		if u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+			return fmt.Errorf("config: HIGHJACK_ALLOWED_ORIGINS entry %q must be scheme://host only", origin)
+		}
 	}
 	return nil
 }

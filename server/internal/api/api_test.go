@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -175,5 +176,70 @@ func TestGracefulShutdownCompletes(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("ListenAndServe did not return after Shutdown")
+	}
+}
+
+// TestCORSEchoesOnlyAllowedOrigins proves the CORS allow-list is exact:
+// a configured origin is echoed, an unconfigured one is not, and preflight
+// short-circuits without reaching the handler.
+func TestCORSEchoesOnlyAllowedOrigins(t *testing.T) {
+	cfg := &config.Config{
+		Addr:              ":0",
+		HeartbeatMs:       1000,
+		ReadHeaderTimeout: time.Second,
+		ReadTimeout:       time.Second,
+		WriteTimeout:      time.Second,
+		IdleTimeout:       time.Second,
+		ShutdownTimeout:   time.Second,
+		AllowedOrigins:    []string{"http://127.0.0.1:5173"},
+	}
+	srv := New(cfg, slog.New(slog.DiscardHandler), nil)
+	h := srv.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Origin", "http://127.0.0.1:5173")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://127.0.0.1:5173" {
+		t.Fatalf("configured origin not echoed: %q", got)
+	}
+	if rec.Header().Get("Vary") != "Origin" {
+		t.Fatal("Vary: Origin must be set for cache safety")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Origin", "http://evil.example")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("unconfigured origin must not be allowed, got %q", got)
+	}
+
+	// Preflight is answered by the middleware, not the handler.
+	req = httptest.NewRequest(http.MethodOptions, "/matches", nil)
+	req.Header.Set("Origin", "http://127.0.0.1:5173")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("preflight status = %d, want 204", rec.Code)
+	}
+}
+
+func TestConfigRejectsMalformedAllowedOrigins(t *testing.T) {
+	t.Setenv("HIGHJACK_ALLOWED_ORIGINS", "not-an-origin")
+	if _, err := config.Load(); err == nil {
+		t.Fatal("expected rejection of malformed origin")
+	}
+	t.Setenv("HIGHJACK_ALLOWED_ORIGINS", "http://ok.example, http://also-ok.example/path")
+	if _, err := config.Load(); err == nil {
+		t.Fatal("expected rejection of origin carrying a path")
+	}
+	t.Setenv("HIGHJACK_ALLOWED_ORIGINS", "http://a.example, http://b.example")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("valid origins rejected: %v", err)
+	}
+	if len(cfg.AllowedOrigins) != 2 {
+		t.Fatalf("expected 2 origins, got %d", len(cfg.AllowedOrigins))
 	}
 }

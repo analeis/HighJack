@@ -54,6 +54,9 @@ jobs:
           (cd apps/game && bun run build)
 
       - name: Browser verification (Playwright + axe)
+        # The Playwright config starts the real Go server and the game
+        # client's production preview alongside the website, so the game UI
+        # is verified against the authoritative backend, not a mock.
         run: (cd apps/web && bunx playwright install --with-deps chromium && bunx playwright test)
 
       - uses: actions/upload-artifact@v4
@@ -85,6 +88,19 @@ jobs:
 
       - name: Tests (hermetic)
         run: go test -race ./...
+
+      - name: Database migration round-trip
+        # Migration correctness needs a real PostgreSQL: an in-memory fake
+        # cannot prove SQL, transactions, or constraints.
+        run: |
+          docker compose -f infra/docker/docker-compose.dev.yml up -d postgres-test
+          for i in $(seq 1 30); do
+            docker exec highjack-postgres-test pg_isready -U highjack >/dev/null 2>&1 && break
+            sleep 1
+          done
+          HIGHJACK_TEST_DATABASE_URL="postgres://highjack:highjack@127.0.0.1:5433/highjack_test?sslmode=disable" \
+            go test -count=1 -run 'TestMigrations|TestMatch|TestCommit|TestPlayer' ./server/internal/persistence/...
+          docker compose -f infra/docker/docker-compose.dev.yml down -v
 
       - name: Build binary
         run: go build -o /tmp/highjack-server ./server/cmd/highjack

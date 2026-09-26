@@ -191,16 +191,18 @@ func (s *Store) LoadMatch(ctx context.Context, id game.GameID) (*MatchRow, error
 		hash        string
 		cursor      int64
 		interrupted bool
+		status      string
+		turnPhase   string
 		configDoc   []byte
 		stateDoc    []byte
 	)
 	err := s.pool.QueryRow(ctx,
-		`SELECT g.seed_hex, g.config_hash, g.cursor, g.interrupted, c.document, m.state
+		`SELECT g.seed_hex, g.config_hash, g.cursor, g.interrupted, g.status, g.turn_phase, c.document, m.state
 		 FROM games g
 		 JOIN game_configs c ON c.id = g.config_id
 		 JOIN match_snapshots m ON m.match_id = g.id
 		 WHERE g.id = $1`, string(id)).
-		Scan(&seedHex, &hash, &cursor, &interrupted, &configDoc, &stateDoc)
+		Scan(&seedHex, &hash, &cursor, &interrupted, &status, &turnPhase, &configDoc, &stateDoc)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoMatch
 	}
@@ -214,6 +216,14 @@ func (s *Store) LoadMatch(ctx context.Context, id game.GameID) (*MatchRow, error
 	state, err := game.UnmarshalGameState(stateDoc)
 	if err != nil {
 		return nil, fmt.Errorf("parse stored state: %w", err)
+	}
+	// The games row is the lifecycle authority (it records the boot-time
+	// interrupted transition); the snapshot carries gameplay state.
+	if phase := game.Phase(status); phase != state.Phase {
+		if !phase.Valid() {
+			return nil, fmt.Errorf("stored match has unknown status %q", status)
+		}
+		state.Phase = phase
 	}
 	return &MatchRow{
 		Config:      *cfg,

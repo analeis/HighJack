@@ -37,7 +37,9 @@ type GameState struct {
 	Tick    uint64     `json:"tick"`
 	Players []Player   `json:"players"`
 	Board   BoardState `json:"board"`
-	Turn    TurnState  `json:"turn"`
+	// Turn is the authoritative turn pointer. It stays zero until the match
+	// starts (lobby): an empty Phase means "no turn yet".
+	Turn TurnState `json:"turn"`
 
 	// RootSeedHex records the engine root seed for replay/debugging. It is
 	// server-visible metadata, not part of client-visible game state; the

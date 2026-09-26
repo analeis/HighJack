@@ -88,7 +88,7 @@ func run() error {
 
 	server := api.New(cfg, log, readiness)
 	server.MountMatches(registry)
-	realtimeHandler := realtime.NewHandler(log, cfg.HeartbeatMs, registry)
+	realtimeHandler := realtime.NewHandler(log, cfg.HeartbeatMs, registry, cfg.AllowedOrigins)
 	server.MountRealtime(realtimeHandler)
 
 	// Signal-driven lifecycle: serve until SIGINT/SIGTERM, then drain.

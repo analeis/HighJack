@@ -13,15 +13,23 @@ const (
 	PhasePlaying Phase = "playing"
 	// PhaseEnded: terminal state; the match accepts no further actions.
 	PhaseEnded Phase = "ended"
+	// PhaseInterrupted: a match left active by a previous server process.
+	// It is terminal and never silently resumed: recovery is explicit.
+	PhaseInterrupted Phase = "interrupted"
 )
 
 func (p Phase) Valid() bool {
 	switch p {
-	case PhaseLobby, PhasePlaying, PhaseEnded:
+	case PhaseLobby, PhasePlaying, PhaseEnded, PhaseInterrupted:
 		return true
 	default:
 		return false
 	}
+}
+
+// Terminal reports whether the phase accepts no further transitions.
+func (p Phase) Terminal() bool {
+	return p == PhaseEnded || p == PhaseInterrupted
 }
 
 // PlayerStatus is a player's participation state within a match.

@@ -8,7 +8,9 @@ import (
 
 // MarshalGameState serializes authoritative state for durable snapshots.
 // GameState is already a plain serializable value (no transport, clock, or
-// engine internals), so persistence needs no custom mapping.
+// engine internals), so persistence needs no custom mapping. The omitted
+// fields (winner, end reason, config hash) stay absent while unset, and the
+// zero turn phase round-trips as absent.
 func MarshalGameState(state *GameState) ([]byte, error) {
 	if state == nil {
 		return nil, fmt.Errorf("game: cannot marshal nil state")
@@ -32,7 +34,9 @@ func UnmarshalGameState(data []byte) (*GameState, error) {
 	if !state.Phase.Valid() {
 		return nil, fmt.Errorf("unmarshal state: unknown phase %q", state.Phase)
 	}
-	if !state.Turn.Phase.Valid() {
+	// An empty turn phase is legitimate: a match row exists before the
+	// match starts and therefore has no turn yet.
+	if state.Turn.Phase != "" && !state.Turn.Phase.Valid() {
 		return nil, fmt.Errorf("unmarshal state: unknown turn phase %q", state.Turn.Phase)
 	}
 	return &state, nil

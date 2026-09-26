@@ -134,7 +134,10 @@ func isPrintableASCII(s string) bool {
 	return true
 }
 
-// securityHeaders applies conservative defaults to every response.
+// securityHeaders applies conservative defaults to every response. CORS is
+// explicit and allow-list based: browsers only need it when the game client
+// is served from a different origin than the API, and a configured origin is
+// echoed exactly (never "*" with credentials).
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -142,8 +145,29 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Cache-Control", "no-store")
+		if origin := r.Header.Get("Origin"); origin != "" && s.originAllowed(origin) {
+			h.Set("Access-Control-Allow-Origin", origin)
+			h.Set("Vary", "Origin")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			h.Set("Access-Control-Allow-Headers", "Content-Type, X-Request-Id")
+			h.Set("Access-Control-Max-Age", "600")
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// originAllowed reports whether a browser origin may call the API.
+func (s *Server) originAllowed(origin string) bool {
+	for _, allowed := range s.cfg.AllowedOrigins {
+		if allowed == origin {
+			return true
+		}
+	}
+	return false
 }
 
 // recoverPanics converts handler panics into 500s without leaking stack
