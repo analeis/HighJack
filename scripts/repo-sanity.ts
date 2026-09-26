@@ -7,10 +7,13 @@
  * - file size ceilings (catches stray binaries)
  * - documentation links resolve
  * - no build outputs or junk tracked in git
+ * - CI enforces every gate the pipeline defines
  */
 import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { validationGates } from './lib/validation-gates.ts';
+import { verificationGates } from './lib/verification-gates.ts';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 const problems: string[] = [];
@@ -148,6 +151,58 @@ for (const doc of walkMarkdown(path.join(ROOT, 'docs'))) {
     const resolved = path.resolve(path.dirname(doc), decodeURIComponent(target));
     if (!existsSync(resolved)) {
       problems.push(`${path.relative(ROOT, doc)}: broken relative link → ${target}`);
+    }
+  }
+}
+
+// ---- CI / pipeline agreement ---------------------------------------------------
+
+// Every gate the pipeline defines must also be enforced by CI.
+//
+// This exists because the two drifted and the drift was invisible. CI's database
+// step once carried a `-run` filter that silently excluded the JSONB round-trip and
+// the interrupted-match policy tests while the step reported success. The gates are
+// now written out in the workflow using the toolchain each job already has — the
+// backend job runs `go` directly rather than through a JavaScript runner — so the
+// commands are no longer literally identical to the pipeline's. That makes a
+// comparison the thing that keeps them honest.
+//
+// The comparison is on substance, not spelling. A gate counts as enforced when the
+// workflow invokes it by name (`bun scripts/gate.ts <name>`) or contains its
+// command. Two differences are normalised away first, because neither changes what
+// is checked:
+//   - output paths: certification builds to a temp directory so it cannot dirty the
+//     tree it is certifying, while CI builds to ./bin. Same check, different path.
+//   - shell control operators: a gate may report success with `&& echo`, while CI
+//     prefers `|| { ...; exit 1; }` so a failure prints its cause. The check is the
+//     part before the first operator.
+function normalise(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/(^|\s)-o\s+\S+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const workflowPath = path.join(ROOT, '.github', 'workflows', 'ci.yml');
+if (existsSync(workflowPath)) {
+  // Collapse newlines and indentation so a wrapped YAML block still matches a
+  // one-line command.
+  const flat = normalise(readFileSync(workflowPath, 'utf8'));
+
+  for (const gate of [...validationGates, ...verificationGates]) {
+    const invokedByName = flat.includes(`gate.ts ${gate.name}`);
+    const first = gate.cmd[0] ?? '';
+    const isShell = first === 'bash' || first === 'sh';
+    // For a shell gate the interesting text is inside the script, not the binary.
+    const raw = isShell ? (gate.cmd[2] ?? '') : gate.cmd.join(' ');
+    const command = normalise(raw.split(/&&|\|\||;/)[0] ?? '');
+    const present = invokedByName || (command.length > 0 && flat.includes(command));
+    if (!present) {
+      problems.push(
+        `gate "${gate.name}" is defined in the pipeline but not enforced by CI ` +
+          `(looked for: ${command || first})`,
+      );
     }
   }
 }

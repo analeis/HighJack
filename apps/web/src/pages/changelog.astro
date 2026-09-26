@@ -13,6 +13,42 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.4',
+    date: '2026-09-26',
+    title: 'Accessibility, and a CI pipeline that stopped lying',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The board can be played without seeing it',
+        tone: 'gold',
+        items: [
+          "The board is now described in words: phase, round, whose turn it is, the dice, every player's chips, position and state, and every space with its price, rent and owner — as real headings and tables, so a screen reader can navigate to the part it wants",
+          'The canvas is hidden from assistive technology instead of announcing "HighJack board rendered from authoritative match state", which described the drawing method and nothing about the game',
+          "Turn is marked by a ring on the active token, and ownership by the owner's initial on the space. Both were colour and animation only",
+          'Under "reduce motion" the board now still shows whose turn it is. The turn indicator had been a pulse, and the animation code was disabled entirely for those users, so the game became unplayable rather than calmer',
+        ],
+      },
+      {
+        label: 'Reachable and announced',
+        tone: 'teal',
+        items: [
+          'Turn, dice, readiness and connection changes are announced through a live region that is mounted once and never removed. The previous ones were mounted together with the message, which is why they announced nothing',
+          'Focus moves to the board when a match starts, instead of being dropped on the document when the lobby unmounted',
+          'Action buttons meet a 44px touch target, and the dock is a labelled group rather than a navigation landmark full of buttons',
+        ],
+      },
+      {
+        label: 'The pipeline now has to agree with itself',
+        tone: 'teal',
+        items: [
+          'Backend CI runs the Go toolchain directly. Gating `go vet` and the race detector through a JavaScript runner meant the Go build depended on a runtime it never installed',
+          'A repository check fails if any gate defined in the pipeline is not enforced by CI. That drift is not hypothetical: a `-run` filter once made a green step skip the tests it was named after',
+          'Accessibility is now scanned on a live board on the real game origin, not only on a static lobby page',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.3',
     date: '2026-09-26',
     title: 'Client correctness and a playable experience',

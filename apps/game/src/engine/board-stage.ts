@@ -122,14 +122,14 @@ export async function createBoardStage(
       return { cx, cy, tile, horizontal };
     });
 
+    const activeSeat = turn.phase === 'turn_over' ? -1 : turn.currentSeat;
+
     spaces.forEach((space, i) => {
       const slot = slots[i];
       if (!slot) return;
       const w2 = slot.horizontal ? tile : thickness;
       const h2 = slot.horizontal ? thickness : tile;
-      const active =
-        players.find((p) => p.seat === turn.currentSeat)?.position === i &&
-        turn.phase !== 'turn_over';
+      const active = players.find((p) => p.seat === activeSeat)?.position === i;
       const fill = space.owned
         ? playerColor(space.owner)
         : space.kind === 'go'
@@ -164,6 +164,29 @@ export async function createBoardStage(
       label.anchor.set(0.5);
       label.position.set(slot.cx, slot.cy);
       boardLayer.addChild(label);
+
+      // An owned space was previously distinguishable only by the fill colour,
+      // which excludes colour-blind players and is invisible to a screen reader.
+      // The owner's initial gives ownership a second, non-colour channel that
+      // matches the initials already used on the player tokens.
+      if (space.owned) {
+        const owner = players.find((p) => p.id === space.owner);
+        const badge = new Text({
+          text: (owner?.name ?? '?').slice(0, 1).toUpperCase(),
+          style: new TextStyle({
+            fontFamily: 'Space Grotesk Variable, system-ui, sans-serif',
+            fontSize: Math.max(8, tile * 0.2),
+            fontWeight: '800',
+            fill: COLOR.cream100,
+          }),
+        });
+        badge.anchor.set(0.5);
+        badge.position.set(
+          slot.horizontal ? slot.cx - w2 / 2 + tile * 0.16 : slot.cx,
+          slot.horizontal ? slot.cy : slot.cy - h2 / 2 + tile * 0.16,
+        );
+        boardLayer.addChild(badge);
+      }
     });
 
     players.forEach((player, idx) => {
@@ -174,6 +197,18 @@ export async function createBoardStage(
         .circle(0, 0, slot.tile * 0.17)
         .fill(PLAYER_COLORS[idx % PLAYER_COLORS.length])
         .stroke({ width: 2, color: COLOR.cream100 });
+      // The turn indicator must not depend on the pulse below. Under
+      // `prefers-reduced-motion: reduce` the ticker is never registered at all, so
+      // an animated-only marker left the board with no indication of whose turn it
+      // is — the game became unplayable, not just calmer. This ring is part of
+      // layout(), so it is present in both modes.
+      if (player.seat === activeSeat && player.status === 'active') {
+        node.addChild(
+          new Graphics()
+            .circle(0, 0, slot.tile * 0.17 + 4)
+            .stroke({ width: 2.5, color: COLOR.gold500 }),
+        );
+      }
       const initial = new Text({
         text: player.name.slice(0, 1).toUpperCase(),
         style: new TextStyle({

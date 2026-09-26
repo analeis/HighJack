@@ -36,6 +36,44 @@
   coverage.
 - No snapshot tests of markup; assert what a user or screen reader gets.
 
+## CI and the pipeline must agree
+
+`repo sanity` fails if a gate defined in `scripts/lib/validation-gates.ts` is not
+also enforced by `.github/workflows/ci.yml`. The comparison is on substance, not
+spelling: it normalises away output paths and shell control operators, because
+certification builds to a temp directory while CI builds to `./bin`, and a gate may
+report success with `&& echo` while CI prefers `|| { ...; exit 1; }`.
+
+The check exists because the two drifted invisibly. CI's database step once carried
+a `-run` filter that excluded the JSONB round-trip and the interrupted-match policy
+tests while the step still reported success.
+
+The backend job runs the Go toolchain directly — `gofmt`, `go vet`, `govulncheck`,
+`go test -race` and `go build` — with **no JavaScript runtime installed at all**.
+Invoking those through `bun scripts/gate.ts`, as the job previously did, made the Go
+build depend on a runtime the job never installed; it worked only because that script
+has no external imports. If you add a Go gate, add it to the workflow and let the
+sanity check confirm it.
+
+## CI and the pipeline must agree
+
+`repo sanity` fails if a gate defined in `scripts/lib/validation-gates.ts` is not
+also enforced by `.github/workflows/ci.yml`. The comparison is on substance, not
+spelling: it normalises away output paths and shell control operators, because
+certification builds to a temp directory while CI builds to `./bin`, and a gate may
+report success with `&& echo` while CI prefers `|| { ...; exit 1; }`.
+
+The check exists because the two drifted invisibly. CI's database step once carried
+a `-run` filter that excluded the JSONB round-trip and the interrupted-match policy
+tests while the step still reported success.
+
+The backend job runs the Go toolchain directly — `gofmt`, `go vet`, `govulncheck`,
+`go test -race` and `go build` — with **no JavaScript runtime installed at all**.
+Invoking those through `bun scripts/gate.ts`, as the job previously did, made the Go
+build depend on a runtime the job never installed; it worked only because that script
+happens to have no external imports. If you add a Go gate, add it to the workflow and
+let the sanity check confirm it.
+
 ## Browser harness
 
 The Playwright harness never reuses an existing **game server** or **game

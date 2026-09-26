@@ -106,8 +106,8 @@ test.describe('game client', () => {
     await pageB.getByRole('button', { name: 'Join' }).click();
 
     // Both clients are now in the match, each with a live dock.
-    const dockA = page.getByRole('navigation', { name: 'Match actions' });
-    const dockB = pageB.getByRole('navigation', { name: 'Match actions' });
+    const dockA = page.getByRole('group', { name: 'Match actions' });
+    const dockB = pageB.getByRole('group', { name: 'Match actions' });
     await expect(dockB).toBeVisible({ timeout: 20_000 });
     await expect(dockA).toBeVisible();
 
@@ -199,6 +199,70 @@ test.describe('game client', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(2);
-    await expect(page.getByRole('navigation', { name: 'Match actions' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Match actions' })).toBeVisible();
+  });
+});
+
+/**
+ * Accessibility of a live board.
+ *
+ * The existing axe coverage scans `/game` on the website origin, which is the lobby
+ * and nothing else. Every accessibility defect that mattered lived in the board
+ * itself: a canvas with a label describing its own rendering method, a dock of
+ * disabled buttons with no explanation, a live region that mounted with the message
+ * it was meant to announce, and turn and ownership encoded in colour and animation.
+ * A scan that never reaches a live board cannot see any of it.
+ */
+test.describe('game accessibility', () => {
+  test('a live board has no serious axe violations and exposes its state in text', async ({
+    page,
+  }) => {
+    const AxeBuilder = (await import('@axe-core/playwright')).default;
+    await openLobby(page, 'Ace');
+
+    // The canvas is decorative; the text equivalent is the accessible representation.
+    // A canvas left exposed to the accessibility tree reports its own label and
+    // nothing about the board, which is the defect this asserts against.
+    await expect(page.locator('canvas')).toHaveAttribute('aria-hidden', 'true');
+    const board = page.getByLabel('Board state');
+    await expect(board).toBeAttached();
+    await expect(board).toContainText('Lobby');
+    await expect(board.getByRole('heading', { name: 'Players' })).toBeAttached();
+    await expect(board.getByRole('table')).toHaveCount(2);
+
+    // The live region must exist before it has anything to say. A region that mounts
+    // together with its message announces nothing.
+    const live = page.locator('[role="status"][aria-live="polite"]');
+    await expect(live).toHaveCount(1);
+
+    // Focus must be handed to the board on arrival, not dropped on <body>.
+    await expect(page.getByLabel('Match board and actions')).toBeFocused();
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    const serious = results.violations.filter(
+      (v) => v.impact === 'serious' || v.impact === 'critical',
+    );
+    const summary = serious
+      .map((v) => `${v.id}(${v.impact}): ${v.nodes.length} — ${v.nodes[0]?.target.join(' ')}`)
+      .join('\n');
+    expect(serious, summary).toEqual([]);
+  });
+
+  test('dock controls meet the touch target minimum', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium-mobile', 'mobile-only');
+    await openLobby(page, 'Ace');
+    const buttons = page.getByRole('group', { name: 'Match actions' }).getByRole('button');
+    const count = await buttons.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const box = await buttons.nth(i).boundingBox();
+      // 44px is the comfortable target; 24px is the WCAG 2.2 AA minimum. Assert the
+      // minimum the dock is designed for, so a padding regression is caught here
+      // rather than by someone playing on a phone.
+      expect(box?.height ?? 0, `button ${i} height`).toBeGreaterThanOrEqual(44);
+      expect(box?.width ?? 0, `button ${i} width`).toBeGreaterThanOrEqual(44);
+    }
   });
 });

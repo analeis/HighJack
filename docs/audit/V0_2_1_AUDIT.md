@@ -501,6 +501,12 @@ server or the game preview in the Playwright harness.
   MTP-4, PRS-4, PRS-5, OPS-6, OPS-13; RSK-1…5 documentation.
 - **Acceptance:** every accepted finding is either fixed or recorded with
   rationale; no document describes behavior the code does not have.
+- **Shipped.** A11Y-1 (canvas text equivalent), A11Y-2 (persistent live region),
+  A11Y-3 (non-colour turn and ownership cues, including under reduced motion),
+  A11Y-4 (focus handoff), A11Y-5 (44px targets, landmark role), OPS-6 (backend CI
+  on the Go toolchain alone, with a mechanical CI/pipeline agreement check).
+  CLT-11/12, CLT-17…21, MTP-4, PRS-4/5, RSK-1…5 remain open and are recorded with
+  rationale in `V0_2_STABILIZATION_REPORT.md`.
 
 ---
 

@@ -82,25 +82,37 @@ jobs:
           go-version: '1.26'
           cache-dependency-path: go.sum
 
+      # The backend gates run on the Go toolchain, with no JavaScript runtime in
+      # this job at all. They used to be invoked through `bun scripts/gate.ts`,
+      # which was wrong twice over: `go vet` and the race detector are not a
+      # JavaScript concern, and this job never ran `bun install`, so the runner
+      # worked only because that file happens to have no external imports. Any
+      # Bun or Node regression would have failed the Go build for no reason.
+      #
+      # The drift this could reintroduce is guarded mechanically: `repo sanity`
+      # fails if a gate in scripts/lib/validation-gates.ts is not also present in
+      # this workflow, whichever way it is expressed.
       - name: Formatting (gofmt)
-        run: bun scripts/gate.ts lint:gofmt
+        run: test -z "$(gofmt -l ./server)" || { gofmt -l ./server; exit 1; }
 
       - name: Vet
-        run: bun scripts/gate.ts lint:govet
+        run: go vet ./...
 
       - name: Vulnerability scan
-        run: bun scripts/gate.ts audit:govuln
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./server/...
 
-      # -count=1 -race: the match runtime and realtime handler are concurrent
-      # by design, and a cached green result is not evidence.
+      # -count=1 defeats the test cache and -race covers the match runtime and the
+      # realtime handler, which are concurrent by design. A cached green result is
+      # not evidence.
       - name: Tests (hermetic, race detector)
-        run: bun scripts/gate.ts test:go
+        run: go test -count=1 -race ./server/...
 
       - name: Database migration and match persistence
-        # Migration correctness needs a real PostgreSQL: an in-memory fake
-        # cannot prove SQL, transactions, or constraints. The gate runs the
-        # entire persistence package — no -run filter, so it cannot match
-        # zero tests and still exit 0.
+        # Migration correctness needs a real PostgreSQL: an in-memory fake cannot
+        # prove SQL, transactions, or constraints. The whole persistence package is
+        # run — no -run filter, so it cannot match zero tests and still exit 0. A
+        # name filter is how CI came to skip the JSONB round-trip and the
+        # interrupted-match policy tests while reporting success.
         run: |
           docker compose -f infra/docker/docker-compose.dev.yml up -d postgres-test
           for i in $(seq 1 30); do
@@ -108,11 +120,11 @@ jobs:
             sleep 1
           done
           HIGHJACK_TEST_DATABASE_URL="postgres://highjack:highjack@127.0.0.1:5433/highjack_test?sslmode=disable" \
-            bun scripts/gate.ts test:go:db
+            go test -count=1 ./server/internal/persistence/...
           docker compose -f infra/docker/docker-compose.dev.yml down -v
 
       - name: Build binary
-        run: bun scripts/gate.ts build:server
+        run: go build -o ./bin/highjack-server ./server/cmd/highjack
 
       - name: Build container image
         run: docker build -f infra/docker/Dockerfile.server -t highjack-server:ci .

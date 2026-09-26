@@ -12,6 +12,7 @@ import {
   myHoldings,
   setLocalPlayer,
 } from './state/game-store.ts';
+import type { GameView } from './state/game-store.ts';
 import {
   GameConnection,
   createMatch,
@@ -213,8 +214,19 @@ export function App(): JSX.Element {
     }
   });
 
+  // Focus handoff at the lobby -> board transition. Removing the lobby unmounts
+  // whatever had focus, which dropped a keyboard or screen-reader user at the top of
+  // the document with no indication that the view had changed; focus then sat on
+  // <body> and the next Tab reached the browser chrome. The stage carries a label
+  // describing where the user has arrived.
+  let stageEl: HTMLDivElement | undefined;
+  createEffect(() => {
+    if (gameStore.view() && stageEl) stageEl.focus();
+  });
+
   return (
     <div class="flex h-dvh flex-col overflow-hidden bg-felt-950">
+      <Announcer />
       <TopBar />
       <Show
         when={gameStore.view()}
@@ -234,8 +246,14 @@ export function App(): JSX.Element {
           // absolutely-positioned stage area is what makes the mobile
           // layout usable at all.
           <>
-            <div class="relative min-h-0 flex-1">
+            <div
+              ref={stageEl}
+              tabIndex={-1}
+              aria-label="Match board and actions"
+              class="relative min-h-0 flex-1"
+            >
               <StageCanvas ref={(el) => (canvasRef = el)} />
+              <BoardTextEquivalent />
               <SidePanel state={view()} />
               <StatusBanner />
             </div>
@@ -250,12 +268,191 @@ export function App(): JSX.Element {
 function StageCanvas(props: { ref: (el: HTMLCanvasElement) => void }): JSX.Element {
   return (
     <div class="absolute inset-0 md:left-72">
-      <canvas
-        ref={props.ref}
-        class="h-full w-full"
-        aria-label="HighJack board rendered from authoritative match state"
-        role="img"
-      />
+      {/*
+        The canvas is decorative and hidden from assistive technology. Its previous
+        label described the rendering method — "rendered from authoritative match
+        state" — which told a screen-reader user nothing about the board: no dice,
+        no properties, no prices, no positions, no turn. BoardTextEquivalent is the
+        accessible representation, and it carries the same state.
+      */}
+      <canvas ref={props.ref} class="h-full w-full" aria-hidden="true" />
+    </div>
+  );
+}
+
+/**
+ * The board, in words.
+ *
+ * A canvas is opaque to assistive technology, so the board needs a text equivalent
+ * carrying the same authoritative state. It is visually hidden but present in the
+ * accessibility tree, and it is a real structure — headings and tables — rather than
+ * one long string, so a screen-reader user can navigate to the part they want
+ * instead of hearing the whole board on every change.
+ */
+function BoardTextEquivalent(): JSX.Element {
+  const view = gameStore.view();
+  return (
+    <div class="sr-only" aria-label="Board state">
+      <Show when={view} fallback={<p>No active match.</p>}>
+        {(v) => {
+          const board = v();
+          const active = board.players.find(
+            (p) => p.seat === board.turn.currentSeat && p.status === 'active',
+          );
+          const roll = board.lastRoll;
+          return (
+            <>
+              <h2>Match {board.matchId}</h2>
+              <p>
+                {describePhase(board)} Round {board.turn.round}.{' '}
+                {active
+                  ? `${active.name} to act${board.playerId === active.id ? ' — that is you' : ''}.`
+                  : 'No player has the turn.'}{' '}
+                {roll
+                  ? `Last roll ${roll.die1} and ${roll.die2} by ${
+                      board.players.find((p) => p.id === roll.byId)?.name ?? 'unknown'
+                    }.`
+                  : 'No dice rolled yet.'}
+                {board.winnerId
+                  ? ` Winner: ${board.players.find((p) => p.id === board.winnerId)?.name ?? board.winnerId}.`
+                  : ''}
+              </p>
+
+              <h3>Players</h3>
+              <table>
+                <caption>Players, chips and positions</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Seat</th>
+                    <th scope="col">Player</th>
+                    <th scope="col">Chips</th>
+                    <th scope="col">On</th>
+                    <th scope="col">State</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {board.players.map((p) => (
+                    <tr>
+                      <td>{p.seat + 1}</td>
+                      <td>
+                        {p.name}
+                        {p.id === board.playerId ? ' (you)' : ''}
+                      </td>
+                      <td>{p.money.toLocaleString('en-US')}</td>
+                      <td>{board.spaces[p.position]?.name ?? 'off board'}</td>
+                      <td>
+                        {[
+                          p.status !== 'active' ? p.status : null,
+                          p.isHost ? 'host' : null,
+                          p.ready ? 'ready' : 'not ready',
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <h3>Spaces</h3>
+              <table>
+                <caption>Spaces in board order, with price, rent and owner</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Space</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Rent</th>
+                    <th scope="col">Owner</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {board.spaces.map((space) => (
+                    <tr>
+                      <td>
+                        {space.name}
+                        {space.level > 0 ? ` (level ${space.level})` : ''}
+                      </td>
+                      <td>
+                        {space.kind === 'property' ? space.price.toLocaleString('en-US') : '—'}
+                      </td>
+                      <td>{space.rent.toLocaleString('en-US')}</td>
+                      <td>
+                        {space.owned
+                          ? (board.players.find((p) => p.id === space.owner)?.name ?? 'unknown')
+                          : 'unowned'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          );
+        }}
+      </Show>
+    </div>
+  );
+}
+
+function describePhase(v: GameView): string {
+  switch (v.phase) {
+    case 'lobby':
+      return 'Lobby, waiting for players.';
+    case 'playing':
+      return v.turn.phase === 'await_buy_decision'
+        ? 'In play, deciding whether to buy.'
+        : v.turn.phase === 'await_roll'
+          ? 'In play, rolling.'
+          : 'In play.';
+    case 'ended':
+      return `Finished${v.endReason ? `: ${v.endReason}` : ''}.`;
+    case 'interrupted':
+      return 'Interrupted.';
+    default:
+      return '';
+  }
+}
+
+/**
+ * A live region that is mounted once and never removed.
+ *
+ * The dock and the side panel each carried `role="status"` on elements that were
+ * mounted and unmounted with the state they reported. A live region has to be in the
+ * accessibility tree *before* its content changes, so a region that arrives with the
+ * message it is announcing usually says nothing at all. This one is always present;
+ * only its text changes.
+ */
+function Announcer(): JSX.Element {
+  // The accessors themselves, not their values: `message` is a reactive function,
+  // and `gameStore.status()` would capture the value once and never update, leaving
+  // a live region whose text is frozen at the connection state it saw on mount.
+  const view = gameStore.view;
+  const status = gameStore.status;
+  const detail = gameStore.statusDetail;
+  const message = () => {
+    const v = view();
+    if (status() !== 'connected') {
+      return detail() || `Connection ${status()}.`;
+    }
+    if (!v) return '';
+    const active = v.players.find((p) => p.seat === v.turn.currentSeat && p.status === 'active');
+    if (v.phase === 'lobby') {
+      const waiting = v.players.filter((p) => p.ready).length;
+      return `Lobby: ${waiting} of ${v.players.length} ready.`;
+    }
+    if (!active) return '';
+    const turn = v.playerId === active.id ? 'Your turn.' : `${active.name}'s turn.`;
+    const roll = v.lastRoll;
+    return `${turn}${
+      roll
+        ? ` Rolled ${roll.die1} and ${roll.die2}${
+            v.turn.phase === 'await_buy_decision' ? '. Choose whether to buy.' : '.'
+          }`
+        : ''
+    }`;
+  };
+  return (
+    <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {message()}
     </div>
   );
 }
@@ -580,7 +777,11 @@ function ActionDock(props: {
           </span>
         </Show>
       </section>
-      <nav
+      {/* `role="group"`, not `<nav>`: nothing here navigates. A navigation
+          landmark containing only buttons misleads a screen-reader user into
+          expecting links to move between pages. */}
+      <div
+        role="group"
         aria-label="Match actions"
         class="z-10 flex flex-wrap items-center justify-center gap-2 border-t border-line-subtle bg-felt-900/90 px-4 py-3"
       >
@@ -663,7 +864,7 @@ function ActionDock(props: {
         <Show when={!allowed('roll_dice') && state().phase === 'playing' && !ended()}>
           <span class="w-full text-center text-xs text-muted-500">waiting for your turn…</span>
         </Show>
-      </nav>
+      </div>
     </>
   );
 }
@@ -683,8 +884,8 @@ function ActionButton(props: {
       onClick={() => void props.onClick()}
       class={
         props.enabled
-          ? 'cursor-pointer rounded-md bg-gold-500 px-5 py-2 font-display text-sm font-bold text-felt-950 shadow-card transition-colors hover:bg-gold-400'
-          : 'cursor-not-allowed rounded-md border border-line-subtle bg-surface-raised px-5 py-2 font-display text-sm font-bold text-muted-500 opacity-70'
+          ? 'min-h-11 cursor-pointer rounded-md bg-gold-500 px-5 py-2 font-display text-sm font-bold text-felt-950 shadow-card transition-colors hover:bg-gold-400'
+          : 'min-h-11 cursor-not-allowed rounded-md border border-line-subtle bg-surface-raised px-5 py-2 font-display text-sm font-bold text-muted-500 opacity-70'
       }
     >
       {props.label}
