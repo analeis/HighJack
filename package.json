@@ -39,6 +39,7 @@
   },
   "overrides": {
     "playwright-core": "1.63.0",
-    "js-yaml": "^4.3.2"
+    "js-yaml": "^4.3.2",
+    "seroval": "^1.6.3"
   }
 }
