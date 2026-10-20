@@ -31,6 +31,30 @@ Rules: never rename or repurpose an existing field or error code. Additive
 changes bump minor; breaking changes bump major and require a migration
 note here.
 
+### Parity is checked at the field level, not only the name level
+
+The TypeScript package in `packages/protocol` and the Go mirror in
+`server/internal/protocol` are two hand-maintained copies of one contract. Two
+suites keep them honest, and they check different things:
+
+- **Vocabulary parity** (`server/internal/protocol/parity_test.go`) compares the
+  _names_ the two sides use: event types, error codes, match phases, turn
+  phases, action types, space kinds, and the protocol version.
+- **Field parity** (`server/internal/protocol/field_parity_test.go`) compares
+  the _shape_ of every event as it appears on the wire against the fields the
+  TypeScript contract declares. It encodes a fully populated sample of every
+  event with the production encoder, so anything the encoder strips, and
+  anything `omitempty` can drop, is accounted for by construction.
+
+The second suite exists because the first could not see the only two ways the
+two sides actually diverged. The TypeScript contract required a `seed` field on
+`game_started` that the server deliberately removes — the seed determines every
+future roll, so publishing it would let any participant predict the rest of the
+match — which meant `isGameEvent` rejected every `game_started` event the
+server actually sent. In the other direction, the server sends `releasedSpaces`
+on a bankruptcy and the contract did not describe it, so a client reading the
+contract could not know the field existed.
+
 ## Envelopes
 
 One JSON object per WebSocket text frame.

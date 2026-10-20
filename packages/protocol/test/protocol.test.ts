@@ -27,7 +27,7 @@ import {
   validateSemantics,
   validateStructure,
 } from '../src/index.ts';
-import type { GameAction } from '../src/index.ts';
+import type { GameAction, GameStartedEvent } from '../src/index.ts';
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 
@@ -95,6 +95,44 @@ describe('event fixtures', () => {
       expect(isGameEvent(raw), `${file} should be a valid GameEvent`).toBe(true);
     });
   }
+});
+
+/**
+ * The match seed is not on the wire.
+ *
+ * The server derives every future roll from it, so publishing it would let any
+ * participant predict the rest of the match. The encoder removes it, and the
+ * shared contract used to require it anyway — which meant `isGameEvent`
+ * rejected every `game_started` event the server actually sent.
+ */
+describe('the game_started contract', () => {
+  /**
+   * A compile-time assertion that the contract does not declare a seed.
+   *
+   * If `seed` is ever added back to `GameStartedEvent`, this type becomes
+   * `never` and the assignment below stops compiling — the failure lands on
+   * the change that caused it rather than on a runtime assertion somewhere
+   * else.
+   */
+  type NoSeedField = 'seed' extends keyof GameStartedEvent ? never : true;
+
+  it('does not require a seed', () => {
+    const compiles: NoSeedField = true;
+    expect(compiles).toBe(true);
+  });
+
+  it('accepts the event the server actually sends', () => {
+    const fromTheWire = { type: 'game_started', configHash: 'abc123' };
+    expect(isGameEvent(fromTheWire)).toBe(true);
+  });
+
+  it('still accepts a stray seed from an older peer', () => {
+    // Tolerated, not required. A peer that sends a seed is harmless — the
+    // information has already been published by that peer, and refusing the
+    // event would break the match over it.
+    const withSeed = { type: 'game_started', configHash: 'abc123', seed: 'deadbeef' };
+    expect(isGameEvent(withSeed)).toBe(true);
+  });
 });
 
 describe('message fixtures', () => {

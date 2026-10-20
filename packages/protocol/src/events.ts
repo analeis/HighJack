@@ -55,8 +55,13 @@ export interface GameStartedEvent extends EventBase {
   readonly type: 'game_started';
   /** Hash of the canonical serialized GameConfig the match runs under. */
   readonly configHash: string;
-  /** Deterministic RNG seed for the match (hex-encoded). */
-  readonly seed: string;
+  // The match's root seed is deliberately *not* part of the wire contract. The
+  // server derives every future roll from it, so publishing it would let any
+  // participant predict the rest of the match. The Go encoder removes it for
+  // exactly that reason: it is durable replay metadata rather than client
+  // state. It used to be declared here as a required field, which made the
+  // shared contract wrong in the one direction that matters — `isGameEvent`
+  // rejected every `game_started` event the server actually sent.
 }
 
 export interface PlayerEliminatedEvent extends EventBase {
@@ -118,6 +123,16 @@ export interface PlayerBankruptEvent extends EventBase {
   readonly cause: string;
   readonly creditorId?: string | undefined;
   readonly amountOwed: Money;
+  /**
+   * The board spaces that reverted to the bank.
+   *
+   * Without it the bank absorbs property value with no event naming it, so the
+   * log cannot explain the post-state and a replay cannot reconstruct
+   * ownership. The server has always sent it; the shared contract did not
+   * describe it, so a client reading the contract could not know the field
+   * existed.
+   */
+  readonly releasedSpaces?: readonly string[] | undefined;
 }
 
 export interface TurnAdvancedEvent extends EventBase {
@@ -183,7 +198,7 @@ export function isPlayerReadyChangedEvent(value: unknown): value is PlayerReadyC
 
 export function isGameStartedEvent(value: unknown): value is GameStartedEvent {
   if (!isRecord(value) || value['type'] !== 'game_started') return false;
-  return hasString(value, 'configHash') && hasString(value, 'seed');
+  return hasString(value, 'configHash');
 }
 
 export function isPlayerEliminatedEvent(value: unknown): value is PlayerEliminatedEvent {
@@ -247,11 +262,14 @@ export function isBankTransferEvent(value: unknown): value is BankTransferEvent 
 export function isPlayerBankruptEvent(value: unknown): value is PlayerBankruptEvent {
   if (!isRecord(value) || value['type'] !== 'player_bankrupt') return false;
   const creditor = value['creditorId'];
+  const released = value['releasedSpaces'];
   return (
     hasString(value, 'playerId') &&
     hasString(value, 'cause') &&
     (creditor === undefined || typeof creditor === 'string') &&
-    isSafeInt(value['amountOwed'])
+    isSafeInt(value['amountOwed']) &&
+    (released === undefined ||
+      (Array.isArray(released) && released.every((id) => typeof id === 'string')))
   );
 }
 

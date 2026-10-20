@@ -13,6 +13,32 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.8',
+    date: '2026-09-30',
+    title: 'The protocol contract now matches the wire',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Two contracts that had quietly disagreed',
+        tone: 'gold',
+        items: [
+          'The shared protocol required a "seed" field on a game-start event that the server deliberately never sends. The seed determines every future roll, so publishing it would let any participant predict the rest of the match — and the validator that checked incoming events rejected every game-start the server actually sent',
+          'The server sends the list of spaces that reverted to the bank when a player goes bankrupt, and the contract did not describe the field at all, so a client reading the contract could not know it existed',
+          'The client now reverts exactly the spaces the event names, rather than inferring it from ownership',
+        ],
+      },
+      {
+        label: 'Parity is now checked at the field level',
+        tone: 'teal',
+        items: [
+          'The existing parity tests compare the names the two sides use. A new suite compares the shape of every event as it appears on the wire against the contract, by encoding a fully populated sample of each with the production encoder — so anything the encoder removes, and anything that can be omitted, is accounted for by construction',
+          'The contract carries a compile-time assertion that it does not require a seed. If that field is ever added back, the build fails on the line that caused it',
+          'The shared fixture for a game-start event no longer claims a field the wire does not have',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.7',
     date: '2026-09-29',
     title: 'A build that can say what it is',

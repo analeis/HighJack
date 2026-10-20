@@ -190,6 +190,48 @@ describe('authoritative client state', () => {
     expect(view()?.players[0]?.status).toBe('eliminated');
   });
 
+  it('reverts exactly the spaces the bankruptcy event names', () => {
+    // The server names the spaces that reverted to the bank. The client used to
+    // infer it — "every space this player owned" — which agrees with the server
+    // today and would not if the rules changed. The event is the authority.
+    applySnapshot(
+      snapshot({
+        players: [player('p1', 0), player('p2', 1)],
+        spaces: [
+          space({ id: 'go', kind: 'go', name: 'Start' }),
+          space({ id: 'a1', owned: true, owner: 'p1' }),
+          space({ id: 'a2', owned: true, owner: 'p1' }),
+          space({ id: 'b1', owned: true, owner: 'p2' }),
+        ],
+      }),
+      CONFIG,
+      1,
+      false,
+    );
+    applyEvents([
+      {
+        tick: 1,
+        // `satisfies` rather than a cast: it type-checks the event against the
+        // contract, so a field the contract does not describe would not compile.
+        event: {
+          type: 'player_bankrupt',
+          playerId: 'p1',
+          cause: 'bankruptcy_rent',
+          amountOwed: 40,
+          releasedSpaces: ['a1'],
+        } satisfies GameEvent,
+      },
+    ]);
+    expect(view()?.spaces[1]?.owned).toBe(false);
+    expect(view()?.spaces[1]?.owner).toBe('');
+    // Named as kept, so it stays.
+    expect(view()?.spaces[2]?.owned).toBe(true);
+    expect(view()?.spaces[2]?.owner).toBe('p1');
+    // Another player's space is untouched.
+    expect(view()?.spaces[3]?.owned).toBe(true);
+    expect(view()?.spaces[3]?.owner).toBe('p2');
+  });
+
   it('reads the current player and my holdings from state', () => {
     applySnapshot(
       snapshot({

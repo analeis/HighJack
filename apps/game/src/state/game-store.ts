@@ -317,10 +317,16 @@ function reduceEvent(state: GameView, event: GameEvent): GameView {
         p.id === event.playerId ? { ...p, status: 'eliminated' } : p,
       );
       if (event.type === 'player_bankrupt') {
-        // Holdings revert to the bank on bankruptcy.
-        state.spaces = state.spaces.map((s) =>
-          s.owner === event.playerId ? { ...s, owned: false, owner: '' } : s,
-        );
+        // The server names the spaces that reverted to the bank. Falling back to
+        // "every space this player owned" is what the client did before the
+        // field was described by the shared contract, and it agrees with the
+        // server today — but the event is the authority, and the client should
+        // not have to infer it.
+        const released = event.releasedSpaces;
+        state.spaces = state.spaces.map((s) => {
+          const reverted = released ? released.includes(s.id) : s.owner === event.playerId;
+          return reverted ? { ...s, owned: false, owner: '' } : s;
+        });
       }
       break;
     case 'game_started':

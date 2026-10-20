@@ -43,8 +43,8 @@ defects. They are recorded, not refactored:
 | CAP-1 | The registry never evicts; the lobby is unrated                  | HIGH            | **v0.2.6**                      |
 | TRC-1 | No build path produces an identifiable binary                    | MEDIUM          | **Fixed in v0.2.7**             |
 | TRC-2 | README, manifests and client UI name the wrong version           | MEDIUM          | **Fixed in v0.2.7**             |
-| PRO-1 | The TS protocol requires a `seed` the server strips              | MEDIUM          | **v0.2.7**                      |
-| PRO-2 | Parity tests compare vocabulary, not field shapes                | MEDIUM          | **v0.2.7**                      |
+| PRO-1 | The TS protocol requires a `seed` the server strips              | MEDIUM          | **Fixed in v0.2.8**             |
+| PRO-2 | Parity tests compare vocabulary, not field shapes                | MEDIUM          | **Fixed in v0.2.8**             |
 | TOK-1 | The stored seat is never cleared and is not per-match            | MEDIUM          | **v0.2.8**                      |
 | CER-1 | The ESLint gate needs an unprovisioned root install              | MEDIUM          | **v0.2.8**                      |
 | CER-2 | `scripts/` is type-checked but never linted                      | LOW             | **v0.2.8**                      |
@@ -216,3 +216,69 @@ Two browser-level tests, both of which fail when the fix is reverted:
 
 - the client's badge matches `VERSION`;
 - the server's `/version` reports `VERSION` and a real commit.
+
+## v0.2.8 — protocol correctness (shipped)
+
+The two halves of the protocol finding, plus a third divergence the new check
+found on its first run.
+
+### What was actually wrong
+
+**The contract required a field the server removes.** `packages/protocol`
+declared `GameStartedEvent.seed` as required, and `isGameEvent` therefore
+rejected every `game_started` event the server sent. The server removes the
+seed deliberately: it derives every future roll from it, so publishing it would
+let any participant predict the rest of the match.
+
+The client did not notice, because it never validates events — it casts them.
+The defect was in the _exported contract_, which is what a second
+implementation, a generated client, or an external reviewer would read.
+
+**The contract omitted a field the server sends.** `player_bankrupt` carries
+`releasedSpaces`, the board spaces that reverted to the bank. Without it the
+bank absorbs property value with no event naming it, so the log cannot explain
+the post-state and a replay cannot reconstruct ownership. The contract never
+described it.
+
+**The client inferred what the event states.** On bankruptcy the client
+reverted every space the player owned rather than the ones the event names.
+The two agree today, and the new field makes the distinction checkable.
+
+### The fix
+
+- The contract no longer declares a seed, and no longer requires one.
+- The contract now describes `releasedSpaces`, and the client uses it.
+- The shared `game_started` fixture no longer claims a field the wire lacks.
+
+### Field-level parity
+
+The existing parity suite compares _names_ — event types, error codes, phases,
+action types. It could not see either divergence above, because both are about
+the _shape_ of an event rather than its name.
+
+A new suite compares the shape of every event as it appears on the wire against
+the contract, with two rules:
+
+- every field the server puts on the wire must be described by the contract;
+- every field the contract _requires_ must be one the server sends.
+
+It encodes a **fully populated** sample of each event with the production
+encoder, so the encoder's removals and `omitempty` are accounted for by
+construction rather than by a special case. The first version of this test used
+zero-valued samples and reported a divergence that was not one — an
+`omitempty` field is invisible in a zero value. That is recorded here because
+it is the kind of mistake a field-level test invites, and the fix is to make
+the sample carry the field rather than to relax the assertion.
+
+The TypeScript contract also carries a compile-time assertion that it does not
+declare a seed. If that field is ever added back, the build fails on the line
+that caused it, rather than on a runtime assertion somewhere else.
+
+### Regression tests
+
+- `TestEventFieldsMatchTypeScript` — the wire shape against the contract.
+- `TestGameStartedCarriesNoSeed` — the security property, named as such.
+- `TestTypeScriptDoesNotRequireTheSeed` — the contract half.
+- `isGameEvent` accepts the event the server actually sends, and still accepts
+  a stray seed from an older peer.
+- The client reverts exactly the spaces a bankruptcy event names.
