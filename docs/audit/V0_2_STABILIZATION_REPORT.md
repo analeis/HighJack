@@ -1,20 +1,35 @@
 # HighJack v0.2.x Stabilization Report
 
-Status: **complete**. Four patch releases, each certified against the tree it ships.
+Status: **complete**, and superseded in part by the post-review patchwork
+recorded in [`V0_2_5_PATCHWORK.md`](V0_2_5_PATCHWORK.md).
 
 This report closes the post-v0.2.0 audit cycle. It records what was found, what was
 fixed, what was deliberately deferred, and — as importantly — where the process
 itself was wrong.
 
+> **Addendum.** A full code review after v0.2.4 produced a second findings
+> register. It was worked across five further patch releases, v0.2.5 through
+> v0.2.9, each with a regression test and its own certification. Two of the
+> review's findings turned out to be _evidence_ problems rather than code
+> problems — two tests failed at random, so roughly one certification run in
+> five failed spuriously — and one of the fixes found a third protocol
+> divergence on its first run. See `V0_2_5_PATCHWORK.md` for the disposition of
+> every finding.
+
 ## Releases
 
-| Version | Commit       | Scope                                                                     |
-| ------- | ------------ | ------------------------------------------------------------------------- |
-| v0.2.0  | `494ac57`    | Board loop (baseline for this cycle)                                      |
-| v0.2.1  | `524c6ec`    | Evidence integrity, engine correctness, first real two-client tests       |
-| v0.2.2  | `8454f93`    | Multiplayer integrity, durability, resource and origin hardening          |
-| v0.2.3  | `82dfac7`    | Server-owned legality, playable client, and a P0 regression in v0.2.1     |
-| v0.2.4  | this release | Accessibility, and a CI pipeline that could agree with itself while lying |
+| Version | Commit    | Scope                                                                     |
+| ------- | --------- | ------------------------------------------------------------------------- |
+| v0.2.0  | `494ac57` | Board loop (baseline for this cycle)                                      |
+| v0.2.1  | `524c6ec` | Evidence integrity, engine correctness, first real two-client tests       |
+| v0.2.2  | `8454f93` | Multiplayer integrity, durability, resource and origin hardening          |
+| v0.2.3  | `82dfac7` | Server-owned legality, playable client, and a P0 regression in v0.2.1     |
+| v0.2.4  | `524d056` | Accessibility, and a CI pipeline that could agree with itself while lying |
+| v0.2.5  | `143664d` | A split transition, an honest refusal, and a flaky gate                   |
+| v0.2.6  | `af8daa8` | The lobby can no longer be exhausted                                      |
+| v0.2.7  | `8856585` | A build that can say what it is                                           |
+| v0.2.8  | `488a5bf` | The protocol contract now matches the wire                                |
+| v0.2.9  | `ae6a829` | A seat that is forgotten, and a pipeline that says what is wrong          |
 
 `v0.1.0` (`8f2fec1`) is untouched. Every release was certified with 17 gates, zero
 skipped, and a report whose `commit` and `tree` both equal `HEAD`.
