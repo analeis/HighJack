@@ -207,6 +207,84 @@ if (existsSync(workflowPath)) {
   }
 }
 
+// ---- the toolchain the gates need --------------------------------------------
+
+// The typecheck gate runs `bun check`, which was added in Bun 1.4.3.
+//
+// The repository used to pin `bun@1.3.14` in `packageManager`, and CI pinned
+// the same version. The gate therefore failed in CI with "command not found"
+// while the identical gate passed locally on 1.4.3 — a green local run that
+// proved nothing about the release, which is the exact failure mode this
+// project has spent a release cycle fighting.
+//
+// These checks make that impossible to reintroduce silently: the requirement is
+// declared once, in `engines.bun`, and the workflow may not pin anything below
+// it.
+const MINIMUM_BUN = '1.4.3';
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map((n) => Number(n) || 0);
+  const pb = b.split('.').map((n) => Number(n) || 0);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return Math.sign(diff);
+  }
+  return 0;
+}
+
+const rootManifestPath = path.join(ROOT, 'package.json');
+if (existsSync(rootManifestPath)) {
+  const manifest = JSON.parse(readFileSync(rootManifestPath, 'utf8')) as {
+    packageManager?: string;
+    engines?: { bun?: string };
+  };
+
+  // A `packageManager` field is a Corepack pin, and Corepack does not manage
+  // Bun. It is read by other tools, and a stale value there is worse than
+  // none: it names a version that cannot run the project's own gates.
+  if (manifest.packageManager) {
+    const pinned = manifest.packageManager.replace(/^bun@/, '');
+    if (compareVersions(pinned, MINIMUM_BUN) < 0) {
+      problems.push(
+        `packageManager pins bun ${pinned}, but the gates need ${MINIMUM_BUN} or later ` +
+          '(`bun check` was added in 1.4.3). State the minimum in engines.bun instead.',
+      );
+    }
+  }
+
+  const required = manifest.engines?.bun;
+  if (!required) {
+    problems.push(
+      `engines.bun is missing: the typecheck gate needs Bun ${MINIMUM_BUN} or later, and the ` +
+        'requirement has to be stated somewhere the tools read',
+    );
+  } else if (!/\d+\.\d+\.\d+/.test(required)) {
+    problems.push(`engines.bun is ${JSON.stringify(required)}, which names no version`);
+  } else {
+    const floor = required.match(/\d+\.\d+\.\d+/)?.[0] ?? '0.0.0';
+    if (compareVersions(floor, MINIMUM_BUN) < 0) {
+      problems.push(
+        `engines.bun allows ${floor}, but the typecheck gate needs ${MINIMUM_BUN} or later`,
+      );
+    }
+  }
+}
+
+// The workflow may not pin a Bun that lacks a command a gate uses.
+if (existsSync(workflowPath)) {
+  const workflow = readFileSync(workflowPath, 'utf8');
+  for (const m of workflow.matchAll(/bun-version:\s*['"]?([^'"\s]+)['"]?/g)) {
+    const pinned = (m[1] ?? '').trim();
+    if (pinned === '' || pinned === 'latest' || pinned === 'nightly') continue;
+    if (compareVersions(pinned, MINIMUM_BUN) < 0) {
+      problems.push(
+        `the workflow pins bun ${pinned}, but the typecheck gate needs ${MINIMUM_BUN} or later ` +
+          "(`bun check` was added in 1.4.3). Use 'latest' or a version at or above it.",
+      );
+    }
+  }
+}
+
 // ---- release version ---------------------------------------------------------
 
 // The repository's VERSION file is the single source of truth for which

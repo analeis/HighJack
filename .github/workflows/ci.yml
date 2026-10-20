@@ -16,14 +16,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The latest Bun, not a pinned one.
+      #
+      # This used to pin 1.3.14, which is older than the `bun check` command the
+      # typecheck gate needs: the gate failed in CI with "command not found" while
+      # the same gate passed locally on 1.4.3. A pin that predates the tools the
+      # project uses is worse than no pin, because it fails in a way that looks
+      # like a code problem. `package.json` declares the minimum the project
+      # needs in `engines.bun`; CI tracks the newest.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.14'
+          bun-version: latest
 
-      - uses: actions/setup-node@v4
+      # The browser gate builds and runs the real Go server, so this job needs a
+      # Go toolchain too. It used to rely on whatever Go the runner image
+      # happened to ship, which is an unpinned dependency on an image.
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache-dependency-path: go.sum
+
+      # Node is required by Playwright's driver; Bun drives everything else.
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-        # Node runtime is required by Playwright's driver; Bun drives everything else.
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -68,7 +84,7 @@ jobs:
           (cd apps/web && bunx playwright install --with-deps chromium)
           bun scripts/gate.ts verify:browser
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
@@ -81,7 +97,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
           cache-dependency-path: go.sum
@@ -117,15 +133,31 @@ jobs:
         # run — no -run filter, so it cannot match zero tests and still exit 0. A
         # name filter is how CI came to skip the JSONB round-trip and the
         # interrupted-match policy tests while reporting success.
+        # The teardown is a separate step with `if: always()`. It used to be the
+        # last line of this one, so a failing test left the database container
+        # running for the rest of the job — and, on a self-hosted runner, on the
+        # machine afterwards.
         run: |
           docker compose -f infra/docker/docker-compose.dev.yml up -d postgres-test
-          for i in $(seq 1 30); do
-            docker exec highjack-postgres-test pg_isready -U highjack >/dev/null 2>&1 && break
+          ready=0
+          for i in $(seq 1 60); do
+            if docker exec highjack-postgres-test pg_isready -U highjack >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
             sleep 1
           done
+          if [ "$ready" -ne 1 ]; then
+            echo "the test database did not become ready" >&2
+            docker logs highjack-postgres-test >&2
+            exit 1
+          fi
           HIGHJACK_TEST_DATABASE_URL="postgres://highjack:highjack@127.0.0.1:5433/highjack_test?sslmode=disable" \
             go test -count=1 ./server/internal/persistence/...
-          docker compose -f infra/docker/docker-compose.dev.yml down -v
+
+      - name: Stop the test database
+        if: always()
+        run: docker compose -f infra/docker/docker-compose.dev.yml down -v
 
       - name: Build binary
         run: go build -o ./bin/highjack-server ./server/cmd/highjack
@@ -158,7 +190,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.14'
+          bun-version: latest
 
       # No `bun install` here. Both scripts in this job — the asset validator
       # and the repository sanity check — read only the repository and the

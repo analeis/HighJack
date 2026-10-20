@@ -426,3 +426,131 @@ The Go and TypeScript codebases were already modern — no `interface{}`, no
 classic `for i := 0; i < n; i++` loops, no legacy array patterns — and the
 dependency graph was already minimal. There was nothing to fix there, and
 saying so is more useful than inventing work.
+
+## v0.2.11 — hygiene (shipped)
+
+A dependency and hygiene release. No gameplay change, no protocol change, no
+API change.
+
+### The finding that mattered most: the release gate could not run in CI
+
+`v0.2.10` was certified locally and **failed in CI**. The Frontend job's
+Typecheck step died because CI pinned Bun 1.3.14, and `bun check` — the command
+the typecheck gate runs — was added in Bun **1.4.3**.
+
+The local certification said `CERTIFIED` and CI said red, on the same commit,
+for the same gate. That is the same class of failure as the v0.2.1 stale-server
+defect: a green local run that proved nothing about the release, because the
+local machine and the release machine were running different tools.
+
+Three things had to be true for it to happen, and all three are now closed:
+
+- `packageManager` named `bun@1.3.14` — a Corepack pin for a runtime Corepack
+  does not manage, naming a version that cannot run the project's own gate.
+- CI pinned the same version independently.
+- Nothing compared the pinned version against what the gates actually need.
+
+The requirement is now stated once, in `engines.bun`, and `repo sanity` fails if
+the workflow pins anything below it, if `engines.bun` is lowered, or if a
+`packageManager` pin is added back. Each was verified by breaking it.
+
+CI installs the newest Bun rather than a pin, so a regression in the newest
+release surfaces immediately instead of at the next pin bump.
+
+### The commands
+
+The root scripts were doing the work of the workspace scripts by hand: a bash
+`for` loop with `cd` into three directories, running `bunx vitest` where the
+workspaces already had a `test` script. They now use `bun run --filter`, which
+is the modern form, is not a shell loop, and picks up a new workspace without
+editing the root.
+
+| Script                                                     | What it does                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `test`                                                     | every workspace's unit tests, then the Go suite with `-race`           |
+| `test:go`                                                  | `go test -count=1 -race ./server/...` — the same assurance as the gate |
+| `typecheck`                                                | `bun check`, the reference compiler, and `astro check` — all three     |
+| `typecheck:ts` / `typecheck:reference` / `typecheck:astro` | each one on its own                                                    |
+| `format` / `format:check`                                  | `oxfmt` in place, and `oxfmt --check`                                  |
+| `lint`                                                     | `oxlint` and `go vet`                                                  |
+
+The old `test` script ran `go test ./...` with no race detector and no
+`-count=1`, so a local run was _weaker_ than the gate it was supposed to
+preview. It is now the same.
+
+The website's `test` script ran Vitest over no test files. It now has a
+configuration that excludes `e2e/` — without it, `vitest run` collected the
+Playwright specs and tried to execute them as unit tests, so a root `test` that
+included the website reported a failure that had nothing to do with the code.
+
+### Dependencies
+
+- **`packageManager` removed.** It named a version that cannot run the gates.
+- **`engines.bun: ">=1.4.3"` added** — the minimum, stated where the tools read
+  it.
+- **Two `overrides` removed as no-ops.** `js-yaml` and `seroval` were pinned
+  for constraints that no longer exist: `seroval` was only needed because
+  solid-js 1.9.15 asked for `~1.5.4`, and 1.9.17 asks for `~1.6.8`. The
+  security floor those overrides provided is now held by the `audit:deps` gate,
+  which is one mechanism rather than two.
+- **`playwright-core` kept, as a range.** It is a no-op today, but it encodes a
+  real invariant: `@playwright/test` and `@axe-core/playwright` must resolve
+  the _same_ core, or the e2e suite has two incompatible `Page` types. A caret
+  range enforces one version and still floats.
+- **Workspace dependencies bumped**: pixi.js, solid-js, vitest, `@astrojs/solid-js`,
+  `@astrojs/check`, `@axe-core/playwright`, `@playwright/test`, `@testing-library/user-event`,
+  and jsdom across a major (26 → 30).
+
+### Go
+
+`go mod tidy -diff` was already empty and `go mod verify` already passed, so the
+graph was already minimal — two direct requirements and five indirect, all at
+their latest. Two things changed:
+
+- The `go` directive was `1.26.8`, which is the patch of whoever last ran
+  `tidy`, not a requirement the code has. It is now `1.26.0` — the minor
+  version, which is what the directive is for.
+- `go.sum` is unchanged: 28 lines for 17 modules, every module verified.
+
+### The symlinks
+
+The question worth answering plainly: **the symlinks are Bun's, not Go's.**
+`go.mod` produces none — the Go module cache has zero symlinks in it. The 1190
+symlinks in the tree are Bun's isolated install layout: `node_modules/<pkg>`
+points into a content-addressed store at `node_modules/.bun/<pkg>@<version>+<hash>/`,
+and `node_modules/.bin/*` point at the package binaries.
+
+They are correct: **zero broken**, every one resolving to the exact version
+the lockfile pins, every binary executable, and none of them tracked by git.
+That layout is the point — it is how Bun stores one copy of each version and
+links it, instead of npm's duplicated nested installs. The tree went from
+seventy-odd transitive packages to seven partly because of it.
+
+One real trap did surface: removing a direct dependency can leave a stale root
+symlink behind, and the next install does not necessarily clear it. The gates
+catch it, because they test for the tool's directory and a broken symlink
+fails that test with a message that names the cause.
+
+### Everything else
+
+- `scripts/dev-server-bg.sh` was unreferenced — the Playwright harness stopped
+  using it when it moved to the release build script. Removed.
+- The Frontend CI job now sets up Go. Its browser gate builds and runs the
+  real server, so it was depending on whatever Go the runner image happened to
+  ship.
+- The test database's teardown is its own step with `if: always()`. It used to
+  be the last line of the test step, so a failing test left the container
+  running.
+- CI actions moved to their current majors: `setup-go@v7`, `setup-node@v7`,
+  `upload-artifact@v7`.
+- PostgreSQL 17 → 18 in the compose file, and Alpine 3.20 → 3.23 in the image.
+  The database behaviour is proven: the whole persistence suite has run against
+  PostgreSQL 18.6 throughout this cycle. The image could not be built here —
+  Docker is not available in this environment — so CI is its first test.
+- Five architecture and design documents still declared _"Status: v0.1.0
+  Foundation"_ four releases after the board loop became playable. Corrected.
+- The deployment README described a Redis deployment, a `v0.1` website with no
+  server integration, and a build command that scraped the version out of
+  `package.json` with `grep`. It now points at the `VERSION` file, states the
+  one-instance constraint and why, and says plainly that
+  `HIGHJACK_ALLOWED_ORIGINS` is not optional in production.

@@ -1,7 +1,6 @@
 # Design System Reference
 
-> Status: v0.1.0 Foundation — implemented in `packages/ui` and consumed by
-> both apps.
+> Status: v0.2.10 — implemented in `packages/ui` and consumed by both apps.
 
 ## Architecture
 

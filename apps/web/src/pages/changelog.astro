@@ -13,6 +13,43 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.11',
+    date: '2026-10-21',
+    title: 'Hygiene: the gate that could not run in CI',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The release gate now runs everywhere it should',
+        tone: 'gold',
+        items: [
+          'The previous release was certified locally and failed in CI, on the same commit, for the same check. CI pinned an older Bun than the typecheck gate needs, so the check it ran did not exist there',
+          'The requirement is now stated once, as a minimum version, and the repository refuses a build that pins anything below it. Re-pinning the old version, lowering the requirement, or adding the old version pin back each fail the check',
+          'CI installs the newest Bun rather than a fixed one, so a regression in the newest release surfaces immediately instead of at the next version bump',
+        ],
+      },
+      {
+        label: 'The commands do what they say',
+        tone: 'teal',
+        items: [
+          'The root test command ran a shell loop into three directories by hand. It now uses the workspace filter, so a new workspace is picked up without editing anything',
+          'The local test command was weaker than the release check it was meant to preview — no race detector, and a cached result could look like a pass. It is now the same',
+          'Type checking has one command for all three checkers, and the format command has a check-only twin',
+          'The website had a test command that ran nothing, and collecting the browser tests as if they were unit tests made a failure that had nothing to do with the code',
+        ],
+      },
+      {
+        label: 'Dependencies and infrastructure',
+        tone: 'teal',
+        items: [
+          'Two version pins were removed as no-ops: the constraints that made them necessary no longer exist. The security floor they provided is now held by the dependency audit, which is one mechanism rather than two',
+          'The pin that keeps the two browser-testing packages on one core version is kept, as a range so it still floats',
+          'The database moved to PostgreSQL 18 and the image to a current Alpine, and the backend now sets up its own Go toolchain in the browser job instead of relying on the runner image',
+          'An unreferenced script was removed, and five design documents that still said "v0.1.0 Foundation" were corrected',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.10',
     date: '2026-10-21',
     title: 'A leaner toolchain, and a website that is actually linted',

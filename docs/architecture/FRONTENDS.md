@@ -1,7 +1,7 @@
 # Frontend Architecture
 
-> Status: v0.1.0 Foundation. The website is complete for its scope; the
-> game client is a bootable shell demonstrating the layering.
+> Status: v0.2.10. The website is complete for its scope; the game client
+> is a playable board loop over the authoritative backend.
 
 ## Two frontends, one boundary
 

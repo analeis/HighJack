@@ -1,6 +1,6 @@
 # HighJack Architecture Overview
 
-> Status: v0.1.0 Foundation. This document describes what exists today.
+> Status: v0.2.10. This document describes what exists today.
 > Future architecture is labeled explicitly as such.
 
 ## The core idea

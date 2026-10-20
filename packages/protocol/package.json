@@ -1,6 +1,6 @@
 {
   "name": "@highjack/protocol",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "HighJack client/server protocol contract: messages, actions, events, errors, versioning.",
   "license": "MIT",
   "type": "module",

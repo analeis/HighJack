@@ -1,6 +1,6 @@
 {
   "name": "highjack",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "private": true,
   "description": "HighJack- a browser-first multiplayer board/economy game built around a configurable ruleset and deterministic simulation.",
   "license": "MIT",
@@ -9,9 +9,8 @@
     "apps/*",
     "packages/*"
   ],
-  "packageManager": "bun@1.3.14",
   "engines": {
-    "bun": ">=1.3.0"
+    "bun": ">=1.4.3"
   },
   "scripts": {
     "dev": "bun run --filter='@highjack/web' dev",
@@ -20,11 +19,16 @@
     "build": "bun run build:web && bun run build:game && ./scripts/build-server.sh",
     "build:web": "bun run --filter='@highjack/web' build",
     "build:game": "bun run --filter='@highjack/game' build",
-    "test": "bash -c 'for d in packages/protocol packages/ui apps/game; do (cd $d && bunx vitest run) || exit 1; done' && go test ./...",
+    "test": "bun run --filter='./packages/*' --filter='./apps/game' --filter='./apps/web' test && bun run test:go",
+    "test:go": "go test -count=1 -race ./server/...",
     "test:e2e": "bun run --filter='@highjack/web' test:e2e",
     "lint": "oxlint packages apps scripts && go vet ./...",
     "format": "oxfmt .",
-    "typecheck": "bun check -p tsconfig.json",
+    "format:check": "oxfmt --check .",
+    "typecheck": "bun run typecheck:ts && bun run typecheck:reference && bun run typecheck:astro",
+    "typecheck:ts": "bun check -p tsconfig.json",
+    "typecheck:reference": "bunx tsc6 --noEmit -p tsconfig.json",
+    "typecheck:astro": "bun run --filter='@highjack/web' check",
     "validate": "bun scripts/validate.ts",
     "gate": "bun scripts/gate.ts",
     "certify": "bun scripts/certify.ts"
@@ -37,8 +41,6 @@
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "overrides": {
-    "playwright-core": "1.64.1",
-    "js-yaml": "^4.3.2",
-    "seroval": "^1.6.3"
+    "playwright-core": "^1.64.1"
   }
 }

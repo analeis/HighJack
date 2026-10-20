@@ -4,12 +4,25 @@
 
 | Tool                  | Version    | Notes                                  |
 | --------------------- | ---------- | -------------------------------------- |
-| [Bun](https://bun.sh) | ≥ 1.3      | Workspaces, tests, builds, scripts     |
+| [Bun](https://bun.sh) | ≥ 1.4.3    | Workspaces, tests, builds, scripts     |
 | [Go](https://go.dev)  | 1.26.x     | Backend                                |
 | Docker                | any recent | Only for the optional local PostgreSQL |
 
 Node is not required directly (Bun drives everything); Playwright will
 fetch a browser on first e2e run.
+
+### Why Bun 1.4.3 and not "whatever is installed"
+
+The typecheck gate runs `bun check`, which was added in Bun 1.4.3. The
+repository used to pin `bun@1.3.14` through the `packageManager` field, and
+CI pinned the same version — a version that cannot run the project's own gate.
+The gate failed in CI with "command not found" while the identical gate passed
+locally, which is the worst possible failure: a green local run that says
+nothing about the release.
+
+So there is no `packageManager` field now. The requirement is stated as a
+minimum in `engines.bun`, and CI installs the newest Bun, so a regression in the
+newest release surfaces immediately rather than at the next pin bump.
 
 ## Bootstrap
 
@@ -44,7 +57,7 @@ bun run --filter='@highjack/web' preview
 ### Game shell (`apps/game`)
 
 ```sh
-bun run dev:game     # http://localhost:5173 — concept screen, no gameplay yet
+bun run dev:game     # http://localhost:5173 — the playable board loop
 ```
 
 ### Backend
@@ -96,6 +109,11 @@ To create one:
 ## Full validation
 
 ```sh
+bun run test         # every workspace's unit tests, then the Go suite with -race
+bun run typecheck    # bun check, the reference compiler, and astro check
+bun run lint         # oxlint and go vet
+bun run format       # oxfmt, in place
+bun run format:check # oxfmt, without writing
 bun run validate     # formatting, lint, typecheck, unit tests, builds, asset & repo sanity
 bun run certify      # validate + browser verification + release classification
 ```
