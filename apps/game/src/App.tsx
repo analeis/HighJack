@@ -16,6 +16,7 @@ import type { GameView } from './state/game-store.ts';
 import {
   GameConnection,
   createMatch,
+  forgetSeat,
   joinMatch,
   readStoredSeat,
   rememberSeat,
@@ -86,6 +87,11 @@ export function App(): JSX.Element {
     onSnapshot: (snapshot: GameSnapshot, config: GameConfig, nextSeq: number, resync: boolean) => {
       applySnapshot(snapshot, config, nextSeq, resync);
       syncStage();
+      // A finished match has no seat to return to. The stored seat is a bearer
+      // credential that never expires, and it used to be kept for the life of the
+      // browser, so a reload kept sending the player back to a table that had
+      // already ended.
+      if (snapshot.phase === 'ended') forgetSeat(snapshot.matchId);
     },
     onLegalActions: (actions: readonly ActionType[]) => {
       applyLegalActions(actions);
@@ -99,6 +105,19 @@ export function App(): JSX.Element {
     ) => {
       applyEvents(events);
       syncStage();
+      // Leaving is a deliberate act, so the stored credential is dropped: a
+      // reload then offers a fresh table rather than rejoining one this player
+      // has walked away from.
+      const view = gameStore.view();
+      for (const entry of events) {
+        if (
+          entry.event.type === 'player_left' &&
+          entry.event.playerId === view?.playerId &&
+          view.matchId !== ''
+        ) {
+          forgetSeat(view.matchId);
+        }
+      }
     },
     onActionResult: (
       seq: number,
@@ -117,6 +136,16 @@ export function App(): JSX.Element {
         return;
       }
       if (!ok && seq >= 0) gameStore.setLastError(message ?? code ?? 'action rejected');
+      if (!ok && seq < 0) {
+        // A handshake-level refusal: the server rejected the *match or the
+        // token*, not an action. The seat cannot be used again, so it is
+        // dropped rather than retried on every reload — which is what would
+        // otherwise happen, because a rejected seat was never forgotten.
+        if (message === 'unknown match' || message === 'invalid join token') {
+          forgetSeat();
+          gameStore.setLastError('that table is no longer available — create a new one');
+        }
+      }
     },
   };
 

@@ -117,3 +117,116 @@ func TestALobbyRateLimitOfZeroDisablesTheLimit(t *testing.T) {
 		t.Fatalf("a disabled rate limit must be valid: %v", err)
 	}
 }
+
+func TestLoadReadsTheCoreEnvironment(t *testing.T) {
+	t.Setenv("HIGHJACK_ENV", "production")
+	t.Setenv("HIGHJACK_ADDR", "127.0.0.1:9999")
+	t.Setenv("HIGHJACK_DATABASE_URL", "postgres://example/db")
+	t.Setenv("HIGHJACK_LOG_LEVEL", "warn")
+	t.Setenv("HIGHJACK_ALLOWED_ORIGINS", "http://a.example, http://b.example")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Env != EnvProduction {
+		t.Fatalf("Env = %q, want production", cfg.Env)
+	}
+	if cfg.Addr != "127.0.0.1:9999" {
+		t.Fatalf("Addr = %q", cfg.Addr)
+	}
+	if cfg.DatabaseURL != "postgres://example/db" {
+		t.Fatalf("DatabaseURL = %q", cfg.DatabaseURL)
+	}
+	if cfg.LogLevel != "warn" {
+		t.Fatalf("LogLevel = %q", cfg.LogLevel)
+	}
+	if len(cfg.AllowedOrigins) != 2 {
+		t.Fatalf("AllowedOrigins = %v, want two entries", cfg.AllowedOrigins)
+	}
+	if cfg.AllowedOrigins[0] != "http://a.example" || cfg.AllowedOrigins[1] != "http://b.example" {
+		t.Fatalf("AllowedOrigins = %v, want the origins trimmed", cfg.AllowedOrigins)
+	}
+}
+
+func TestLoadRejectsAnUnknownEnvironment(t *testing.T) {
+	t.Setenv("HIGHJACK_ENV", "staging")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected rejection of an unknown environment")
+	}
+}
+
+func TestLoadRejectsAMalformedAddress(t *testing.T) {
+	t.Setenv("HIGHJACK_ADDR", "not-an-address")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected rejection of a malformed address")
+	}
+}
+
+func TestLoadRejectsAnOriginWithAPath(t *testing.T) {
+	t.Setenv("HIGHJACK_ALLOWED_ORIGINS", "http://a.example/some/path")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected rejection of an origin carrying a path")
+	}
+}
+
+func TestAnEmptyDatabaseURLDisablesPersistence(t *testing.T) {
+	t.Setenv("HIGHJACK_DATABASE_URL", "   ")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.DatabaseURL != "" {
+		t.Fatalf("DatabaseURL = %q, want empty: a blank DSN means persistence is off", cfg.DatabaseURL)
+	}
+}
+
+// TestDevModeIsOnlyOffInProduction is a security-relevant default.
+//
+// Dev mode relaxes the origin check: a browser from an origin the server
+// cannot verify is accepted. Outside production that is a convenience; in
+// production it would be a hole, so the environment has to be set explicitly
+// for the server to be safe.
+func TestDevModeIsOnlyOffInProduction(t *testing.T) {
+	t.Setenv("HIGHJACK_ENV", "production")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.DevMode() {
+		t.Fatal("production must not be in development mode")
+	}
+
+	t.Setenv("HIGHJACK_ENV", "development")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.DevMode() {
+		t.Fatal("development must be in development mode")
+	}
+
+	// The test environment is not production either.
+	t.Setenv("HIGHJACK_ENV", "test")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.DevMode() {
+		t.Fatal("test must be in development mode")
+	}
+}
+
+func TestTheDefaultEnvironmentIsDevelopment(t *testing.T) {
+	// This is the setting an operator gets by omission, so it is worth stating
+	// explicitly: the server starts permissive unless HIGHJACK_ENV says
+	// otherwise.
+	t.Setenv("HIGHJACK_ENV", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Env != EnvDevelopment {
+		t.Fatalf("Env = %q, want development", cfg.Env)
+	}
+}

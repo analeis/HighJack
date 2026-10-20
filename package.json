@@ -1,6 +1,6 @@
 {
   "name": "highjack",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "private": true,
   "description": "HighJack- a browser-first multiplayer board/economy game built around a configurable ruleset and deterministic simulation.",
   "license": "MIT",

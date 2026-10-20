@@ -590,7 +590,7 @@ func TestDuplicateSeqDoesNotRepublishToPeers(t *testing.T) {
 		t.Fatalf("roll: %v", err)
 	}
 	// First publication.
-	f.m.Broadcast(res.Events, 3)
+	f.m.Broadcast(res.Events)
 	firstCount := sink2.count()
 
 	// The client never saw the ack and retries the same sequence. The runtime
@@ -607,7 +607,7 @@ func TestDuplicateSeqDoesNotRepublishToPeers(t *testing.T) {
 		t.Fatalf("a replayed result must carry no events to publish; got %d", len(replay.Events))
 	}
 	// The transport publishes only non-replayed results, so this is a no-op.
-	f.m.Broadcast(replay.Events, 3)
+	f.m.Broadcast(replay.Events)
 
 	if got := sink2.count(); got != firstCount {
 		t.Fatalf("a duplicate submission re-published to a peer: %d -> %d frames", firstCount, got)
@@ -627,7 +627,7 @@ func TestBroadcastReachesEveryPeerExactlyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("roll: %v", err)
 	}
-	f.m.Broadcast(res.Events, 3)
+	f.m.Broadcast(res.Events)
 
 	for i, sink := range []*recordingSink{sink1, sink2} {
 		got := sink.eventTypes()
@@ -657,7 +657,7 @@ func TestBroadcastIsolatesFailingSinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ready: %v", err)
 	}
-	f.m.Broadcast(res.Events, 1)
+	f.m.Broadcast(res.Events)
 
 	if bad.count() != 0 {
 		t.Fatal("a failing sink should not record frames")
@@ -679,7 +679,7 @@ func TestBroadcastSkipsDisconnectedSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ready: %v", err)
 	}
-	f.m.Broadcast(res.Events, 1)
+	f.m.Broadcast(res.Events)
 
 	if gone.count() != 0 {
 		t.Fatal("a disconnected session must not receive broadcasts")
@@ -987,14 +987,14 @@ func TestBoundSessionReceivesNothingUntilItsSnapshotIsWritten(t *testing.T) {
 	if _, err := m.ApplyAction(context.Background(), "s1", 1, game.PlayerReadyAction{Ready: true}); err != nil {
 		t.Fatalf("ready: %v", err)
 	}
-	m.Broadcast(m.envelopesForTest(), 1)
+	m.Broadcast(m.envelopesForTest())
 	if sink.count() != 0 {
 		t.Fatalf("a session that has not received its snapshot was published to (%d frames)", sink.count())
 	}
 
 	// Once the handshake completes, publications resume.
 	m.MarkReady("s2")
-	m.Broadcast(m.envelopesForTest(), 1)
+	m.Broadcast(m.envelopesForTest())
 	if sink.count() == 0 {
 		t.Fatal("a ready session received no publications")
 	}

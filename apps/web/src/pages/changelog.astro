@@ -13,6 +13,41 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.9',
+    date: '2026-10-01',
+    title: 'A seat that is forgotten, and a pipeline that says what is wrong',
+    status: 'released',
+    highlights: [
+      {
+        label: 'A seat is released when it should be',
+        tone: 'gold',
+        items: [
+          'The reconnect token is now stored per match rather than under one global key, so joining a second table no longer throws away the first',
+          'A seat is dropped when its match ends, when the player leaves, and when the server says the match or the token is gone. The "forget" function existed and was called from nowhere, so a token that never expires and is never revoked sat in local storage for the life of the browser, and a reload kept returning the player to a table they had already left',
+          'At most eight seats are kept, because every one of them is a bearer credential',
+        ],
+      },
+      {
+        label: 'The pipeline names its own problems',
+        tone: 'teal',
+        items: [
+          'The lint gate now says "the root dependencies are not installed" instead of failing deep inside a linter with a module-not-found error that points at the wrong thing',
+          'The certification pipeline itself is now linted. It produces the evidence for every other claim in this project, and it was type-checked but never linted — adding the coverage found an unused import on its first run',
+          'The repository job no longer installs five hundred packages to run two scripts that import nothing but the standard library',
+        ],
+      },
+      {
+        label: 'The smaller ones',
+        tone: 'neutral',
+        items: [
+          'A migration added late with a number below one already applied is now refused rather than silently skipped. The old watermark could not tell "already run" from "will never run", and the second leaves the schema behind the code',
+          'The configuration package has tests for the first time',
+          'Two dead parameters and a dead block are gone',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.8',
     date: '2026-09-30',
     title: 'The protocol contract now matches the wire',

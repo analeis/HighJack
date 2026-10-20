@@ -19,7 +19,6 @@
  */
 import { execSync } from 'node:child_process';
 import { relative } from 'node:path';
-import path from 'node:path';
 import { runGates, printSummary, writeReport, ROOT, type GateResult } from './lib/gates.ts';
 import { validationGates } from './lib/validation-gates.ts';
 import { verificationGates } from './lib/verification-gates.ts';

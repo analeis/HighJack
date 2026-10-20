@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // migrationFile is one parsed *.sql file from the migrations directory.
@@ -72,15 +71,32 @@ func (s *Store) Migrate(ctx context.Context, dir string) ([]string, error) {
 		return nil, err
 	}
 
-	appliedMax, err := s.maxAppliedVersion(ctx)
+	applied, err := s.appliedVersions(ctx)
 	if err != nil {
 		return nil, err
 	}
+	highest := int64(0)
+	for v := range applied {
+		if v > highest {
+			highest = v
+		}
+	}
 
-	var applied []string
+	var ran []string
 	for _, f := range files {
-		if f.Version <= appliedMax {
+		if _, done := applied[f.Version]; done {
 			continue
+		}
+		// A migration whose version is below one already applied is not a
+		// migration that has run — it is one that was added late and would be
+		// silently skipped, leaving the schema behind the code that expects it.
+		// The old watermark comparison could not tell the two apart, because it
+		// only remembered the highest version applied.
+		if f.Version < highest {
+			return nil, fmt.Errorf(
+				"migration %04d_%s has a version below the highest applied migration (%04d): "+
+					"it would never run. Renumber it above every applied migration",
+				f.Version, f.Name, highest)
 		}
 		sqlBytes, err := os.ReadFile(f.Path)
 		if err != nil {
@@ -105,9 +121,9 @@ func (s *Store) Migrate(ctx context.Context, dir string) ([]string, error) {
 		}
 		s.log.Info("migration applied",
 			"version", f.Version, "name", f.Name)
-		applied = append(applied, fmt.Sprintf("%04d_%s", f.Version, f.Name))
+		ran = append(ran, fmt.Sprintf("%04d_%s", f.Version, f.Name))
 	}
-	return applied, nil
+	return ran, nil
 }
 
 const migrationsTableName = "schema_migrations"
@@ -125,14 +141,27 @@ func (s *Store) ensureMigrationsTable(ctx context.Context) error {
 	return nil
 }
 
-func (s *Store) maxAppliedVersion(ctx context.Context) (int64, error) {
-	var max pgtype.Int8
-	row := s.pool.QueryRow(ctx, `SELECT MAX(version) FROM `+migrationsTableName)
-	if err := row.Scan(&max); err != nil {
-		return 0, fmt.Errorf("read applied migrations: %w", err)
+// appliedVersions reads every migration version that has already run.
+//
+// The set, not just the highest version: a file added late with a version
+// below the highest applied one is a migration that will never run, and only
+// the set can tell it apart from one that has already run.
+func (s *Store) appliedVersions(ctx context.Context) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	rows, err := s.pool.Query(ctx, `SELECT version FROM `+migrationsTableName)
+	if err != nil {
+		return nil, fmt.Errorf("read applied migrations: %w", err)
 	}
-	if !max.Valid {
-		return 0, nil
+	defer rows.Close()
+	for rows.Next() {
+		var v int64
+		if err := rows.Scan(&v); err != nil {
+			return nil, fmt.Errorf("read applied migration version: %w", err)
+		}
+		out[v] = true
 	}
-	return max.Int64, nil
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read applied migrations: %w", err)
+	}
+	return out, nil
 }

@@ -45,14 +45,14 @@ defects. They are recorded, not refactored:
 | TRC-2 | README, manifests and client UI name the wrong version           | MEDIUM          | **Fixed in v0.2.7**             |
 | PRO-1 | The TS protocol requires a `seed` the server strips              | MEDIUM          | **Fixed in v0.2.8**             |
 | PRO-2 | Parity tests compare vocabulary, not field shapes                | MEDIUM          | **Fixed in v0.2.8**             |
-| TOK-1 | The stored seat is never cleared and is not per-match            | MEDIUM          | **v0.2.8**                      |
-| CER-1 | The ESLint gate needs an unprovisioned root install              | MEDIUM          | **v0.2.8**                      |
-| CER-2 | `scripts/` is type-checked but never linted                      | LOW             | **v0.2.8**                      |
-| LOW-1 | `Broadcast`'s `exceptSeq` is unused                              | LOW             | **v0.2.8**                      |
-| LOW-2 | Dead block in `Bind`                                             | LOW             | **v0.2.8**                      |
-| LOW-3 | The `config` package has no tests                                | LOW             | **v0.2.8**                      |
-| LOW-4 | The migration runner ignores a late-added lower version          | LOW             | **v0.2.8**                      |
-| LOW-5 | The `repository` CI job installs 518 packages to run two scripts | LOW             | **v0.2.8**                      |
+| TOK-1 | The stored seat is never cleared and is not per-match            | MEDIUM          | **Fixed in v0.2.9**             |
+| CER-1 | The ESLint gate needs an unprovisioned root install              | MEDIUM          | **Fixed in v0.2.9**             |
+| CER-2 | `scripts/` is type-checked but never linted                      | LOW             | **Fixed in v0.2.9**             |
+| LOW-1 | `Broadcast`'s `exceptSeq` is unused                              | LOW             | **Fixed in v0.2.9**             |
+| LOW-2 | Dead block in `Bind`                                             | LOW             | **Fixed in v0.2.9**             |
+| LOW-3 | The `config` package has no tests                                | LOW             | **Fixed in v0.2.9**             |
+| LOW-4 | The migration runner ignores a late-added lower version          | LOW             | **Fixed in v0.2.9**             |
+| LOW-5 | The `repository` CI job installs 518 packages to run two scripts | LOW             | **Fixed in v0.2.9**             |
 | RSK-1 | Multi-instance correctness                                       | —               | **Open — deployment decision**  |
 | PRS-3 | The match mutex is held across the commit                        | —               | **Open — concurrency decision** |
 
@@ -282,3 +282,52 @@ that caused it, rather than on a runtime assertion somewhere else.
 - `isGameEvent` accepts the event the server actually sends, and still accepts
   a stray seed from an older peer.
 - The client reverts exactly the spaces a bankruptcy event names.
+
+## v0.2.9 — lifecycle and hygiene (shipped)
+
+The last of the register: the seat lifecycle, the certification pipeline's own
+quality, and the small defects.
+
+### The seat lifecycle
+
+The reconnect token is a bearer credential. The server keeps only its digest;
+the client keeps the secret. It never expires and is never revoked. How the
+client stores it is therefore a security question, and the answer was:
+
+- one global key, so joining a second table discarded the first seat;
+- a `forgetSeat` function that existed and was called from nowhere, so the
+  token stayed in local storage for the life of the browser;
+- a reload that always returned the player to whichever table was joined last,
+  including one that had already ended.
+
+Seats are now stored per match, capped at eight, and released when the match
+ends, when the player leaves, and when the server says the match or the token
+is gone. That last case is the one that mattered most: a seat the server has
+rejected was retried on every reload, forever, because nothing ever forgot it.
+
+### The pipeline naming its own problems
+
+The lint gate failed with `ERR_MODULE_NOT_FOUND` from inside ESLint when the
+root dependencies were not installed — a diagnostic that points at ESLint
+rather than at the missing install. It now says which one it is.
+
+`scripts/` is linted. It holds the certification pipeline — the thing that
+produces the evidence for every other claim — and it was type-checked but never
+linted. Adding the coverage found an unused import on its first run.
+
+The repository CI job no longer installs five hundred packages to run two
+scripts that import nothing but the standard library.
+
+### The smaller ones
+
+- A migration added late with a version below one already applied is now
+  **refused**. The runner compared against the highest applied version, so it
+  could not tell "already run" from "will never run" — and the second leaves
+  the schema behind the code, with the server starting happily against a
+  database it cannot write to. The runner now keeps the _set_ of applied
+  versions.
+- The `config` package has tests for the first time, including the security-
+  relevant default that the environment is `development` unless it is set
+  otherwise.
+- `Broadcast` no longer takes a parameter it never used; `Bind` no longer
+  contains a dead block.

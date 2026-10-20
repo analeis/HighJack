@@ -284,6 +284,16 @@ export interface StoredSeat {
 
 const SEAT_KEY = 'highjack.seat.v1';
 
+/**
+ * How many seats are kept.
+ *
+ * A seat is a bearer credential that never expires and is never revoked, so
+ * keeping every one a browser ever took is a liability rather than a feature.
+ * The cap keeps the useful case — the table you are at, and the one you just
+ * left — without accumulating a pile of tokens.
+ */
+const MAX_STORED_SEATS = 8;
+
 type Storage = Pick<globalThis.Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 function storage(): Storage | null {
@@ -296,34 +306,101 @@ function storage(): Storage | null {
   }
 }
 
-/** Persist a seat so a reload rejoins the same table. */
-export function rememberSeat(matchId: string, token: string, playerId: string): void {
-  storage()?.setItem(SEAT_KEY, JSON.stringify({ matchId, token, playerId }));
+/** The seats this browser holds, keyed by match id. */
+interface StoredSeats {
+  [matchId: string]: { token: string; playerId: string };
 }
 
-/** Read the stored seat, or null. A malformed or partial value is discarded. */
-export function readStoredSeat(): StoredSeat | null {
+/**
+ * Read every stored seat.
+ *
+ * The seats are keyed by match id rather than held as one value, so joining a
+ * second table no longer discards the first. A single global key meant that
+ * joining a new match overwrote the old seat, and a reload always returned to
+ * whichever table was joined last — including one that had already ended.
+ */
+function readSeats(): StoredSeats {
   const raw = storage()?.getItem(SEAT_KEY);
-  if (!raw) return null;
+  if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw) as Partial<StoredSeat>;
-    if (
-      typeof parsed.matchId !== 'string' ||
-      typeof parsed.token !== 'string' ||
-      typeof parsed.playerId !== 'string' ||
-      parsed.matchId === '' ||
-      parsed.token === '' ||
-      parsed.playerId === ''
-    ) {
-      return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) return {};
+    const out: StoredSeats = {};
+    for (const [matchId, seat] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof seat !== 'object' || seat === null) continue;
+      const { token, playerId } = seat as { token?: unknown; playerId?: unknown };
+      if (
+        typeof token !== 'string' ||
+        typeof playerId !== 'string' ||
+        token === '' ||
+        playerId === ''
+      ) {
+        continue;
+      }
+      out[matchId] = { token, playerId };
     }
-    return { matchId: parsed.matchId, token: parsed.token, playerId: parsed.playerId };
+    return out;
   } catch {
-    return null;
+    return {};
   }
 }
 
-/** Forget the stored seat, e.g. once a match has ended for good. */
-export function forgetSeat(): void {
-  storage()?.removeItem(SEAT_KEY);
+function writeSeats(seats: StoredSeats): void {
+  const store = storage();
+  if (!store) return;
+  const ids = Object.keys(seats);
+  if (ids.length === 0) {
+    store.removeItem(SEAT_KEY);
+    return;
+  }
+  store.setItem(SEAT_KEY, JSON.stringify(seats));
+}
+
+/** Persist a seat so a reload rejoins the same table. */
+export function rememberSeat(matchId: string, token: string, playerId: string): void {
+  if (matchId === '' || token === '' || playerId === '') return;
+  const seats = readSeats();
+  seats[matchId] = { token, playerId };
+  // Keep the most recently stored seats. Object key order is insertion order
+  // for string keys, so the first entries are the oldest.
+  const ids = Object.keys(seats);
+  if (ids.length > MAX_STORED_SEATS) {
+    for (const id of ids.slice(0, ids.length - MAX_STORED_SEATS)) delete seats[id];
+  }
+  writeSeats(seats);
+}
+
+/**
+ * Read a stored seat.
+ *
+ * With a match id, the seat for that table. Without one, the most recently
+ * stored seat — which is the one a reload should return to.
+ */
+export function readStoredSeat(matchId?: string): StoredSeat | null {
+  const seats = readSeats();
+  const ids = Object.keys(seats);
+  if (ids.length === 0) return null;
+  const id = matchId ?? ids[ids.length - 1] ?? '';
+  const seat = seats[id];
+  if (!seat) return null;
+  return { matchId: id, token: seat.token, playerId: seat.playerId };
+}
+
+/**
+ * Forget a stored seat, once a match has ended or the player has left.
+ *
+ * This used to exist and be called from nowhere, so a seat — and the bearer
+ * token in it — stayed in local storage for the life of the browser, and a
+ * reload always returned the player to a table they had already left.
+ */
+export function forgetSeat(matchId?: string): void {
+  const store = storage();
+  if (!store) return;
+  if (matchId === undefined) {
+    store.removeItem(SEAT_KEY);
+    return;
+  }
+  const seats = readSeats();
+  delete seats[matchId];
+  writeSeats(seats);
 }

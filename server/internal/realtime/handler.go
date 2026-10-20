@@ -255,7 +255,7 @@ func (h *Handler) handleAction(conn *websocket.Conn, c *connSink, session string
 	// that fold a repeated rent_paid would charge it twice. The ack still
 	// carries the authoritative snapshot, so a retrying client stays correct.
 	if !result.Replayed {
-		m.Broadcast(result.Events, a.Seq)
+		m.Broadcast(result.Events)
 	}
 	return c.sendAck(a.Seq, result.NextSeq, result.Snapshot)
 }

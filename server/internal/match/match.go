@@ -372,7 +372,7 @@ func (m *Match) Join(ctx context.Context, displayName string) (game.PlayerID, st
 	// Tell the clients. Existing lobby members previously learned about a new seat
 	// only when some later action happened to produce a snapshot, so a table could
 	// sit showing a stale roster while waiting for players who had already joined.
-	m.Broadcast(envelopes, 0)
+	m.Broadcast(envelopes)
 	return playerID, token, nil
 }
 
@@ -451,11 +451,8 @@ func (m *Match) Bind(sessionID, token, clientID string, sink Sink) (game.PlayerI
 		m.mu.Unlock()
 		return "", ErrUnauthorized
 	}
-	if existing, dup := m.sessions[sessionID]; dup {
-		// Rebinding the same connection id (reconnect on the same session)
-		// replaces the old sink rather than leaking it.
-		_ = existing
-	}
+	// Rebinding the same connection id (a reconnect on the same session)
+	// replaces the old sink rather than leaking it.
 	s := m.sessions[sessionID]
 	if s == nil {
 		s = &session{id: sessionID}
@@ -752,7 +749,7 @@ func (m *Match) sinceLocked(cursor uint64) (events []EventEnvelope, ok bool) {
 // interleave even across peers. It is deliberately a separate lock from mu:
 // holding mu here would serialise the whole match behind a network write, which
 // is exactly what the architecture notes forbid.
-func (m *Match) Broadcast(events []EventEnvelope, exceptSeq int64) {
+func (m *Match) Broadcast(events []EventEnvelope) {
 	if len(events) == 0 {
 		return
 	}

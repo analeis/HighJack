@@ -36,7 +36,22 @@ export const validationGates: Gate[] = [
   { name: 'format', cmd: ['bunx', 'prettier', '--check', '.'] },
   {
     name: 'lint:eslint',
-    cmd: ['bunx', 'eslint', 'packages', 'apps'],
+    // The root dependencies have to be installed. The lint config lives at the
+    // repository root and imports `typescript-eslint` from there, so a checkout
+    // with only the per-workspace installs fails *inside* ESLint with
+    // ERR_MODULE_NOT_FOUND — a diagnostic that points at ESLint rather than at
+    // the missing install, which is exactly the wrong place to look. The check
+    // names the cause.
+    //
+    // `scripts` is linted too. It holds the certification pipeline — the thing
+    // that produces the evidence for every other claim — and it was
+    // type-checked but never linted, so a defect in it would have been found by
+    // no gate at all.
+    cmd: [
+      'bash',
+      '-c',
+      'test -d node_modules/typescript-eslint || { echo "eslint: the root dependencies are not installed."; echo "Run \\`bun install\\` at the repository root."; exit 1; }; bunx eslint packages apps scripts',
+    ],
   },
   { name: 'lint:gofmt', cmd: ['bash', '-c', 'test -z "$(gofmt -l ./server)" && echo gofmt clean'] },
   { name: 'lint:govet', cmd: ['go', 'vet', './...'] },

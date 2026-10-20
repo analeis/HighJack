@@ -36,6 +36,22 @@
   coverage.
 - No snapshot tests of markup; assert what a user or screen reader gets.
 
+## The lint gate, and the root install
+
+`bunx eslint` needs the _root_ dependencies. The lint configuration lives at
+the repository root and imports `typescript-eslint` from there, so a checkout
+with only the per-workspace installs fails. The gate checks for the install
+first and says so, because the failure it replaces is an
+`ERR_MODULE_NOT_FOUND` from deep inside ESLint — a diagnostic that points at
+the wrong thing entirely.
+
+`bun install` at the repository root is therefore required before any gate
+that touches the front end will run.
+
+`scripts/` is linted along with `packages` and `apps`. It holds the
+certification pipeline, so a defect in it would otherwise be found by no gate
+at all.
+
 ## CI and the pipeline must agree
 
 `repo sanity` fails if a gate defined in `scripts/lib/validation-gates.ts` is not
@@ -54,6 +70,22 @@ Invoking those through `bun scripts/gate.ts`, as the job previously did, made th
 build depend on a runtime the job never installed; it worked only because that script
 has no external imports. If you add a Go gate, add it to the workflow and let the
 sanity check confirm it.
+
+## The lint gate, and the root install
+
+`bunx eslint` needs the _root_ dependencies. The lint configuration lives at
+the repository root and imports `typescript-eslint` from there, so a checkout
+with only the per-workspace installs fails. The gate checks for the install
+first and says so, because the failure it replaces is an
+`ERR_MODULE_NOT_FOUND` from deep inside ESLint — a diagnostic that points at
+the wrong thing entirely.
+
+`bun install` at the repository root is therefore required before any gate
+that touches the front end will run.
+
+`scripts/` is linted along with `packages` and `apps`. It holds the
+certification pipeline, so a defect in it would otherwise be found by no gate
+at all.
 
 ## CI and the pipeline must agree
 
