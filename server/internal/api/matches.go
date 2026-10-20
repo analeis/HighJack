@@ -36,7 +36,13 @@ type createMatchResponse struct {
 // handleCreateMatch mints a private match with an unguessable id.
 func (s *Server) handleCreateMatch(w http.ResponseWriter, r *http.Request) {
 	var req createMatchRequest
-	if r.ContentLength > 0 {
+	// The body is read whenever the request carries one, not only when it
+	// declares a length. A chunked request declares no length — `ContentLength`
+	// is -1 — so gating on `> 0` silently ignored the config of every streaming
+	// client and created the default board while the caller believed its own
+	// ruleset had been accepted. A zero length still means "no body", which is
+	// the only case worth skipping.
+	if r.ContentLength != 0 {
 		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 		if err := dec.Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, response{Status: "invalid_body"})
@@ -55,8 +61,19 @@ func (s *Server) handleCreateMatch(w http.ResponseWriter, r *http.Request) {
 	}
 	m, err := s.registry.Create(r.Context(), cfg)
 	if err != nil {
-		logging.FromContext(r.Context()).Error("match creation failed", "error", err.Error())
-		writeError(w, http.StatusInternalServerError, response{Status: "match_create_failed"})
+		switch {
+		case errors.Is(err, match.ErrRegistryFull):
+			// The registry is at its bound. That is a capacity condition, not a
+			// server fault: reporting it as 500 told an operator reading the logs
+			// that the process was broken, when in fact it was working correctly
+			// and refusing to accept more work. 503 is the honest answer, and it
+			// is the status a load balancer can act on.
+			logging.FromContext(r.Context()).Warn("match registry is full", "limit", match.MaxLiveMatches)
+			writeError(w, http.StatusServiceUnavailable, response{Status: "registry_full"})
+		default:
+			logging.FromContext(r.Context()).Error("match creation failed", "error", err.Error())
+			writeError(w, http.StatusInternalServerError, response{Status: "match_create_failed"})
+		}
 		return
 	}
 	hash, err := m.Config().Hash()

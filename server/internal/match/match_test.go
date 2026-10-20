@@ -1180,7 +1180,7 @@ func TestRateLimiterStillEnforcesWithinTheWindow(t *testing.T) {
 func TestRegistryRefusesToGrowWithoutLimit(t *testing.T) {
 	reg := NewRegistry(testLogger(), &fakeStore{})
 	ctx := context.Background()
-	for i := 0; i < maxLiveMatches; i++ {
+	for i := 0; i < MaxLiveMatches; i++ {
 		if _, err := reg.Create(ctx, game.DefaultConfig()); err != nil {
 			t.Fatalf("create %d: %v", i, err)
 		}
@@ -1189,8 +1189,8 @@ func TestRegistryRefusesToGrowWithoutLimit(t *testing.T) {
 		t.Fatalf("err = %v, want ErrRegistryFull", err)
 	}
 	// The bound is a refusal, not a panic or a silent overwrite.
-	if got := len(reg.matches); got != maxLiveMatches {
-		t.Fatalf("registry holds %d matches, want %d", got, maxLiveMatches)
+	if got := len(reg.matches); got != MaxLiveMatches {
+		t.Fatalf("registry holds %d matches, want %d", got, MaxLiveMatches)
 	}
 }
 
@@ -1212,7 +1212,17 @@ func TestTokenLookupIsExactAndRejectsMutations(t *testing.T) {
 		playersByTokenLocked(hash); !ok {
 		t.Fatal("the correct hash must resolve")
 	}
-	for _, bad := range []string{"", hash[:len(hash)-1], hash + "x", "0" + hash[1:]} {
+	// The mutations must actually differ from the original. Replacing the first
+	// character with a fixed "0" does not always: the token is random, so roughly
+	// one hash in sixteen already begins with "0", and the mutation was then
+	// identical to the original and resolved — a test that failed for a reason
+	// that had nothing to do with the behaviour it was checking. The character
+	// substituted is chosen to differ from the one it replaces.
+	substitute := byte('0')
+	if hash[0] == substitute {
+		substitute = '1'
+	}
+	for _, bad := range []string{"", hash[:len(hash)-1], hash + "x", string(substitute) + hash[1:]} {
 		if _, ok := (&Match{players: map[game.PlayerID]string{"pl_a": hash}}).
 			playersByTokenLocked(bad); ok {
 			t.Fatalf("a mutated hash %q resolved", bad)

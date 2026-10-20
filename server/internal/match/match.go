@@ -201,10 +201,14 @@ func (r *Registry) MarkInterruptedFlags(ctx context.Context) error {
 	return nil
 }
 
-// maxLiveMatches bounds the registry. POST /matches is unauthenticated and
+// MaxLiveMatches bounds the registry. POST /matches is unauthenticated and
 // unrated, and every match retains a full board, a bounded history ring and a
 // session table, so an unbounded registry is a trivial way to exhaust memory.
-const maxLiveMatches = 512
+//
+// Exported because the API reports the bound when it refuses a request: an
+// operator reading the logs should be able to see the limit they are being
+// held to.
+const MaxLiveMatches = 512
 
 // ErrRegistryFull is returned once the live-match bound is reached.
 var ErrRegistryFull = errors.New("match: too many live matches")
@@ -215,7 +219,7 @@ func (r *Registry) Create(ctx context.Context, cfg game.GameConfig) (*Match, err
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	r.mu.RLock()
-	full := len(r.matches) >= maxLiveMatches
+	full := len(r.matches) >= MaxLiveMatches
 	r.mu.RUnlock()
 	if full {
 		return nil, ErrRegistryFull
@@ -546,11 +550,23 @@ func (m *Match) commitLocked(events []game.Event, next *game.GameState) []EventE
 		envelopes = append(envelopes, EventEnvelope{Tick: ev.Tick(), Event: ev})
 		m.history = append(m.history, EventEnvelope{Tick: ev.Tick(), Event: ev})
 	}
-	if len(m.history) > historyCap {
-		drop := len(m.history) - historyCap
-		m.history = append([]EventEnvelope(nil), m.history[drop:]...)
-		m.base = m.history[0].Tick
-	}
+	// The retention window is trimmed on tick boundaries, never on raw event
+	// counts.
+	//
+	// It used to be trimmed by count here, while the join path trimmed on tick
+	// boundaries, and the two disagreed. Counting cuts a transition in half: one
+	// transition emits several events that all share a tick, and the tick is the
+	// transition's identity on the wire, so a client applies a whole transition
+	// at once. A window that begins mid-transition retains the *tail* of one, and
+	// `Since` then serves that tail as a complete catch-up — a client is handed a
+	// purchase without its payment, or a turn advance without the roll that
+	// caused it.
+	//
+	// The split is intermittent rather than constant, because it depends on
+	// whether the cut happens to land on a group boundary, which depends on the
+	// dice. It therefore survived two releases with the correct behaviour
+	// asserted only in a comment on the other path.
+	m.trimHistoryLocked()
 	return envelopes
 }
 

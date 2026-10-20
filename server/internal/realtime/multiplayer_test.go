@@ -1039,10 +1039,26 @@ func TestAckSnapshotCarriesViewerLegalActions(t *testing.T) {
 	if len(permitted) == 0 {
 		t.Fatalf("the ack advertised no legal actions at all: %v", actions)
 	}
-	// The roll consumed the turn, so the roll itself must no longer be offered
-	// while a buy decision or the end of the turn is.
-	if permitted["roll_dice"] {
-		t.Fatalf("the roll is still offered after it was taken: %v", actions)
+	// The invariant is not "the roll is never offered again" — it is "the roll is
+	// offered exactly when the turn awaits a roll".
+	//
+	// A double grants an extra roll, and a double happens on one roll in six, so
+	// asserting that the roll disappears unconditionally failed roughly one run in
+	// six. That is a flaky test in the certification path, which is worse than no
+	// test at all: it reports a defect that does not exist and hides the ones that
+	// do. The dice come from the root seed, which is random, so the failure came
+	// and went.
+	turn, _ := ackSnap["turn"].(map[string]any)
+	phase, _ := turn["phase"].(string)
+	switch phase {
+	case "await_roll":
+		if !permitted["roll_dice"] {
+			t.Fatalf("the turn awaits a roll but the roll is not offered: %v", actions)
+		}
+	default:
+		if permitted["roll_dice"] {
+			t.Fatalf("the turn phase is %q but the roll is still offered: %v", phase, actions)
+		}
 	}
 }
 

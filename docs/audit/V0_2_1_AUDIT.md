@@ -495,6 +495,45 @@ server or the game preview in the Playwright harness.
   match loop is playable end to end on desktop and mobile; the browser gate
   covers the real product with two real clients.
 
+### v0.2.5 — Correctness (post-review patchwork)
+
+The v0.2.x code review produced a findings register. This release takes the two
+demonstrated correctness defects from it, plus the test-quality defects that the
+review surfaced indirectly. Everything else in that register is deliberately
+deferred to later patches; see `V0_2_STABILIZATION_REPORT.md`.
+
+- **CRT-1 — the retention window split transitions (HIGH).** `commitLocked`, the
+  path every roll, purchase and turn change takes, trimmed the retained event
+  history by raw event count, while the join path trimmed on tick boundaries and
+  documented at length why counting is wrong. A transition emits several events
+  that share a tick, and the tick is the transition's identity on the wire, so a
+  count-based cut retains the _tail_ of a transition; `Since` then serves that
+  tail as a complete catch-up and a client applies a purchase without its
+  payment. The cut lands mid-group only sometimes, so the defect was
+  intermittent. Reproduced deterministically with a pinned root seed, then fixed
+  by routing the action path through the same tick-boundary trim the join path
+  already used. Neither path had a test.
+- **CRT-2 — a full registry reported as a server fault (HIGH).** `POST /matches`
+  mapped `ErrRegistryFull` to 500 `match_create_failed`. It is a capacity
+  condition: the process is working correctly and declining more work. It now
+  answers 503 `registry_full`.
+- **CRT-3 — a chunked request's config was silently ignored (LOW).** The body
+  was read only when the request declared a `ContentLength`. A chunked request
+  declares none, so every streaming client received the default board while the
+  response reported success. The body is now read whenever the request carries
+  one.
+- **TST-1 — the certification gate failed at random (HIGH, evidence quality).**
+  Two tests asserted things that were false for some random values:
+  `TestAckSnapshotCarriesViewerLegalActions` asserted that a roll is never
+  offered again, which is untrue when the dice are a double — a double grants an
+  extra roll, and a double happens on one roll in six; and
+  `TestTokenLookupIsExactAndRejectsMutations` "mutated" a random hash by
+  replacing its first character with a fixed one, which is not a mutation at all
+  when the hash already began with it, roughly one hash in sixteen. Together
+  these made about one certification run in five fail spuriously. A gate that
+  fails at random undermines every green result it has ever produced, including
+  the ones that were correct.
+
 ### v0.2.4 — Accessibility, hardening & documentation truthfulness
 
 - **Addresses:** the remainder — ENG-7, ENG-9; CLT-11, CLT-12, CLT-17…21;

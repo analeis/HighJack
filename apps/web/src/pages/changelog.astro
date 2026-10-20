@@ -13,6 +13,41 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.5',
+    date: '2026-09-27',
+    title: 'Correctness: a split transition, an honest refusal, and a flaky gate',
+    status: 'released',
+    highlights: [
+      {
+        label: 'A client is no longer handed half a transition',
+        tone: 'gold',
+        items: [
+          "The retained event window is now trimmed on tick boundaries on every path, not only on the join path. Counting events cut a transition in half, because one transition emits several events that share a tick and the tick is the transition's identity on the wire",
+          'A client resuming just below the oldest retained tick was served the tail of a split transition — a purchase without its payment, or a turn advance without the roll that caused it',
+          'The defect was intermittent, because it depended on where the cut happened to land. It is now reproduced deterministically across pinned seeds, and the trim itself is tested directly',
+        ],
+      },
+      {
+        label: 'Refusals report what they are',
+        tone: 'teal',
+        items: [
+          'A full match registry now answers 503 rather than 500. It is a capacity condition, not a server fault, and an operator reading the logs was being told the process was broken when it was working correctly and declining more work',
+          'A custom board sent in a chunked request is now applied. The body was only read when the request declared a length, so every streaming client silently got the default board while the response reported success',
+        ],
+      },
+      {
+        label: 'The certification gate stopped failing at random',
+        tone: 'teal',
+        items: [
+          'Two tests failed for reasons that had nothing to do with what they checked, and both were dependent on random values',
+          'One asserted that a roll is never offered again, which is false when the dice are a double — a double grants an extra roll, and a double happens on one roll in six',
+          'The other replaced the first character of a random hash with a fixed character, which is not a mutation at all when the hash already began with it — about one hash in sixteen',
+          'Together these made roughly one certification run in five fail spuriously. A gate that fails at random is a gate whose green result means less than it appears to',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.4',
     date: '2026-09-26',
     title: 'Accessibility, and a CI pipeline that stopped lying',
