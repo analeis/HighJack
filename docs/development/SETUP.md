@@ -77,6 +77,11 @@ Environment variables (all optional):
 | `HIGHJACK_LOBBY_RATE_LIMIT`  | `60`          | Lobby requests per client address per window; `0` disables the limit |
 | `HIGHJACK_LOBBY_RATE_WINDOW` | `1m`          | The sliding window the lobby rate limit applies over                 |
 
+The release version lives in the repository's `VERSION` file, not in an
+environment variable: the workspace manifests, the game client's build, the
+server binary's `/version` endpoint, and the release tag are all checked
+against it.
+
 ## Migrations
 
 Migrations are explicit SQL under `server/migrations/` named

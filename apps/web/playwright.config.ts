@@ -54,8 +54,14 @@ export default defineConfig({
     {
       // Run from the repository root: `go run` resolves the package path
       // against the working directory, not the config file.
+      //
+      // The binary is built by the repository's own build script rather than
+      // by `go run`, so the server under test is built the way the release
+      // builds it — with its version and commit linked in. `go run` leaves
+      // both unset, so the server reports "dev" and "unknown" and cannot
+      // identify itself.
       command:
-        'cd ../.. && go run ./server/cmd/highjack 2>/tmp/highjack-e2e-server.log; tail -f /dev/null',
+        'cd ../.. && ./scripts/build-server.sh && ./bin/highjack-server 2>/tmp/highjack-e2e-server.log; tail -f /dev/null',
       url: 'http://127.0.0.1:8080/health',
       // The game server is the oracle for every assertion in the game suite. A
       // `go run` process left over from an earlier build answers /health happily

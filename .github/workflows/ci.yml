@@ -127,7 +127,15 @@ jobs:
         run: go build -o ./bin/highjack-server ./server/cmd/highjack
 
       - name: Build container image
-        run: docker build -f infra/docker/Dockerfile.server -t highjack-server:ci .
+        # The image carries its own version and commit, so a running container
+        # can be traced to the tree it was built from. The Dockerfile accepted
+        # these as build arguments from the start; nothing ever passed them, so
+        # every image reported "dev" and "unknown" from /version.
+        run: |
+          docker build -f infra/docker/Dockerfile.server \
+            --build-arg VERSION="$(tr -d '[:space:]' < VERSION)" \
+            --build-arg COMMIT="$(git rev-parse --short HEAD)" \
+            -t highjack-server:ci .
 
       - name: Smoke-test container health endpoint
         run: |

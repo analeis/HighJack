@@ -1,4 +1,20 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+
+/**
+ * The release the repository is on, read from the VERSION file.
+ *
+ * The client states its version in the top bar, and it used to state a literal
+ * that was two releases stale. The build now injects the version from VERSION,
+ * so the client's own badge is checked against the same file the release
+ * process reads — the two cannot disagree without this failing.
+ */
+const RELEASE_VERSION = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../VERSION'),
+  'utf8',
+).trim();
 
 /**
  * Game client verification (v0.2 board loop).
@@ -213,6 +229,29 @@ test.describe('game client', () => {
  * it was meant to announce, and turn and ownership encoded in colour and animation.
  * A scan that never reaches a live board cannot see any of it.
  */
+test.describe('release traceability', () => {
+  test('the client states the release the repository is on', async ({ page }) => {
+    await openLobby(page, 'Ace');
+    // The badge reads "board loop · vX.Y.Z" on a wide viewport and "vX.Y.Z" on
+    // a narrow one, so the assertion is on the version itself.
+    await expect(
+      page.locator('header').getByText(new RegExp(`v${RELEASE_VERSION.replace(/[.$]/g, '\$&')}`)),
+    ).toBeVisible();
+  });
+
+  test('the server identifies its own build', async ({ page }) => {
+    // The server's /version endpoint is how a deployed build is traced back to
+    // the tree it came from. It used to report "dev" and "unknown" for every
+    // build, because no build path in the repository ever passed it a version.
+    const res = await page.request.get(`${SERVER}/version`);
+    expect(res.ok()).toBe(true);
+    const body = (await res.json()) as { version: string; commit: string };
+    expect(body.version).toBe(RELEASE_VERSION);
+    expect(body.commit).not.toBe('unknown');
+    expect(body.commit).not.toBe('');
+  });
+});
+
 test.describe('game accessibility', () => {
   test('a live board has no serious axe violations and exposes its state in text', async ({
     page,

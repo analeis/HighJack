@@ -207,6 +207,108 @@ if (existsSync(workflowPath)) {
   }
 }
 
+// ---- release version ---------------------------------------------------------
+
+// The repository's VERSION file is the single source of truth for which
+// release this is. Everything that states a version reads it: the workspace
+// manifests, the game client's build, the server binary's /version endpoint,
+// and the tag the release is cut from.
+//
+// These checks exist because the versions did not agree. Every manifest said
+// 0.1.0, the game client's badge said v0.2.0, the tags were at v0.2.4, and the
+// server binary reported "dev" and "unknown" because no build path ever passed
+// it a version at all. A reader could not tell which release they were looking
+// at, and the /version endpoint could not identify a running build.
+const versionPath = path.join(ROOT, 'VERSION');
+const releaseVersion = existsSync(versionPath) ? readFileSync(versionPath, 'utf8').trim() : '';
+
+if (!/^\d+\.\d+\.\d+$/.test(releaseVersion)) {
+  problems.push(
+    `VERSION must be a bare semver like 0.2.7, found ${releaseVersion ? `"${releaseVersion}"` : '(no VERSION file)'}`,
+  );
+} else {
+  // The manifests.
+  const manifests = [
+    'package.json',
+    'apps/game/package.json',
+    'apps/web/package.json',
+    'packages/protocol/package.json',
+    'packages/ui/package.json',
+  ];
+  for (const rel of manifests) {
+    const abs = path.join(ROOT, rel);
+    if (!existsSync(abs)) continue;
+    try {
+      const declared = JSON.parse(readFileSync(abs, 'utf8')).version as string | undefined;
+      if (declared !== releaseVersion) {
+        problems.push(
+          `${rel} declares version ${declared ?? '(none)'}, but VERSION says ${releaseVersion}`,
+        );
+      }
+    } catch (err) {
+      problems.push(`${rel} is not readable JSON: ${(err as Error).message}`);
+    }
+  }
+
+  // The game client's badge. It used to be a literal, and it was two releases
+  // stale. It now reads __APP_VERSION__, which the build injects from VERSION.
+  const appPath = path.join(ROOT, 'apps/game/src/App.tsx');
+  if (existsSync(appPath)) {
+    const app = readFileSync(appPath, 'utf8');
+    if (!app.includes('__APP_VERSION__')) {
+      problems.push(
+        'apps/game/src/App.tsx does not reference __APP_VERSION__; the client must read its ' +
+          'version from the VERSION file rather than a literal',
+      );
+    }
+  }
+
+  // The tag. A release commit is certified *before* it is tagged, so the
+  // nearest reachable tag is normally the previous release and the two are
+  // expected to differ. What must never happen is the tag being *ahead* of
+  // VERSION, which would mean the version was rolled back below a release
+  // that already exists.
+  try {
+    const tag = execSync('git describe --tags --abbrev=0', {
+      cwd: ROOT,
+      encoding: 'utf8',
+    }).trim();
+    const tagged = tag.replace(/^v/, '');
+    if (/^\d+\.\d+\.\d+$/.test(tagged) && compareSemver(tagged, releaseVersion) > 0) {
+      problems.push(
+        `the nearest tag is ${tag}, which is newer than VERSION (${releaseVersion}): ` +
+          'the release version was rolled back below a tag that already exists',
+      );
+    }
+  } catch {
+    // No tag reachable: this repository has never been released. Nothing to
+    // check.
+  }
+}
+
+/**
+ * Compares two bare semver strings. A pre-release or build suffix sorts before
+ * the plain version, which is the usual semver rule.
+ */
+function compareSemver(a: string, b: string): number {
+  const parse = (v: string): { nums: number[]; pre: string } => {
+    const parts = v.split('-', 2);
+    const core = parts[0] ?? '';
+    const pre = parts[1] ?? '';
+    return { nums: core.split('.').map((n) => Number(n) || 0), pre };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa.nums[i] ?? 0) - (pb.nums[i] ?? 0);
+    if (diff !== 0) return Math.sign(diff);
+  }
+  if (pa.pre === pb.pre) return 0;
+  if (pa.pre === '') return 1;
+  if (pb.pre === '') return -1;
+  return pa.pre < pb.pre ? -1 : 1;
+}
+
 // ---- report -------------------------------------------------------------------
 
 if (problems.length > 0) {

@@ -41,8 +41,8 @@ defects. They are recorded, not refactored:
 | CRT-3 | A chunked request's config was ignored                           | LOW             | **Fixed in v0.2.5**             |
 | TST-1 | Two tests failed at random                                       | HIGH (evidence) | **Fixed in v0.2.5**             |
 | CAP-1 | The registry never evicts; the lobby is unrated                  | HIGH            | **v0.2.6**                      |
-| TRC-1 | No build path produces an identifiable binary                    | MEDIUM          | **v0.2.7**                      |
-| TRC-2 | README, manifests and client UI name the wrong version           | MEDIUM          | **v0.2.7**                      |
+| TRC-1 | No build path produces an identifiable binary                    | MEDIUM          | **Fixed in v0.2.7**             |
+| TRC-2 | README, manifests and client UI name the wrong version           | MEDIUM          | **Fixed in v0.2.7**             |
 | PRO-1 | The TS protocol requires a `seed` the server strips              | MEDIUM          | **v0.2.7**                      |
 | PRO-2 | Parity tests compare vocabulary, not field shapes                | MEDIUM          | **v0.2.7**                      |
 | TOK-1 | The stored seat is never cleared and is not per-match            | MEDIUM          | **v0.2.8**                      |
@@ -163,3 +163,56 @@ here.
 The `config` package had no tests at all — the one place where a typo in an
 environment variable turns into a server that behaves differently from the one
 the operator intended. The capacity knobs are now covered.
+
+## v0.2.7 — traceability (shipped)
+
+A reader of this repository, a reader of the running server, and the person
+holding a deployed container all had different ideas of which release they were
+looking at.
+
+### What was actually wrong
+
+- Every workspace manifest said `0.1.0`.
+- The game client's badge said `v0.2.0` — two releases stale.
+- The tags were at `v0.2.4`.
+- The README described the project as a foundation "not yet the full game".
+- The server binary reported `dev` and `unknown` from `/version`, because
+  `version.Version` and `version.Commit` default to those and **no build path
+  in the repository ever overrode them**. The Dockerfile accepted the metadata
+  as build arguments; nothing ever passed them. The endpoint was well designed
+  and could never identify anything.
+
+### The fix
+
+`VERSION` at the repository root is now the single source of truth, and
+everything that states a version reads it:
+
+| Consumer                     | How it gets the version                                     |
+| ---------------------------- | ----------------------------------------------------------- |
+| The five workspace manifests | `repo sanity` fails if they disagree with `VERSION`         |
+| The game client's badge      | injected at build time by Vite's `define`                   |
+| The server binary            | `-ldflags` in `scripts/build-server.sh`                     |
+| The container image          | `--build-arg VERSION` / `COMMIT`, now actually passed by CI |
+| The release tag              | `git tag -a "v$(cat VERSION)"` — derived, not typed         |
+
+The checks are mechanical, not conventional. `repo sanity` fails when the
+manifests, the client, or the version disagree, and when the nearest reachable
+tag is _ahead_ of `VERSION` — the case that means the version was rolled back
+below a release that already exists. Each was verified by breaking it.
+
+The browser-test server is now built by the repository's own build script rather
+than by `go run`, so the server the tests exercise is the server the release
+ships, version and commit included. `go run` left both unset.
+
+### The client's badge is now visible everywhere
+
+It was `hidden sm:inline`, so a phone player — the audience the mobile work in
+v0.2.4 was for — could not see which build they were on at all. It is now
+visible on every viewport, shortened on narrow ones.
+
+### Regression tests
+
+Two browser-level tests, both of which fail when the fix is reverted:
+
+- the client's badge matches `VERSION`;
+- the server's `/version` reports `VERSION` and a real commit.

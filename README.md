@@ -4,7 +4,19 @@
 
 HighJack combines property/economic gameplay with optional systems: trading, auctions, gambling tables, minigames, treasure cards, and global events; all switchable per-match through a first-class game configuration.
 
-> **Status: v0.1.0- Foundation.** This repository contains the production foundation (architecture, website, design system, backend, protocol, and tooling), not yet the full game. Gameplay systems are being built feature-by-feature on top of this base.
+> **Status: v0.2.7 — playable board loop.** The backend, protocol, and tooling are
+> the production foundation; the board loop is now a real, playable multiplayer
+> game. A match is a configurable ruleset executed by a deterministic
+> authoritative simulation: the server owns every dice roll, balance, and
+> ownership change, and the client may only render and request. See the
+> [changelog](apps/web/src/pages/changelog.astro) for what is in each release,
+> and [docs/audit/V0_2_5_PATCHWORK.md](docs/audit/V0_2_5_PATCHWORK.md) for the
+> current post-review work.
+>
+> The current release version is in [`VERSION`](VERSION). It is the single source
+> of truth: the workspace manifests, the game client's build, the server
+> binary's `/version` endpoint, and the release tag are all checked against it,
+> so they cannot drift apart.
 
 ## What is inside
 
@@ -30,6 +42,10 @@ go test ./...        # run backend tests
 bun run test         # run frontend unit tests
 bun run dev          # run the website
 ```
+
+`bun install` must be run **at the repository root**. The lint and format gates
+read the root's `eslint.config.js` and `prettier` configuration, and they fail
+without it — in a way that points at ESLint rather than at the missing install.
 
 Backend:
 

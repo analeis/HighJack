@@ -466,8 +466,11 @@ function TopBar(): JSX.Element {
         <span class="font-display text-lg font-extrabold tracking-tight text-cream-100">
           High<span class="text-gold-500">Jack</span>
         </span>
-        <span class="hidden rounded-md border border-line-subtle bg-surface-raised px-2 py-0.5 font-mono text-xs text-muted-400 sm:inline">
-          board loop · v0.2.0
+        {/* The release this client is. Visible on every viewport: it is short,
+            and a player who needs to report a problem should not have to reach
+            a wider screen to say which build they are on. */}
+        <span class="rounded-md border border-line-subtle bg-surface-raised px-2 py-0.5 font-mono text-xs text-muted-400">
+          <span class="hidden sm:inline">board loop · </span>v{__APP_VERSION__}
         </span>
         <Show when={view()}>
           {(v) => (

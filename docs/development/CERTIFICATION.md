@@ -83,6 +83,19 @@ how the CI database step came to filter out the very tests it was meant to run.
    - commit SHA
    - gate summary from the report
    - any _optional_ gates skipped and why
+7. Set the release version in `VERSION`, and bring the workspace manifests into
+   line with it. `repo sanity` fails if they disagree, so this step cannot be
+   skipped by accident.
+8. Cut the tag: `git tag -a "v$(cat VERSION)"`. The tag is derived from `VERSION`
+   rather than typed, so the two cannot disagree.
+
+   The order matters. The version is bumped _before_ certification, because
+   certification runs on a commit that is not yet tagged, and `repo sanity`
+   checks the nearest reachable tag is never _ahead_ of `VERSION` — the case
+   that means the version was rolled back below a release that already exists.
+
+9. Verify the release identifies itself: the binary's `/version` endpoint must
+   report the released version and a real commit, not `dev` and `unknown`.
 
 ## Reproducibility rules
 

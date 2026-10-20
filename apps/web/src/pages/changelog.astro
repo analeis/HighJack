@@ -13,6 +13,32 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.7',
+    date: '2026-09-29',
+    title: 'A build that can say what it is',
+    status: 'released',
+    highlights: [
+      {
+        label: 'One version, everywhere, checked',
+        tone: 'gold',
+        items: [
+          "The release version now lives in one file, VERSION, and everything that states a version reads it: the workspace manifests, the game client's build, the server binary, and the release tag",
+          'The server binary is built with its version and commit linked in, so /version reports what is actually running. It used to report "dev" and "unknown" for every build, because no build path in the repository ever passed it a version at all — the container image even accepted the metadata as build arguments that nothing ever supplied',
+          'The game client states its release in the top bar on every screen, not only a wide one. The badge was a literal, and it was two releases stale',
+          'The container image and the browser-test server are both built the way the release builds them, so what the tests exercise is what ships',
+        ],
+      },
+      {
+        label: 'The versions cannot drift apart again',
+        tone: 'teal',
+        items: [
+          'A repository check fails if the manifests, the client, or the release version disagree. It is a check rather than a convention, so the disagreement cannot come back',
+          'The README described the project as a foundation "not yet the full game", four releases and a playable board loop ago',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.6',
     date: '2026-09-28',
     title: 'The lobby can no longer be exhausted',
