@@ -82,7 +82,7 @@ function gitFiles(extraArgs: string): string[] {
 // Scan everything git would carry: tracked files plus untracked-but-not-
 // ignored files, so the gate is effective before an initial commit too.
 const candidates = new Set([...gitFiles('--cached'), ...gitFiles('--others --exclude-standard')]);
-const tracked = [...candidates].sort();
+const tracked = [...candidates].toSorted();
 if (tracked.length === 0) {
   problems.push('could not enumerate repository files for the sanity scan');
 }
@@ -252,13 +252,29 @@ if (!/^\d+\.\d+\.\d+$/.test(releaseVersion)) {
 
   // The game client's badge. It used to be a literal, and it was two releases
   // stale. It now reads __APP_VERSION__, which the build injects from VERSION.
-  const appPath = path.join(ROOT, 'apps/game/src/App.tsx');
-  if (existsSync(appPath)) {
-    const app = readFileSync(appPath, 'utf8');
-    if (!app.includes('__APP_VERSION__')) {
+  //
+  // The whole client source is searched rather than one file: the badge moved
+  // into a component of its own when the client was split up, and a check pinned
+  // to a filename would have failed for the wrong reason.
+  const clientSrc = path.join(ROOT, 'apps/game/src');
+  if (existsSync(clientSrc)) {
+    let usesVersion = false;
+    for (const file of readdirSync(clientSrc, { recursive: true })) {
+      // A `.d.ts` only declares the constant; it does not use it. Counting the
+      // declaration would let the check pass while the badge had gone back to
+      // a literal.
+      if (typeof file !== 'string' || !/\.(ts|tsx)$/.test(file) || file.endsWith('.d.ts')) {
+        continue;
+      }
+      if (readFileSync(path.join(clientSrc, file), 'utf8').includes('__APP_VERSION__')) {
+        usesVersion = true;
+        break;
+      }
+    }
+    if (!usesVersion) {
       problems.push(
-        'apps/game/src/App.tsx does not reference __APP_VERSION__; the client must read its ' +
-          'version from the VERSION file rather than a literal',
+        'the game client does not reference __APP_VERSION__; it must read its version from ' +
+          'the VERSION file rather than a literal',
       );
     }
   }

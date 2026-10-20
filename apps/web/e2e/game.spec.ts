@@ -235,7 +235,7 @@ test.describe('release traceability', () => {
     // The badge reads "board loop · vX.Y.Z" on a wide viewport and "vX.Y.Z" on
     // a narrow one, so the assertion is on the version itself.
     await expect(
-      page.locator('header').getByText(new RegExp(`v${RELEASE_VERSION.replace(/[.$]/g, '\$&')}`)),
+      page.locator('header').getByText(new RegExp(`v${RELEASE_VERSION.replace(/[.$]/g, '$&')}`)),
     ).toBeVisible();
   });
 

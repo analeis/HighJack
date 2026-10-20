@@ -1,12 +1,13 @@
 package persistence
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -44,11 +45,11 @@ func LoadMigrations(dir string) ([]migrationFile, error) {
 		}
 		files = append(files, migrationFile{Version: version, Name: m[2], Path: filepath.Join(dir, e.Name())})
 	}
-	sort.Slice(files, func(i, j int) bool {
-		if files[i].Version != files[j].Version {
-			return files[i].Version < files[j].Version
+	slices.SortFunc(files, func(a, b migrationFile) int {
+		if c := cmp.Compare(a.Version, b.Version); c != 0 {
+			return c
 		}
-		return files[i].Name < files[j].Name
+		return cmp.Compare(a.Name, b.Name)
 	})
 	for i := 1; i < len(files); i++ {
 		if files[i].Version == files[i-1].Version {

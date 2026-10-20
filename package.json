@@ -1,6 +1,6 @@
 {
   "name": "highjack",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "private": true,
   "description": "HighJack- a browser-first multiplayer board/economy game built around a configurable ruleset and deterministic simulation.",
   "license": "MIT",
@@ -22,23 +22,22 @@
     "build:game": "bun run --filter='@highjack/game' build",
     "test": "bash -c 'for d in packages/protocol packages/ui apps/game; do (cd $d && bunx vitest run) || exit 1; done' && go test ./...",
     "test:e2e": "bun run --filter='@highjack/web' test:e2e",
-    "lint": "eslint packages apps --concurrency auto && go vet ./...",
-    "format": "prettier --write .",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "oxlint packages apps scripts && go vet ./...",
+    "format": "oxfmt .",
+    "typecheck": "bun check -p tsconfig.json",
     "validate": "bun scripts/validate.ts",
     "gate": "bun scripts/gate.ts",
     "certify": "bun scripts/certify.ts"
   },
   "devDependencies": {
-    "bun-types": "1.4.2",
-    "eslint": "^10.10.0",
-    "prettier": "^3.9.6",
-    "prettier-plugin-astro": "^1.0.0",
-    "typescript": "^6",
-    "typescript-eslint": "^8.70.0"
+    "@astrojs/compiler-rs": "^0.5.2",
+    "bun-types": "1.4.3",
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.89.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "overrides": {
-    "playwright-core": "1.63.0",
+    "playwright-core": "1.64.1",
     "js-yaml": "^4.3.2",
     "seroval": "^1.6.3"
   }

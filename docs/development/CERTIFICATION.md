@@ -15,8 +15,8 @@ DEVELOPMENT ──▶ VALIDATED ──▶ VERIFIED ──▶ CERTIFIED ──▶
 
 | Category             | Gate                                                                                                         | Mandatory                             | Tool                                  |
 | -------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ------------------------------------- |
-| Formatting           | no formatting diffs                                                                                          | ✔                                     | prettier --check, gofmt -l            |
-| Static analysis      | lint + vet clean                                                                                             | ✔                                     | eslint, go vet                        |
+| Formatting           | no formatting diffs                                                                                          | ✔                                     | oxfmt --check, gofmt -l               |
+| Static analysis      | lint + vet clean                                                                                             | ✔                                     | oxlint, go vet                        |
 | Types                | typecheck clean                                                                                              | ✔                                     | tsc, astro check                      |
 | Unit tests           | all suites green                                                                                             | ✔                                     | vitest, go test                       |
 | Integration          | hermetic HTTP/WS/protocol suites green                                                                       | ✔                                     | go test                               |

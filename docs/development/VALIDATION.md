@@ -15,10 +15,10 @@ Single entry point; exits non-zero on the first failed gate.
 
 ```
 validate
-├── format        prettier --check (TS/TSX/CSS/MD/JSON + .astro via prettier-plugin-astro)
-├── lint          eslint (packages+apps) · go vet ./...
+├── format        oxfmt --check (TS/TSX/CSS/MD/JSON/YAML + .astro)
+├── lint          oxlint (packages+apps+scripts) · go vet ./...
 ├── gofmt         gofmt -l on server/ reports nothing
-├── typecheck     tsc --noEmit (root project) · astro check
+├── typecheck     bun check (root project) · tsc6 (reference) · astro check
 ├── test:go       go test ./...
 ├── test:ts       vitest in packages/protocol, packages/ui, apps/game
 ├── build:web     astro build
@@ -27,6 +27,28 @@ validate
 ├── assets        scripts/check-assets.ts
 └── repo          scripts/repo-sanity.ts
 ```
+
+### The toolchain
+
+| Concern               | Tool        | Why                                                                                                                                                     |
+| --------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Typecheck             | `bun check` | Bun's own typechecker: the same tsconfig, the same errors, and no TypeScript package at all. About 18x faster than the reference compiler here.         |
+| Typecheck (reference) | `tsc6`      | The reference compiler, run alongside. Requiring both to be clean is strictly safer than either alone — a false negative in one is caught by the other. |
+| Lint                  | `oxlint`    | ESLint-compatible rule names, no TypeScript API, and it resolves `.astro` frontmatter.                                                                  |
+| Format                | `oxfmt`     | Prettier-compatible; the config is migrated from the old `.prettierrc.json` with `oxfmt --migrate=prettier`.                                            |
+
+The lint and format tools need no TypeScript API, which is what makes the
+TypeScript 7 story tractable: `typescript-eslint` refuses to load against TS 7,
+and nothing in the pipeline needs it to.
+
+### `.astro` is linted now
+
+It never was. The ESLint configuration matched only `**/*.{ts,tsx,mts}`, so
+every `.astro` file was reported as _"ignored because no matching configuration
+was supplied"_ — the whole website, including the changelog and the game page,
+was formatted but never linted. `oxlint` resolves `.astro` frontmatter and
+connects template usage correctly, so an import used only in a template is not
+reported as unused.
 
 ### Asset gate (`scripts/check-assets.ts`)
 
@@ -75,10 +97,20 @@ but anything release-mandatory stays required.
 
 Decisions recorded here so they are not re-litigated by accident:
 
-- **TypeScript stays on the 6.x line.** typescript-eslint does not support
-  the TS 7 native port (it refuses to load); our lint config needs it, and
-  nothing in the codebase needs TS 7 features. Revisit when
-  typescript-eslint supports a stable TS ≥ 7.1.
+- **TypeScript is the 6.x compatibility package, and only for `astro check`.**
+  TypeScript 7.0 ships no programmatic API until 7.1, and Astro's language
+  server needs one, so `typescript` resolves to `npm:@typescript/typescript6`.
+  It is used for exactly two things: `astro check`, and `tsc6` as the reference
+  typechecker. The lint and format tools need no TypeScript API, and neither
+  does `bun check`.
+
+  The `typescript` package is a compatibility shim, not a compiler we rely on.
+  It can go when `astro check` does, and nothing else would need replacing.
+
+- **Type checking runs twice.** `bun check` is fast and is the gate; `tsc6` is
+  the reference and is also a gate. Both must be clean. A single typechecker is
+  a single point of failure, and the two are independent implementations, so
+  their agreement is the evidence that the fast one is equivalent here.
 - **`bun-types` (oven-sh), not `@types/bun`.** The `@types/bun` name on npm
   resolves to a DefinitelyTyped stub whose `/// <reference types="bun-types" />`
   does not resolve, silently dropping `import.meta.dir` and friends (masked

@@ -40,7 +40,7 @@ export function Dialog(props: DialogProps) {
 
   return (
     <dialog
-      ref={ref}
+      ref={(el) => (ref = el)}
       aria-label={props.title}
       onClick={(e) => {
         // Clicks landing on the dialog element itself are backdrop clicks.

@@ -55,7 +55,7 @@ describe('protocol versioning', () => {
   });
 
   it('exposes a stable set of action, event, and error types', () => {
-    expect([...ACTION_TYPES].sort()).toEqual([
+    expect([...ACTION_TYPES].toSorted()).toEqual([
       'buy_property',
       'decline_buy',
       'end_turn',

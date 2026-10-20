@@ -25,7 +25,13 @@ import {
 const CLIENT_ID = 'game/0.2.0';
 
 export type ConnectionStatus =
-  'idle' | 'connecting' | 'handshaking' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
+  | 'idle'
+  | 'connecting'
+  | 'handshaking'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  | 'error';
 
 export interface NetHandlers {
   onStatus(status: ConnectionStatus, detail?: string): void;
@@ -328,7 +334,10 @@ function readSeats(): StoredSeats {
     const out: StoredSeats = {};
     for (const [matchId, seat] of Object.entries(parsed as Record<string, unknown>)) {
       if (typeof seat !== 'object' || seat === null) continue;
-      const { token, playerId } = seat as { token?: unknown; playerId?: unknown };
+      const { token, playerId } = seat as {
+        token?: unknown;
+        playerId?: unknown;
+      };
       if (
         typeof token !== 'string' ||
         typeof playerId !== 'string' ||

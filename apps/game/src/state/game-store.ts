@@ -338,7 +338,11 @@ function reduceEvent(state: GameView, event: GameEvent): GameView {
         event.playerId,
         idx >= 0 ? idx : (state.players.find((p) => p.id === event.playerId)?.position ?? 0),
       );
-      state.lastRoll = { die1: event.die1, die2: event.die2, byId: event.playerId };
+      state.lastRoll = {
+        die1: event.die1,
+        die2: event.die2,
+        byId: event.playerId,
+      };
       break;
     }
     case 'property_bought': {

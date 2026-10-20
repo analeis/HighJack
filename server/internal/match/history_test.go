@@ -128,14 +128,14 @@ func retainedCounts(m *Match) map[uint64]int {
 // the turn, or grants an extra roll on doubles, and `end_turn` is legal only
 // once the turn is over. Each cycle is therefore the shortest legal path through
 // a turn, which fills the retention window quickly.
-func driveMatch(t *testing.T, f *fixture, iterations int) []ActionResult {
+func driveMatch(t testing.TB, f *fixture, iterations int) []ActionResult {
 	t.Helper()
 	var results []ActionResult
 	seq := int64(3)
 	ctx := context.Background()
 	// A hard ceiling on the number of actions, so a turn flow that does not
 	// advance fails the test instead of running until the harness kills it.
-	const maxActions = 4000
+	const maxActions = 12000
 
 	apply := func(action game.Action) {
 		t.Helper()

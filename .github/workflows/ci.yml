@@ -39,12 +39,16 @@ jobs:
       - name: Format check
         run: bun scripts/gate.ts format
 
-      - name: Lint (TypeScript)
-        run: bun scripts/gate.ts lint:eslint
+      - name: Lint (TypeScript, Astro, scripts)
+        run: bun scripts/gate.ts lint:oxlint
 
       - name: Typecheck
+        # `typecheck:ts` is Bun's own typechecker; `typecheck:reference` is the
+        # reference compiler. Both must be clean, which is stronger than either
+        # alone: a false negative in one is caught by the other.
         run: |
-          bun scripts/gate.ts typecheck:tsc
+          bun scripts/gate.ts typecheck:ts
+          bun scripts/gate.ts typecheck:reference
           bun scripts/gate.ts typecheck:astro
 
       - name: Unit tests

@@ -34,27 +34,34 @@ defects. They are recorded, not refactored:
 
 ## Register
 
-| ID    | Finding                                                          | Severity        | Disposition                     |
-| ----- | ---------------------------------------------------------------- | --------------- | ------------------------------- |
-| CRT-1 | Retention window split a transition                              | HIGH            | **Fixed in v0.2.5**             |
-| CRT-2 | A full registry reported as 500                                  | HIGH            | **Fixed in v0.2.5**             |
-| CRT-3 | A chunked request's config was ignored                           | LOW             | **Fixed in v0.2.5**             |
-| TST-1 | Two tests failed at random                                       | HIGH (evidence) | **Fixed in v0.2.5**             |
-| CAP-1 | The registry never evicts; the lobby is unrated                  | HIGH            | **v0.2.6**                      |
-| TRC-1 | No build path produces an identifiable binary                    | MEDIUM          | **Fixed in v0.2.7**             |
-| TRC-2 | README, manifests and client UI name the wrong version           | MEDIUM          | **Fixed in v0.2.7**             |
-| PRO-1 | The TS protocol requires a `seed` the server strips              | MEDIUM          | **Fixed in v0.2.8**             |
-| PRO-2 | Parity tests compare vocabulary, not field shapes                | MEDIUM          | **Fixed in v0.2.8**             |
-| TOK-1 | The stored seat is never cleared and is not per-match            | MEDIUM          | **Fixed in v0.2.9**             |
-| CER-1 | The ESLint gate needs an unprovisioned root install              | MEDIUM          | **Fixed in v0.2.9**             |
-| CER-2 | `scripts/` is type-checked but never linted                      | LOW             | **Fixed in v0.2.9**             |
-| LOW-1 | `Broadcast`'s `exceptSeq` is unused                              | LOW             | **Fixed in v0.2.9**             |
-| LOW-2 | Dead block in `Bind`                                             | LOW             | **Fixed in v0.2.9**             |
-| LOW-3 | The `config` package has no tests                                | LOW             | **Fixed in v0.2.9**             |
-| LOW-4 | The migration runner ignores a late-added lower version          | LOW             | **Fixed in v0.2.9**             |
-| LOW-5 | The `repository` CI job installs 518 packages to run two scripts | LOW             | **Fixed in v0.2.9**             |
-| RSK-1 | Multi-instance correctness                                       | —               | **Open — deployment decision**  |
-| PRS-3 | The match mutex is held across the commit                        | —               | **Open — concurrency decision** |
+| ID    | Finding                                                              | Severity        | Disposition                     |
+| ----- | -------------------------------------------------------------------- | --------------- | ------------------------------- |
+| CRT-1 | Retention window split a transition                                  | HIGH            | **Fixed in v0.2.5**             |
+| CRT-2 | A full registry reported as 500                                      | HIGH            | **Fixed in v0.2.5**             |
+| CRT-3 | A chunked request's config was ignored                               | LOW             | **Fixed in v0.2.5**             |
+| TST-1 | Two tests failed at random                                           | HIGH (evidence) | **Fixed in v0.2.5**             |
+| CAP-1 | The registry never evicts; the lobby is unrated                      | HIGH            | **Fixed in v0.2.6**             |
+| TRC-1 | No build path produces an identifiable binary                        | MEDIUM          | **Fixed in v0.2.7**             |
+| TRC-2 | README, manifests and client UI name the wrong version               | MEDIUM          | **Fixed in v0.2.7**             |
+| PRO-1 | The TS protocol requires a `seed` the server strips                  | MEDIUM          | **Fixed in v0.2.8**             |
+| PRO-2 | Parity tests compare vocabulary, not field shapes                    | MEDIUM          | **Fixed in v0.2.8**             |
+| TOK-1 | The stored seat is never cleared and is not per-match                | MEDIUM          | **Fixed in v0.2.9**             |
+| CER-1 | The ESLint gate needs an unprovisioned root install                  | MEDIUM          | **Fixed in v0.2.9**             |
+| CER-2 | `scripts/` is type-checked but never linted                          | LOW             | **Fixed in v0.2.9**             |
+| LOW-1 | `Broadcast`'s `exceptSeq` is unused                                  | LOW             | **Fixed in v0.2.9**             |
+| LOW-2 | Dead block in `Bind`                                                 | LOW             | **Fixed in v0.2.9**             |
+| LOW-3 | The `config` package has no tests                                    | LOW             | **Fixed in v0.2.9**             |
+| LOW-4 | The migration runner ignores a late-added lower version              | LOW             | **Fixed in v0.2.9**             |
+| LOW-5 | The `repository` CI job installs 518 packages to run two scripts     | LOW             | **Fixed in v0.2.9**             |
+| MOD-1 | The website was never linted: ESLint skipped every `.astro` file     | HIGH            | **Fixed in v0.2.10**            |
+| MOD-2 | The history trim allocated ~11 KB per accepted action                | MEDIUM          | **Fixed in v0.2.10**            |
+| MOD-3 | The game client was one 926-line file                                | LOW             | **Fixed in v0.2.10**            |
+| MOD-4 | The match runtime was one 1029-line file                             | LOW             | **Fixed in v0.2.10**            |
+| MOD-5 | The Solid `ref` idiom was inconsistent across four sites             | LOW             | **Fixed in v0.2.10**            |
+| MOD-6 | Dev mode relaxed the socket origin check but not the HTTP CORS check | MEDIUM          | **Fixed in v0.2.10**            |
+| MOD-7 | Dead exported surface: `Match.Resume`, `Store.SavePlayer`            | LOW             | **Fixed in v0.2.10**            |
+| RSK-1 | Multi-instance correctness                                           | —               | **Open — deployment decision**  |
+| PRS-3 | The match mutex is held across the commit                            | —               | **Open — concurrency decision** |
 
 ## v0.2.5 — correctness (shipped)
 
@@ -331,3 +338,91 @@ scripts that import nothing but the standard library.
   otherwise.
 - `Broadcast` no longer takes a parameter it never used; `Bind` no longer
   contains a dead block.
+
+## v0.2.10 — dependencies and modernisation (shipped)
+
+A dependency update and a modernisation release. No gameplay change, no
+protocol change, no API change.
+
+### The toolchain
+
+The question this release had to answer was whether ESLint and Prettier were
+carrying their weight. The answer was no, and the evidence was:
+
+|                          | ESLint + Prettier | oxlint + oxfmt             |
+| ------------------------ | ----------------- | -------------------------- |
+| Transitive packages      | 72                | 7                          |
+| `.astro` linting         | never             | correct                    |
+| Needs the TypeScript API | yes               | no                         |
+| Reformat on adopting     | —                 | 2 of 48 files              |
+| Config migration         | —                 | `oxfmt --migrate=prettier` |
+
+**The decisive finding was not a performance number.** The ESLint configuration
+matched only `**/*.{ts,tsx,mts}`, so ESLint reported every `.astro` file as
+_"ignored because no matching configuration was supplied"_. The website — the
+changelog, the game page, every component — was formatted by Prettier and
+**never linted at all**. That is the gap this release closes.
+
+Biome was evaluated and rejected: it handles `.astro` too, but its frontmatter
+support produced twelve false positives on imports used only in a template, and
+its formatter differed from Prettier's on seven files rather than two.
+
+### TypeScript
+
+TypeScript 7.0 ships no programmatic API until 7.1. `typescript-eslint` refuses
+to load against it, and Astro's language server refuses it too — between them
+they broke two of the seventeen gates.
+
+The resolution does not need TypeScript 7 as a package at all:
+
+- `bun check` is Bun's own typechecker. It reads the same tsconfig, reports
+  the same error codes, needs no TypeScript package, and is about eighteen
+  times faster. It was cross-validated against `tsc` on a strict-flag fixture
+  and on the whole repository, and it works with `node_modules` deleted.
+- `typescript` remains, aliased to `npm:@typescript/typescript6`, for exactly
+  two things: `astro check`, which needs an API, and `tsc6` as the reference
+  typechecker.
+- **Both typecheckers must be clean.** A single typechecker is a single point
+  of failure, and the two are independent implementations, so their agreement
+  is the evidence that the fast one is equivalent here.
+
+### The code
+
+- **The history trim no longer allocates.** It copied the whole window into a
+  fresh slice on every accepted action — about eleven kilobytes of garbage per
+  action, on the path every player action takes. Copying the retained events
+  down in place instead makes the trim about fifteen times faster and removes
+  the allocation entirely. The retention window is still exactly 1024 events;
+  only the allocation changed. Measured with a benchmark that is now part of the
+  suite.
+- **`apps/game/src/App.tsx` is now seven focused modules** in
+  `apps/game/src/components/`, matching the convention `apps/web` already
+  used. The server URL and the shared labels moved to modules of their own.
+- **`server/internal/match/match.go` is now three files**: the runtime, the
+  registry, and the rate limiter.
+- **The Solid `ref` idiom is uniform.** Three sites used `ref={x}` while the
+  fourth used `ref={(el) => (x = el)}`. Solid's compiler rewrites the first
+  form into an assignment, so both work — but the linter cannot see it, and the
+  implicit form is a trap for anyone who does not know the transform exists.
+- **The CORS check matches the socket's.** Development mode relaxed the
+  WebSocket origin check but not the HTTP one, so a developer running the game
+  client against a local server without `HIGHJACK_ALLOWED_ORIGINS` got a bare
+  CORS failure from the lobby while the socket connected happily.
+- **Dead surface removed.** `Match.Resume` existed and was covered by the tests
+  while production only ever called `ResumeFor`; the tests now cover the path
+  that runs. `SavePlayer` was on the runtime's `Store` interface and called by
+  nothing.
+
+### A note on what was _not_ changed
+
+The configuration validation is implemented twice — about 830 lines of Go and
+340 of TypeScript — and that is deliberate rather than drift: the website
+validates a configuration in the browser as the player edits it, and the server
+validates it again as the authority. The two are covered by shared fixtures
+that assert the same issue paths and the same issue kinds on both sides, so
+leave it alone.
+
+The Go and TypeScript codebases were already modern — no `interface{}`, no
+classic `for i := 0; i < n; i++` loops, no legacy array patterns — and the
+dependency graph was already minimal. There was nothing to fix there, and
+saying so is more useful than inventing work.

@@ -38,12 +38,11 @@
 
 ## The lint gate, and the root install
 
-`bunx eslint` needs the _root_ dependencies. The lint configuration lives at
-the repository root and imports `typescript-eslint` from there, so a checkout
-with only the per-workspace installs fails. The gate checks for the install
-first and says so, because the failure it replaces is an
-`ERR_MODULE_NOT_FOUND` from deep inside ESLint — a diagnostic that points at
-the wrong thing entirely.
+`bunx oxlint` and `bunx oxfmt` need the _root_ dependencies. `bunx` falls back
+to fetching a package from the registry when it is not installed locally, so a
+missing install would silently lint and format with whatever version the
+registry served that day. The gate checks for the install first and names the
+cause.
 
 `bun install` at the repository root is therefore required before any gate
 that touches the front end will run.
@@ -73,12 +72,11 @@ sanity check confirm it.
 
 ## The lint gate, and the root install
 
-`bunx eslint` needs the _root_ dependencies. The lint configuration lives at
-the repository root and imports `typescript-eslint` from there, so a checkout
-with only the per-workspace installs fails. The gate checks for the install
-first and says so, because the failure it replaces is an
-`ERR_MODULE_NOT_FOUND` from deep inside ESLint — a diagnostic that points at
-the wrong thing entirely.
+`bunx oxlint` and `bunx oxfmt` need the _root_ dependencies. `bunx` falls back
+to fetching a package from the registry when it is not installed locally, so a
+missing install would silently lint and format with whatever version the
+registry served that day. The gate checks for the install first and names the
+cause.
 
 `bun install` at the repository root is therefore required before any gate
 that touches the front end will run.

@@ -6,7 +6,10 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [tailwindcss(), solid()],
   build: {
-    target: 'es2022',
+    // Matches the type-checker's target. The two have to agree: a `target` in
+    // the tsconfig that is newer than the one the bundle is built for would
+    // type-check against APIs the shipped code cannot rely on.
+    target: 'es2023',
   },
   // The client says which release it is, and it reads that from the repository's
   // VERSION file rather than from a literal that has to be remembered. The

@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ],
+    "eqeqeq": "error",
+    "no-console": "off",
+
+    "no-unassigned-vars": "off",
+
+    "unicorn/consistent-function-scoping": "off",
+    "eslint/no-underscore-dangle": "off"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.astro/**",
+    "**/node_modules/**",
+    "verification/**",
+    "**/test-results/**",
+    "**/playwright-report/**"
+  ]
+}

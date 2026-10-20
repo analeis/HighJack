@@ -1,6 +1,6 @@
 {
   "name": "@highjack/protocol",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "HighJack client/server protocol contract: messages, actions, events, errors, versioning.",
   "license": "MIT",
   "type": "module",
@@ -12,6 +12,6 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.5"
   }
 }

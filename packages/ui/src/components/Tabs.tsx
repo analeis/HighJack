@@ -59,7 +59,7 @@ export function Tabs(props: TabsProps & { children?: JSX.Element }) {
 
   return (
     <div
-      ref={listRef}
+      ref={(el) => (listRef = el)}
       role="tablist"
       aria-label={props.label}
       class={`flex gap-1 ${props.class ?? ''}`}

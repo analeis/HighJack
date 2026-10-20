@@ -169,7 +169,21 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 }
 
 // originAllowed reports whether a browser origin may call the API.
+//
+// Development mode permits any origin, and it is the only mode that does. The
+// WebSocket transport already relaxed its origin check the same way, and the two
+// disagreed: a developer running the game client against a local server without
+// `HIGHJACK_ALLOWED_ORIGINS` got a bare CORS failure from the HTTP lobby while
+// the socket connected happily. The refusal is a development-mode convenience
+// at worst, and outside production it is the difference between the lobby
+// working and not.
+//
+// The origin is echoed exactly, never "*", so the response is never usable with
+// credentials attached.
 func (s *Server) originAllowed(origin string) bool {
+	if s.cfg.DevMode() {
+		return true
+	}
 	for _, allowed := range s.cfg.AllowedOrigins {
 		if allowed == origin {
 			return true

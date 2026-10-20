@@ -44,8 +44,19 @@ bun run dev          # run the website
 ```
 
 `bun install` must be run **at the repository root**. The lint and format gates
-read the root's `eslint.config.js` and `prettier` configuration, and they fail
-without it — in a way that points at ESLint rather than at the missing install.
+read the root's `oxlint` and `oxfmt` configuration, and `bunx` would otherwise
+fetch them from the registry — silently linting with whatever version the
+registry served that day. The gates check for the install first and say so.
+
+The toolchain is deliberately small:
+
+| Concern               | Tool                                                              |
+| --------------------- | ----------------------------------------------------------------- |
+| Typecheck             | `bun check` — Bun's own typechecker, no TypeScript package needed |
+| Typecheck (reference) | `tsc6` — the reference compiler; both must be clean               |
+| Lint                  | `oxlint` — including `.astro`, which was never linted before      |
+| Format                | `oxfmt` — Prettier-compatible                                     |
+| Backend               | `go` — `gofmt`, `go vet`, `go test -race`                         |
 
 Backend:
 

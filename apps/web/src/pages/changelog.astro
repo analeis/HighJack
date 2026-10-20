@@ -13,6 +13,42 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.10',
+    date: '2026-10-21',
+    title: 'A leaner toolchain, and a website that is actually linted',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Four tools became two, and one of them is Bun',
+        tone: 'gold',
+        items: [
+          "Type checking now runs through Bun's own checker. It reads the same tsconfig, reports the same errors, needs no TypeScript package at all, and is about eighteen times faster",
+          'The reference typechecker runs alongside it, and both must be clean. That is stronger than either alone: a mistake in one is caught by the other',
+          'ESLint and Prettier are gone, replaced by oxlint and oxfmt — seventy-odd packages down to seven, and neither of them needs a TypeScript API',
+          'The formatter configuration was migrated from the old Prettier config, so the reformat touched two files rather than the whole repository',
+        ],
+      },
+      {
+        label: 'The website is linted for the first time',
+        tone: 'teal',
+        items: [
+          'Every Astro file was silently skipped by the old linter — it reported them as having "no matching configuration". The whole site, changelog and game page included, was formatted but never checked',
+          'The new linter reads Astro frontmatter and understands the template, so an import used only in a template is not mistaken for an unused one',
+        ],
+      },
+      {
+        label: 'And the code itself',
+        tone: 'teal',
+        items: [
+          'The retained event history no longer allocates on every action. Copying the window into a fresh slice cost about eleven kilobytes per action; copying it down in place costs none. The trim is about fifteen times faster and the memory is gone',
+          "The game client's nine hundred-line component file is now seven focused modules, and the match runtime's thousand-line file is now a runtime, a registry and a rate limiter",
+          'The Solid ref idiom is the same everywhere, so the assignment is visible in the source instead of being implied by a compiler transform',
+          "A dead wrapper that the tests covered while production never called it is gone, and the lobby's cross-origin check now matches the socket's",
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.9',
     date: '2026-10-01',
     title: 'A seat that is forgotten, and a pipeline that says what is wrong',

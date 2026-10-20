@@ -311,7 +311,8 @@ export interface ConfigIssue {
 }
 
 export type ValidationResult =
-  { readonly ok: true } | { readonly ok: false; readonly issues: readonly ConfigIssue[] };
+  | { readonly ok: true }
+  | { readonly ok: false; readonly issues: readonly ConfigIssue[] };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -649,6 +650,6 @@ export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   const entries = Object.entries(value as Record<string, unknown>)
     .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
 }

@@ -154,12 +154,6 @@ func (f *fakeStore) CreateMatch(context.Context, game.GameID, *game.GameConfig, 
 	return nil
 }
 
-func (f *fakeStore) SavePlayer(_ context.Context, _ game.GameID, _ game.Player, _ string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.saveErr
-}
-
 func (f *fakeStore) joinCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -250,7 +244,7 @@ type fixture struct {
 	tok2  string
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t testing.TB) *fixture {
 	t.Helper()
 	store := &fakeStore{}
 	reg := NewRegistry(testLogger(), store)
@@ -270,7 +264,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 // playing binds both players and starts the match, so board actions are legal.
-func (f *fixture) playing(t *testing.T) (*recordingSink, *recordingSink) {
+func (f *fixture) playing(t testing.TB) (*recordingSink, *recordingSink) {
 	t.Helper()
 	sink1, sink2 := &recordingSink{}, &recordingSink{}
 	bindReady(t, f, "s1", f.tok1, sink1)
@@ -817,7 +811,7 @@ func ticksAreNonDecreasing(s *recordingSink) bool {
 // bindReady binds a session and completes its handshake, which is what makes it
 // eligible for publications. A bound-but-not-ready session is exactly the state a
 // client is in between its token being accepted and its snapshot being written.
-func bindReady(t *testing.T, f *fixture, session, token string, sink Sink) game.PlayerID {
+func bindReady(t testing.TB, f *fixture, session, token string, sink Sink) game.PlayerID {
 	t.Helper()
 	id, err := f.m.Bind(session, token, "test-client", sink)
 	if err != nil {
@@ -1007,7 +1001,7 @@ func TestResumeReturnsAConsistentSnapshotAndCatchup(t *testing.T) {
 	bindReady(t, f, "s2", f.tok2, &recordingSink{})
 
 	cursor := int64(0)
-	snap, catchup, resync := f.m.Resume(&cursor)
+	snap, catchup, resync := f.m.ResumeFor(&cursor, f.p1)
 	if snap.Tick != f.m.Snapshot().Tick {
 		t.Fatalf("Resume returned tick %d but the match is at %d", snap.Tick, f.m.Snapshot().Tick)
 	}
@@ -1025,7 +1019,7 @@ func TestResumeReturnsAConsistentSnapshotAndCatchup(t *testing.T) {
 		}
 	}
 	// A nil cursor means "give me everything": the snapshot alone, no catch-up.
-	snap2, catchup2, resync2 := f.m.Resume(nil)
+	snap2, catchup2, resync2 := f.m.ResumeFor(nil, f.p1)
 	if snap2.Tick != snap.Tick || len(catchup2) != 0 || resync2 {
 		t.Fatalf("nil cursor = %v/%d/%v, want the snapshot alone", snap2.Tick, len(catchup2), resync2)
 	}
@@ -1037,7 +1031,7 @@ func TestResumeResyncsACursorAheadOfTheServer(t *testing.T) {
 	bindReady(t, f, "s1", f.tok1, &recordingSink{})
 
 	ahead := int64(f.m.Snapshot().Tick) + 500
-	snap, catchup, resync := f.m.Resume(&ahead)
+	snap, catchup, resync := f.m.ResumeFor(&ahead, f.p1)
 	if !resync {
 		t.Fatal("a cursor ahead of the server must trigger a resync")
 	}

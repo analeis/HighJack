@@ -183,7 +183,9 @@ func TestGracefulShutdownCompletes(t *testing.T) {
 // a configured origin is echoed, an unconfigured one is not, and preflight
 // short-circuits without reaching the handler.
 func TestCORSEchoesOnlyAllowedOrigins(t *testing.T) {
+	// Production, so the allow-list is the only thing that admits an origin.
 	cfg := &config.Config{
+		Env:               config.EnvProduction,
 		Addr:              ":0",
 		HeartbeatMs:       1000,
 		ReadHeaderTimeout: time.Second,
@@ -222,6 +224,46 @@ func TestCORSEchoesOnlyAllowedOrigins(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("preflight status = %d, want 204", rec.Code)
+	}
+}
+
+// TestCORSRelaxesInDevelopmentOnly covers the one mode in which an unlisted
+// origin is admitted.
+//
+// The WebSocket transport relaxed its origin check in development and the HTTP
+// lobby did not, so the two disagreed: a developer running the game client
+// against a local server without HIGHJACK_ALLOWED_ORIGINS got a bare CORS
+// failure from the lobby while the socket connected happily. Outside production
+// the allow-list still governs.
+func TestCORSRelaxesInDevelopmentOnly(t *testing.T) {
+	base := func(env config.Env) *config.Config {
+		return &config.Config{
+			Env:               env,
+			Addr:              ":0",
+			HeartbeatMs:       1000,
+			ReadHeaderTimeout: time.Second,
+			ReadTimeout:       time.Second,
+			WriteTimeout:      time.Second,
+			IdleTimeout:       time.Second,
+			ShutdownTimeout:   time.Second,
+			AllowedOrigins:    []string{"http://127.0.0.1:5173"},
+		}
+	}
+
+	origin := func(env config.Env) string {
+		srv := New(base(env), slog.New(slog.DiscardHandler), nil)
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		req.Header.Set("Origin", "http://localhost:9999")
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, req)
+		return rec.Header().Get("Access-Control-Allow-Origin")
+	}
+
+	if got := origin(config.EnvDevelopment); got != "http://localhost:9999" {
+		t.Fatalf("development origin = %q, want it echoed", got)
+	}
+	if got := origin(config.EnvProduction); got != "" {
+		t.Fatalf("production origin = %q, want it refused", got)
 	}
 }
 

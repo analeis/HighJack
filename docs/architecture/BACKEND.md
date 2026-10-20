@@ -18,7 +18,9 @@ server/
     ├── logging/           structured slog setup
     ├── protocol/          Go mirror of @highjack/protocol (wire contract)
     ├── game/              authoritative engine boundary (see GAME_ENGINE.md)
-    ├── match/             live match runtime: registry, dispatch, broadcast
+    ├── match/             live match runtime: dispatch, broadcast, sessions
+    │                      (match.go) · registry and capacity (registry.go)
+    │                      · per-session rate limiter (ratelimiter.go)
     ├── realtime/          WebSocket transport + session/token binding
     ├── persistence/       PostgreSQL pool + SQL migration runner
     └── version/           build metadata (ldflags-injected)
@@ -156,7 +158,15 @@ The lobby and the WebSocket share one explicit allow-list,
 `HIGHJACK_ALLOWED_ORIGINS` (comma-separated `scheme://host`; empty means
 same-origin only). Configured origins are echoed exactly with
 `Vary: Origin`; preflight is answered `204`. The WebSocket handshake
-applies the same list. This replaced the previous wildcard origin, so a
+applies the same list.
+
+Outside production, development mode relaxes both: the WebSocket handshake
+accepts any origin, and the HTTP lobby echoes any origin back. The two used to
+disagree — the socket was relaxed and the lobby was not — so a developer
+running the game client against a local server without
+`HIGHJACK_ALLOWED_ORIGINS` got a bare CORS failure from the lobby while the
+socket connected happily. The origin is still echoed exactly, never `*`, so a
+development response is never usable with credentials attached. This replaced the previous wildcard origin, so a
 browser on an unlisted origin can call neither the lobby nor the socket.
 
 ## Observability
