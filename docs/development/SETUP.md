@@ -67,12 +67,15 @@ curl localhost:8080/ready            # reflects database connectivity
 
 Environment variables (all optional):
 
-| Variable                | Default       | Purpose                                  |
-| ----------------------- | ------------- | ---------------------------------------- |
-| `HIGHJACK_ENV`          | `development` | `development` \| `production` \| `test`  |
-| `HIGHJACK_ADDR`         | `:8080`       | Listen address                           |
-| `HIGHJACK_DATABASE_URL` | _(empty)_     | Postgres DSN; empty disables persistence |
-| `HIGHJACK_LOG_LEVEL`    | `info`        | `debug` \| `info` \| `warn` \| `error`   |
+| Variable                     | Default       | Purpose                                                              |
+| ---------------------------- | ------------- | -------------------------------------------------------------------- |
+| `HIGHJACK_ENV`               | `development` | `development` \| `production` \| `test`                              |
+| `HIGHJACK_ADDR`              | `:8080`       | Listen address                                                       |
+| `HIGHJACK_DATABASE_URL`      | _(empty)_     | Postgres DSN; empty disables persistence                             |
+| `HIGHJACK_LOG_LEVEL`         | `info`        | `debug` \| `info` \| `warn` \| `error`                               |
+| `HIGHJACK_MATCH_IDLE_TTL`    | `1h`          | How long a match with no connected client is kept before eviction    |
+| `HIGHJACK_LOBBY_RATE_LIMIT`  | `60`          | Lobby requests per client address per window; `0` disables the limit |
+| `HIGHJACK_LOBBY_RATE_WINDOW` | `1m`          | The sliding window the lobby rate limit applies over                 |
 
 ## Migrations
 

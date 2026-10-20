@@ -109,8 +109,10 @@ Match ── engine (pure)     Apply(state, actor, action)
   → publish events → ack. Nothing is broadcast that is not durable.
 - **Locking**: the per-match mutex is released before any network write, so
   one slow client cannot stall the match. It _is_ still held across the
-  database commit, which is a known limitation tracked in the audit as
-  PRS-3 and fixed in v0.2.2.
+  database commit. That is a known limitation, tracked as PRS-3 and **not**
+  fixed: it is correct for a single instance and bounded at 5s, and fixing it
+  properly needs per-match single-flight, which is a design change rather than
+  a patch. See `docs/audit/V0_2_5_PATCHWORK.md`.
 - **Broadcast failure** never blocks the game loop: a dead sink is
   dropped, and the client reconnects via snapshot. A repeated action sequence
   is answered with the ack only, never re-published, so a retry cannot
@@ -120,9 +122,29 @@ Match ── engine (pure)     Apply(state, actor, action)
   connectivity, so a server cannot report itself ready against a database it
   cannot write to. v0.2 does not restore live matches across process restarts;
   see [GAME_DESIGN.md](../game/GAME_DESIGN.md).
-- **Bounded resources**: the live-match registry and the per-session rate
-  limiter are both bounded and swept, so an unauthenticated caller cannot grow
-  process memory without limit.
+- **Bounded resources**: the live-match registry is bounded at 512 matches and
+  **swept** — a match with no connected client that has not changed for
+  `HIGHJACK_MATCH_IDLE_TTL` (default 1h) is evicted every minute. A match with
+  a connected client is never evicted, so a slow game is never reclaimed out
+  from under its players. The per-session rate limiter is bounded and swept
+  too.
+
+  Both bounds were added together because either alone was insufficient. The
+  bound alone turned into a denial of service: `POST /matches` is
+  unauthenticated and unrated, so a caller could fill the registry and keep it
+  full, and since nothing was ever removed the refusal was permanent for the
+  life of the process. The sweep alone would have left the registry
+  unbounded in principle. Together, an unauthenticated caller can neither grow
+  process memory without limit nor make the lobby stop working.
+
+- **The lobby is rate-limited per client address**: `POST /matches` and
+  `POST /matches/{id}/players` share a sliding-window budget of
+  `HIGHJACK_LOBBY_RATE_LIMIT` requests per `HIGHJACK_LOBBY_RATE_WINDOW`
+  (default 60 per minute). The WebSocket transport already rate-limited
+  actions; the HTTP surface did not, and it is the only surface that creates
+  durable state without a credential. The key is the remote address, so a
+  deployment behind a proxy sees the proxy's address for every client: the
+  limit is then stricter than intended, never looser.
 - **No persistence is a real state**: `NewRegistry` normalises a nil store to a
   nil interface. A typed nil pointer in an interface is not nil, so the guards
   would pass and the runtime would call a method on a nil receiver — which made
@@ -162,11 +184,11 @@ have is per-match identity:
 - Connection → player binding happens at `hello`; after that the server
   ignores any client-supplied identity entirely.
 
-The one deliberate gap: a token is a bearer credential. There is no rate
-limit on `POST /matches/{id}/players` beyond the global HTTP limits, so
-brute-forcing is impractical (256-bit space) but unbounded. A real auth
-package would own seat creation, which is a clean seam: the lobby API
-already mints every token in one place.
+The one deliberate gap: a token is a bearer credential. Brute-forcing is
+impractical (a 256-bit space) and the lobby is rate-limited per client
+address, but the token itself is not revocable and has no expiry. A real auth
+package would own seat creation, which is a clean seam: the lobby API already
+mints every token in one place.
 
 ## Persistence
 

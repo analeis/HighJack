@@ -13,6 +13,32 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.6',
+    date: '2026-09-28',
+    title: 'The lobby can no longer be exhausted',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Nobody can lock the lobby out',
+        tone: 'gold',
+        items: [
+          'Idle matches are now reclaimed. A match with no connected client that has not changed for an hour is evicted every minute, so the registry shrinks instead of only growing',
+          'A match with a connected client is never evicted, however long it sits. A slow game, a player thinking, and a lobby waiting for a second player are all left alone',
+          'The lobby is rate-limited per client address: 60 requests a minute by default, shared by match creation and seat claims. The WebSocket transport already limited actions; the HTTP surface did not, and it is the only one that creates durable state without a credential',
+          'Both bounds were added together, because either alone was insufficient. The bound alone meant a script could fill the registry and keep it full forever; the sweep alone would have left it unbounded in principle',
+        ],
+      },
+      {
+        label: 'The documentation now says what the code does',
+        tone: 'teal',
+        items: [
+          'The backend notes claimed the registry was "bounded and swept". It was bounded, and never swept. They also claimed the match lock being held across a database commit was fixed in v0.2.2. It was not, and it is still not — it is correct for a single instance, bounded at five seconds, and fixing it properly needs a design change rather than a patch',
+          'The configuration package had no tests at all. It is the one place where a typo in an environment variable turns into a server that behaves differently from the one the operator intended',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.5',
     date: '2026-09-27',
     title: 'Correctness: a split transition, an honest refusal, and a flaky gate',

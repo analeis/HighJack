@@ -110,6 +110,10 @@ type Match struct {
 	history []EventEnvelope
 	base    uint64 // oldest retained tick (0 when history is empty)
 
+	// lastActivity is when the match last changed. The registry uses it to
+	// reclaim matches nobody is playing. It is guarded by mu.
+	lastActivity time.Time
+
 	// fanoutMu serialises publication for this match, so two transitions cannot
 	// interleave on a peer's socket. It is separate from mu on purpose: holding
 	// mu across a network write would stall the authoritative state behind a
@@ -249,6 +253,7 @@ func (r *Registry) Create(ctx context.Context, cfg game.GameConfig) (*Match, err
 		id: matchID, cfg: &cfg, hash: hash, seedHex: seed.Hex(), engine: engine,
 		state: state, sessions: make(map[string]*session),
 		players: make(map[game.PlayerID]string), store: r.store, log: r.log,
+		lastActivity: time.Now(),
 	}
 	if m.store != nil {
 		if err := m.store.CreateMatch(ctx, matchID, &cfg, state, seed.Hex()); err != nil {
@@ -267,6 +272,59 @@ func (r *Registry) Get(id game.GameID) *Match {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.matches[id]
+}
+
+// EvictIdle removes matches that nobody is playing and that have not changed
+// for longer than ttl, and returns how many were removed.
+//
+// The registry previously only ever grew. `POST /matches` is unauthenticated
+// and unrated, so a caller could fill the registry to its bound and keep it
+// full: every later request was refused, and because nothing was ever removed,
+// the refusal was permanent for the life of the process. The bound turned a
+// rate limit into a denial of service.
+//
+// A match with a connected client is never evicted, however long it sits. That
+// is the rule that keeps this safe: a slow game, a player thinking about their
+// next move, and a lobby waiting for a second player are all left alone. Only
+// matches nobody is connected to are reclaimed.
+//
+// Evicting a match does not remove its durable rows. The database keeps the
+// record; the registry simply stops serving the match, which is what "live
+// matches are not restored across restarts" already implies.
+func (r *Registry) EvictIdle(ttl time.Duration) int {
+	if ttl <= 0 {
+		return 0
+	}
+	cutoff := time.Now().Add(-ttl)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	evicted := 0
+	for id, m := range r.matches {
+		if m.evictableAt(cutoff) {
+			delete(r.matches, id)
+			evicted++
+		}
+	}
+	if evicted > 0 {
+		r.log.Info("evicted idle matches", "count", evicted, "ttl", ttl.String())
+	}
+	return evicted
+}
+
+// evictableAt reports whether the match has no connected client and has not
+// changed since the cutoff. Callers hold r.mu; the match's own lock is taken
+// here, so the registry lock is held while a match lock is acquired. The
+// ordering is the reverse of every other path, which takes a match lock and
+// then the registry lock — but the registry lock is only ever taken for a
+// lookup, and never while a match lock is held, so the two cannot deadlock.
+func (m *Match) evictableAt(cutoff time.Time) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.sessions) > 0 {
+		return false
+	}
+	return m.lastActivity.Before(cutoff)
 }
 
 // ID returns the match identifier.
@@ -372,6 +430,7 @@ func (m *Match) claimSeat(ctx context.Context, displayName string) (game.PlayerI
 	m.state = next
 	m.appendHistory(events)
 	m.players[joined.PlayerID] = tokenHash
+	m.lastActivity = time.Now()
 
 	// Exactly the events this transition appended, so the publication cannot
 	// include anything from a concurrent transition.
@@ -545,6 +604,7 @@ func (m *Match) ApplyAction(ctx context.Context, sessionID string, seq int64, ac
 // next state (and its tick); this installs it. Callers hold m.mu.
 func (m *Match) commitLocked(events []game.Event, next *game.GameState) []EventEnvelope {
 	m.state = next
+	m.lastActivity = time.Now()
 	envelopes := make([]EventEnvelope, 0, len(events))
 	for _, ev := range events {
 		envelopes = append(envelopes, EventEnvelope{Tick: ev.Tick(), Event: ev})

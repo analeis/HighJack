@@ -118,6 +118,15 @@ func run() error {
 		log.Error("failed to mark interrupted matches", "error", err.Error())
 	}
 
+	// Reclaim matches nobody is playing.
+	//
+	// The registry only ever grew, and `POST /matches` is unauthenticated, so
+	// filling it to its bound was a permanent denial of service: every later
+	// request was refused and nothing was ever removed. A match with a connected
+	// client is never evicted, so this reclaims only what nobody is using.
+	stopJanitor := startJanitor(registry, cfg.MatchIdleTTL, log)
+	defer stopJanitor()
+
 	server := api.New(cfg, log, readiness)
 	server.MountMatches(registry)
 	realtimeHandler := realtime.NewHandler(log, cfg.HeartbeatMs, registry, cfg.AllowedOrigins, cfg.DevMode())
@@ -152,4 +161,40 @@ func run() error {
 	}
 	log.Info("shutdown complete")
 	return nil
+}
+
+// janitorInterval is how often the registry reclaims idle matches. It is
+// frequent enough that a reclaimed match is not held for long, and rare enough
+// that the scan is not a cost.
+const janitorInterval = time.Minute
+
+// startJanitor runs the idle-match reclaimer until the returned function is
+// called.
+func startJanitor(registry *match.Registry, ttl time.Duration, log *slog.Logger) func() {
+	if ttl <= 0 {
+		// Eviction disabled. The registry then only grows, which is the
+		// behaviour before this existed; the log says so rather than leaving an
+		// operator to assume matches are being reclaimed.
+		log.Warn("idle match eviction is disabled; the registry will only grow")
+		return func() {}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(janitorInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				registry.EvictIdle(ttl)
+			}
+		}
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
 }

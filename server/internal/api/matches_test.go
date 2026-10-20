@@ -88,6 +88,94 @@ func TestCreateMatchSucceedsBelowTheRegistryBound(t *testing.T) {
 	}
 }
 
+// TestLobbyIsRateLimited proves the unauthenticated lobby cannot be used to
+// create matches without bound.
+//
+// The WebSocket transport rate-limits actions; the HTTP lobby did not. It is
+// the only surface that creates a board and a durable row per match, on a path
+// that requires no credential, so a single caller could fill the match
+// registry.
+func TestLobbyIsRateLimited(t *testing.T) {
+	registry := match.NewRegistry(slog.New(slog.DiscardHandler), nil)
+	cfg := &config.Config{
+		Env:               config.EnvTest,
+		Addr:              "127.0.0.1:0",
+		HeartbeatMs:       1000,
+		ReadHeaderTimeout: time.Second,
+		ReadTimeout:       time.Second,
+		WriteTimeout:      time.Second,
+		IdleTimeout:       time.Second,
+		ShutdownTimeout:   time.Second,
+		LobbyRateLimit:    3,
+		LobbyRateWindow:   time.Minute,
+	}
+	srv := New(cfg, slog.New(slog.DiscardHandler), nil)
+	srv.MountMatches(registry)
+
+	for i := 0; i < 3; i++ {
+		rec := postMatch(t, srv)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("request %d: status = %d, want %d", i, rec.Code, http.StatusCreated)
+		}
+	}
+	rec := postMatch(t, srv)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d: the lobby must refuse a caller that has exhausted its budget",
+			rec.Code, http.StatusTooManyRequests)
+	}
+	var body response
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body %q: %v", rec.Body.String(), err)
+	}
+	if body.Status != "rate_limited" {
+		t.Fatalf("status field = %q, want rate_limited", body.Status)
+	}
+	if rec.Header().Get("Retry-After") == "" {
+		t.Fatal("a rate-limited response must tell the client when to retry")
+	}
+}
+
+// TestLobbyRateLimitIsPerClientAddress proves one caller cannot exhaust
+// another's budget.
+func TestLobbyRateLimitIsPerClientAddress(t *testing.T) {
+	registry := match.NewRegistry(slog.New(slog.DiscardHandler), nil)
+	cfg := &config.Config{
+		Env:               config.EnvTest,
+		Addr:              "127.0.0.1:0",
+		HeartbeatMs:       1000,
+		ReadHeaderTimeout: time.Second,
+		ReadTimeout:       time.Second,
+		WriteTimeout:      time.Second,
+		IdleTimeout:       time.Second,
+		ShutdownTimeout:   time.Second,
+		LobbyRateLimit:    2,
+		LobbyRateWindow:   time.Minute,
+	}
+	srv := New(cfg, slog.New(slog.DiscardHandler), nil)
+	srv.MountMatches(registry)
+
+	post := func(addr string) int {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/matches", strings.NewReader("{}"))
+		req.RemoteAddr = addr
+		srv.handler().ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	for i := 0; i < 2; i++ {
+		if code := post("10.0.0.1:1000"); code != http.StatusCreated {
+			t.Fatalf("first client request %d: status = %d", i, code)
+		}
+	}
+	if code := post("10.0.0.1:1000"); code != http.StatusTooManyRequests {
+		t.Fatalf("first client: status = %d, want %d", code, http.StatusTooManyRequests)
+	}
+	if code := post("10.0.0.2:2000"); code != http.StatusCreated {
+		t.Fatalf("second client: status = %d, want %d: one client must not exhaust another's budget",
+			code, http.StatusCreated)
+	}
+}
+
 // TestCreateMatchAppliesACustomConfigSentWithoutAContentLength covers a
 // streaming client.
 //

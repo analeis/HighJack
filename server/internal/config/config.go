@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -42,6 +43,29 @@ type Config struct {
 	// lobby and open a WebSocket. Empty means "same origin only", which is
 	// the right default when the API is served behind one host.
 	AllowedOrigins []string
+
+	// MatchIdleTTL is how long a match with no connected client is kept before
+	// it is evicted.
+	//
+	// The registry holds every live match, and `POST /matches` is unauthenticated
+	// and unrated, so without eviction an unauthenticated caller can fill the
+	// registry and keep it full: the bound turns a rate limit into a permanent
+	// refusal, and the lobby stops working for the life of the process.
+	//
+	// A match with a connected client is never evicted, however long it sits, so
+	// a slow game cannot be reclaimed out from under its players.
+	MatchIdleTTL time.Duration
+
+	// LobbyRateLimit is how many lobby requests one client address may make per
+	// LobbyRateWindow. Zero disables the limit.
+	//
+	// The lobby creates a board and a durable row per match, and a seat and a
+	// transaction per player, on an unauthenticated path. The WebSocket
+	// transport already rate-limits actions; the HTTP surface did not.
+	LobbyRateLimit int
+
+	// LobbyRateWindow is the sliding window the lobby rate limit applies over.
+	LobbyRateWindow time.Duration
 }
 
 // Load resolves configuration from environment variables with sane,
@@ -63,6 +87,9 @@ func Load() (*Config, error) {
 		IdleTimeout:       120 * time.Second,
 		ShutdownTimeout:   10 * time.Second,
 		HeartbeatMs:       30_000,
+		MatchIdleTTL:      time.Hour,
+		LobbyRateLimit:    60,
+		LobbyRateWindow:   time.Minute,
 	}
 	if raw := strings.TrimSpace(os.Getenv("HIGHJACK_ALLOWED_ORIGINS")); raw != "" {
 		for _, origin := range strings.Split(raw, ",") {
@@ -70,6 +97,27 @@ func Load() (*Config, error) {
 				cfg.AllowedOrigins = append(cfg.AllowedOrigins, o)
 			}
 		}
+	}
+	if raw := strings.TrimSpace(os.Getenv("HIGHJACK_MATCH_IDLE_TTL")); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			return nil, fmt.Errorf("config: HIGHJACK_MATCH_IDLE_TTL %q is not a duration: %w", raw, err)
+		}
+		cfg.MatchIdleTTL = d
+	}
+	if raw := strings.TrimSpace(os.Getenv("HIGHJACK_LOBBY_RATE_WINDOW")); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			return nil, fmt.Errorf("config: HIGHJACK_LOBBY_RATE_WINDOW %q is not a duration: %w", raw, err)
+		}
+		cfg.LobbyRateWindow = d
+	}
+	if raw := strings.TrimSpace(os.Getenv("HIGHJACK_LOBBY_RATE_LIMIT")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			return nil, fmt.Errorf("config: HIGHJACK_LOBBY_RATE_LIMIT %q is not an integer: %w", raw, err)
+		}
+		cfg.LobbyRateLimit = n
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -92,6 +140,15 @@ func (c *Config) Validate() error {
 	}
 	if c.HeartbeatMs < 0 {
 		return fmt.Errorf("config: heartbeat must not be negative")
+	}
+	if c.MatchIdleTTL < 0 {
+		return fmt.Errorf("config: match idle TTL must not be negative")
+	}
+	if c.LobbyRateLimit < 0 {
+		return fmt.Errorf("config: lobby rate limit must not be negative")
+	}
+	if c.LobbyRateWindow <= 0 {
+		return fmt.Errorf("config: lobby rate window must be positive")
 	}
 	for _, origin := range c.AllowedOrigins {
 		u, err := url.Parse(origin)

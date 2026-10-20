@@ -35,6 +35,11 @@ type Server struct {
 
 	// readiness reports component health; nil means always ready.
 	readiness func(ctx context.Context) error
+
+	// lobbyLimiter bounds lobby requests per client address. The WebSocket
+	// transport already rate-limits actions; the HTTP lobby did not, and it is
+	// an unauthenticated path that creates a board and a durable row per match.
+	lobbyLimiter *match.RateLimiter
 }
 
 // New builds the API server. readiness may be nil. base is the process
@@ -44,6 +49,9 @@ func New(cfg *config.Config, base *slog.Logger, readiness func(context.Context) 
 		cfg:       cfg,
 		log:       base,
 		readiness: readiness,
+	}
+	if cfg.LobbyRateLimit > 0 {
+		s.lobbyLimiter = match.NewRateLimiter(cfg.LobbyRateLimit, cfg.LobbyRateWindow)
 	}
 	s.router = http.NewServeMux()
 	s.routes()

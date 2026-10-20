@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 
 	"github.com/analeis/highjack/server/internal/game"
@@ -16,11 +17,45 @@ const maxJoinBodyBytes = 4 << 10
 // MountMatches wires the private-match HTTP surface: create a match, join
 // it, and read its authoritative snapshot. Gameplay itself happens only
 // over the WebSocket seam.
+//
+// The two endpoints that create durable state are rate-limited per client
+// address. They are unauthenticated, and without a limit one caller can fill
+// the match registry.
 func (s *Server) MountMatches(registry *match.Registry) {
 	s.registry = registry
-	s.router.HandleFunc("POST /matches", s.handleCreateMatch)
-	s.router.HandleFunc("POST /matches/{matchId}/players", s.handleJoinMatch)
+	s.router.Handle("POST /matches", s.rateLimited(s.handleCreateMatch))
+	s.router.Handle("POST /matches/{matchId}/players", s.rateLimited(s.handleJoinMatch))
 	s.router.HandleFunc("GET /matches/{matchId}", s.handleGetMatch)
+}
+
+// rateLimited refuses a request when the client address has exhausted its
+// budget for the current window.
+//
+// The key is the remote address. A deployment behind a proxy sees the proxy's
+// address for every client, so the limit would then apply to the proxy as a
+// whole — stricter than intended, but never looser, and safe by default.
+func (s *Server) rateLimited(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.lobbyLimiter == nil {
+			next(w, r)
+			return
+		}
+		if !s.lobbyLimiter.Allow(clientKey(r)) {
+			w.Header().Set("Retry-After", "60")
+			writeError(w, http.StatusTooManyRequests, response{Status: "rate_limited"})
+			return
+		}
+		next(w, r)
+	}
+}
+
+// clientKey is the rate-limit key for a request.
+func clientKey(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 type createMatchRequest struct {
