@@ -102,8 +102,12 @@ func (s *GameState) Host() *Player {
 }
 
 // ActivePlayers returns active players sorted by seat order.
+// ActivePlayers returns the players still in the game, ordered by seat.
+//
+// The slice is preallocated: this is called several times per action, and
+// growing it from nil reallocates it log2(n) times on the way.
 func (s *GameState) ActivePlayers() []Player {
-	var out []Player
+	out := make([]Player, 0, len(s.Players))
 	for _, p := range s.Players {
 		if p.Active() {
 			out = append(out, p)
@@ -111,6 +115,20 @@ func (s *GameState) ActivePlayers() []Player {
 	}
 	slices.SortFunc(out, func(a, b Player) int { return cmp.Compare(a.Seat, b.Seat) })
 	return out
+}
+
+// ActivePlayerCount returns how many players are still in the game.
+//
+// Two callers only wanted a count, and paid for the whole list — an allocation
+// and a sort — to get it. Counting needs neither, and this is on the action path.
+func (s *GameState) ActivePlayerCount() int {
+	n := 0
+	for _, p := range s.Players {
+		if p.Active() {
+			n++
+		}
+	}
+	return n
 }
 
 // NextSeat returns the lowest unused seat number.

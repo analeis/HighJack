@@ -37,8 +37,6 @@ func NewEngine(cfg *GameConfig, root Seed, rules Ruleset) (*Engine, error) {
 
 func (e *Engine) Config() *GameConfig { return e.config }
 
-func (e *Engine) RootSeed() Seed { return e.root }
-
 // NewState returns the pristine pre-match state for a match id.
 func (e *Engine) NewState(id GameID) *GameState {
 	return &GameState{

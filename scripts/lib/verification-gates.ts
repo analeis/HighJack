@@ -24,6 +24,3 @@ export const verificationGates: Gate[] = [
     cwd: 'apps/web',
   },
 ];
-
-/** Every gate known to the pipeline, validation and verification together. */
-export const allGates = (validation: Gate[]): Gate[] => [...validation, ...verificationGates];

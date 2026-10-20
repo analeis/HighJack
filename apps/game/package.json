@@ -1,6 +1,6 @@
 {
   "name": "@highjack/game",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "HighJack game client shell: SolidJS application surface over a PixiJS render layer.",
   "license": "MIT",
   "type": "module",

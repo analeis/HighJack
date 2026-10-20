@@ -259,7 +259,7 @@ func (r BoardRuleset) bankrupt(next *GameState, cfg *GameConfig, actor, creditor
 		},
 		&PlayerEliminatedEvent{PlayerID: actor, Cause: cause},
 	)
-	if len(next.ActivePlayers()) == 0 {
+	if next.ActivePlayerCount() == 0 {
 		return out, nil // evaluation records the empty-table end
 	}
 	seat, round := advanceSeat(next, np.Seat)

@@ -169,7 +169,7 @@ func evaluateMatchEnd(next *GameState, cfg *GameConfig) ([]Event, error) {
 		return []Event{&GameEndedEvent{WinnerID: winner, Reason: reason}}, nil
 	}
 
-	if len(next.ActivePlayers()) < 2 {
+	if next.ActivePlayerCount() < 2 {
 		return maybeEndForInsufficientPlayers(next)
 	}
 	active := next.ActivePlayers()

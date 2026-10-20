@@ -108,8 +108,15 @@ type Match struct {
 	history []EventEnvelope
 	base    uint64 // oldest retained tick (0 when history is empty)
 
-	// lastActivity is when the match last changed. The registry uses it to
-	// reclaim matches nobody is playing. It is guarded by mu.
+	// lastActivity is when the match last changed, in the sense the eviction
+	// sweep cares about: when someone last joined, or when the last connected
+	// client left. It is guarded by mu.
+	//
+	// It is deliberately *not* stamped on every action. The sweep consults it
+	// once a minute, and a clock read per action was the single largest cost in
+	// the commit path. Stamping it when the last session disconnects is also
+	// more accurate: it measures how long the table has been unattended, which
+	// is the question the sweep is actually asking.
 	lastActivity time.Time
 
 	// fanoutMu serialises publication for this match, so two transitions cannot
@@ -297,6 +304,17 @@ func (m *Match) Disconnect(sessionID string) {
 	// reach ApplyAction, and (b) retain the sink and the cached snapshot — which
 	// holds every space and player — for the life of the match.
 	delete(m.sessions, sessionID)
+	// The match is now unattended, and the idle clock starts now.
+	//
+	// It used to start at the last *action*, which is wrong in two ways. A
+	// player who connected, sat still for an hour and then disconnected was
+	// evicted on the next sweep, because the clock still read from their last
+	// move — so the one moment they were not there was enough to lose the
+	// table. And the clock was read on every action, when it is consulted once
+	// a minute by the eviction sweep.
+	if len(m.sessions) == 0 {
+		m.lastActivity = time.Now()
+	}
 }
 
 // ---- actions ----------------------------------------------------------------
@@ -391,7 +409,6 @@ func (m *Match) ApplyAction(ctx context.Context, sessionID string, seq int64, ac
 // next state (and its tick); this installs it. Callers hold m.mu.
 func (m *Match) commitLocked(events []game.Event, next *game.GameState) []EventEnvelope {
 	m.state = next
-	m.lastActivity = time.Now()
 	envelopes := make([]EventEnvelope, 0, len(events))
 	for _, ev := range events {
 		envelopes = append(envelopes, EventEnvelope{Tick: ev.Tick(), Event: ev})
@@ -651,7 +668,7 @@ func (m *Match) reconcileCommit(ctx context.Context, prev *game.GameState, cause
 			"match", m.id, "error", cause.Error(), "reconcileError", err.Error())
 		return cause
 	}
-	if uint64(row.Cursor) == nextTickOf(prev)+1 {
+	if uint64(row.Cursor) == prev.Tick+1 {
 		// It committed. Adopt the durable state rather than diverging.
 		m.state = row.State.Clone()
 		m.log.Warn("commit reported an error but was durable; reconciled to the stored state",
@@ -663,8 +680,6 @@ func (m *Match) reconcileCommit(ctx context.Context, prev *game.GameState, cause
 		"match", m.id, "error", cause.Error())
 	return cause
 }
-
-func nextTickOf(s *game.GameState) uint64 { return s.Tick }
 
 // MarkReady releases a session's buffered publications.
 //

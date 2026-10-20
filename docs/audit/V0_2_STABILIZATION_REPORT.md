@@ -31,8 +31,10 @@ itself was wrong.
 | v0.2.8  | `488a5bf` | The protocol contract now matches the wire                                |
 | v0.2.9  | `ae6a829` | A seat that is forgotten, and a pipeline that says what is wrong          |
 
-`v0.1.0` (`8f2fec1`) is untouched. Every release was certified with 17 gates, zero
-skipped, and a report whose `commit` and `tree` both equal `HEAD`.
+`v0.1.0` (`8f2fec1`) is untouched. Every release was certified with every gate
+passing — 17 of them up to v0.2.9, and 18 from v0.2.10, which added the
+reference typechecker — with none skipped, and a report whose `commit` and
+`tree` both equal `HEAD`.
 
 ## What the cycle found
 

@@ -13,6 +13,40 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.12',
+    date: '2026-10-22',
+    title: 'The document now describes the protocol, and the gate cannot hang',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The protocol document caught up with the protocol',
+        tone: 'gold',
+        items: [
+          'The protocol overview described the wire as it was four releases ago: it listed four server frames, omitted the four the server actually sends, and presented the per-event frame as current when the server stopped sending it long ago',
+          'It is now correct, and a repository check holds it to the shared contract — so a frame cannot reach the wire without being documented, and cannot be documented without existing',
+          'The legacy per-event frame is now labelled as the compatibility path it is, rather than as the current one',
+        ],
+      },
+      {
+        label: 'A table you left an hour ago is still there',
+        tone: 'teal',
+        items: [
+          'The idle clock now starts when the last connected client leaves, rather than at their last move. It is more accurate — a table you left five minutes ago should not be reclaimed — and it removes a clock read from every single action',
+          'The list of active players was allocated and sorted eight times per action, twice over for the same state, and two callers wanted only a count',
+        ],
+      },
+      {
+        label: 'The pipeline cannot hang, and says what it did',
+        tone: 'teal',
+        items: [
+          'A gate that hung used to hang the certification, with no diagnosis. It is now killed, and the report names the gate and says what to do about it',
+          'The report distinguishes a gate that could not run from one that never ran because an earlier gate failed, which are very different facts',
+          'Nine unused exports and a component nothing used were removed, and the linter now covers the whole front end in the format GitHub renders best',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.11',
     date: '2026-10-21',
     title: 'Hygiene: the gate that could not run in CI',

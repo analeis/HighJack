@@ -207,6 +207,46 @@ if (existsSync(workflowPath)) {
   }
 }
 
+// ---- the protocol document must describe the protocol ------------------------
+
+// The protocol overview described the v0.1 wire protocol: it listed four
+// server→client frames and omitted the four the server has actually sent
+// since v0.2.0, and it presented the pre-v0.2.2 per-event frame as current.
+// Nothing caught it, because prose is not checked.
+//
+// The frame list is read from the shared TypeScript contract, which the Go
+// parity suite already holds to the Go implementation. The document is then
+// held to the contract, so a frame cannot be added to the wire without being
+// documented, and cannot be documented without existing.
+const protocolDocPath = path.join(ROOT, 'docs/protocol/OVERVIEW.md');
+const messagesPath = path.join(ROOT, 'packages/protocol/src/messages.ts');
+if (existsSync(protocolDocPath) && existsSync(messagesPath)) {
+  const messages = readFileSync(messagesPath, 'utf8');
+  const doc = readFileSync(protocolDocPath, 'utf8');
+
+  // The server→client frame types, from the ServerMessage union.
+  const union = messages.match(/export type ServerMessage =([\s\S]*?);/);
+  const frameTypes = union
+    ? [...(union[1] ?? '').matchAll(/(\w+Message)\b/g)].map((m) => m[1] ?? '')
+    : [];
+  if (frameTypes.length === 0) {
+    problems.push('could not read the ServerMessage union from packages/protocol/src/messages.ts');
+  }
+  for (const name of frameTypes) {
+    const type = name.replace(/Message$/, '').toLowerCase();
+    // A frame counts as described if it appears as a wire example or as a
+    // named frame in prose. The legacy per-event frame is documented in prose
+    // rather than as an example, because the server no longer sends it.
+    const described = doc.includes(`"type": "${type}"`) || doc.includes('`' + type + '`');
+    if (!described) {
+      problems.push(
+        `the protocol document does not describe the "${type}" frame; the shared contract ` +
+          'declares it, so the wire and the document have drifted',
+      );
+    }
+  }
+}
+
 // ---- the toolchain the gates need --------------------------------------------
 
 // The typecheck gate runs `bun check`, which was added in Bun 1.4.3.

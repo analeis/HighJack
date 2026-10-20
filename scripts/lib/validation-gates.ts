@@ -56,10 +56,14 @@ export const validationGates: Gate[] = [
     // linted for the first time. It used to be skipped entirely: the ESLint
     // configuration matched only `**/*.{ts,tsx,mts}`, and ESLint reported every
     // `.astro` file as "ignored because no matching configuration was supplied".
+    // In CI the output is formatted for GitHub, which turns a lint failure
+    // into an annotation on the offending line of the pull request rather than a
+    // wall of text in the job log. Everywhere else the readable default is
+    // better, so the format follows the environment.
     cmd: [
       'bash',
       '-c',
-      'test -d node_modules/oxlint || { echo "oxlint: the root dependencies are not installed."; echo "Run \\`bun install\\` at the repository root."; exit 1; }; bunx oxlint packages apps scripts',
+      'test -d node_modules/oxlint || { echo "oxlint: the root dependencies are not installed."; echo "Run \\`bun install\\` at the repository root."; exit 1; }; bunx oxlint packages apps scripts ${GITHUB_ACTIONS:+--format=github}',
     ],
   },
   { name: 'lint:gofmt', cmd: ['bash', '-c', 'test -z "$(gofmt -l ./server)" && echo gofmt clean'] },
@@ -104,7 +108,7 @@ export const validationGates: Gate[] = [
   { name: 'audit:deps', cmd: ['bun', 'audit'] },
   {
     name: 'audit:govuln',
-    cmd: ['go', 'run', 'golang.org/x/vuln/cmd/govulncheck@v1.8.0', './server/...'],
+    cmd: ['go', 'run', 'golang.org/x/vuln/cmd/govulncheck@v1.9.0', './server/...'],
   },
   { name: 'build:web', cmd: ['bun', 'run', 'build'], cwd: 'apps/web' },
   { name: 'build:game', cmd: ['bun', 'run', 'build'], cwd: 'apps/game' },

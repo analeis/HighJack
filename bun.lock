@@ -14,7 +14,7 @@
     },
     "apps/game": {
       "name": "@highjack/game",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "dependencies": {
         "@fontsource-variable/space-grotesk": "^5.3.0",
         "@highjack/protocol": "workspace:*",
@@ -33,7 +33,7 @@
     },
     "apps/web": {
       "name": "@highjack/web",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "dependencies": {
         "@astrojs/solid-js": "^7.1.0",
         "@fontsource-variable/bricolage-grotesque": "^5.3.0",
@@ -55,14 +55,14 @@
     },
     "packages/protocol": {
       "name": "@highjack/protocol",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "devDependencies": {
         "vitest": "^5.0.5",
       },
     },
     "packages/ui": {
       "name": "@highjack/ui",
-      "version": "0.2.10",
+      "version": "0.2.11",
       "dependencies": {
         "tailwindcss": "^4.3.3",
       },
@@ -713,7 +713,7 @@
 
     "earcut": ["earcut@3.2.4", "", {}, "sha512-FHc6yNpnTORB0tM5kmZ03iD2mDuNakDE2lvf4Hw1XkfxtEHIGVi01B/GqUSwx+NcC1WGjidAfpTXzeALtPtfpg=="],
 
-    "electron-to-chromium": ["electron-to-chromium@1.5.461", "", {}, "sha512-3WZFARz1By+/rYcqQ0OLj4UcEdhd6tz2LEcDtKBUq7ey77EeJ1OtetY/5hjSUxw7dC5r5mA7FfkhRbqO9vnTCg=="],
+    "electron-to-chromium": ["electron-to-chromium@1.5.462", "", {}, "sha512-9qpCBlXPy5v7n1Q7WTO5rW2StI4WNQhl96HpgXRZLPlNoXAD0LbsQUflovQYAO44Yia073ISusqohncvGSMbGA=="],
 
     "emmet": ["emmet@2.4.11", "", { "dependencies": { "@emmetio/abbreviation": "^2.3.3", "@emmetio/css-abbreviation": "^2.1.8" } }, "sha512-23QPJB3moh/U9sT4rQzGgeyyGIrcM+GH5uVYg2C6wZIxAIJq7Ng3QLT79tl8FUwDXhyq9SusfknOrofAKqvgyQ=="],
 

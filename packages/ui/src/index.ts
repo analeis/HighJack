@@ -11,4 +11,3 @@ export { Badge, StatusDot, Money, type BadgeProps } from './components/Badge.tsx
 export { Card, CardHeader, CardTitle, CardBody, type CardProps } from './components/Card.tsx';
 export { Switch, type SwitchProps } from './components/Switch.tsx';
 export { Tabs, TabPanel, type TabsProps, type TabDef } from './components/Tabs.tsx';
-export { Dialog, type DialogProps } from './components/Dialog.tsx';

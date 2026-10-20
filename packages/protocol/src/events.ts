@@ -158,12 +158,6 @@ export type GameEvent =
 
 // ---- runtime guards --------------------------------------------------------
 
-const EVENT_TYPE_SET: ReadonlySet<string> = new Set(EVENT_TYPES);
-
-export function isEventType(value: unknown): value is EventType {
-  return typeof value === 'string' && EVENT_TYPE_SET.has(value);
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

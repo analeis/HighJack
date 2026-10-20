@@ -9,7 +9,6 @@
  * acting player from the authenticated connection, so a client cannot
  * spoof another player.
  */
-import type { Money } from './ids.ts';
 
 export const ACTION_TYPES = [
   'player_join',
@@ -79,12 +78,6 @@ export type GameAction =
 
 // ---- runtime guards --------------------------------------------------------
 
-const ACTION_TYPE_SET: ReadonlySet<string> = new Set(ACTION_TYPES);
-
-export function isActionType(value: unknown): value is ActionType {
-  return typeof value === 'string' && ACTION_TYPE_SET.has(value);
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -147,12 +140,4 @@ export function isGameAction(value: unknown): value is GameAction {
     default:
       return false;
   }
-}
-
-/**
- * Example of an economy-shaped amount field used by future actions.
- * Exported so tests can pin down the integer-money contract today.
- */
-export function isValidWager(value: unknown): value is Money {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }

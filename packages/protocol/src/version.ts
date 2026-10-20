@@ -24,13 +24,3 @@ export const PROTOCOL_MAJOR_VERSION = 1;
 
 /** Revision of message/action/event payload schemas shared via fixtures. */
 export const SCHEMA_VERSION = 1;
-
-export interface VersionInfo {
-  readonly protocolVersion: string;
-  readonly schemaVersion: number;
-}
-
-export const VERSION_INFO: VersionInfo = {
-  protocolVersion: PROTOCOL_VERSION,
-  schemaVersion: SCHEMA_VERSION,
-};

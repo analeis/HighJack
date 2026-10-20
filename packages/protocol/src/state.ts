@@ -7,7 +7,7 @@
  * remains the sole authority over the values.
  */
 import { ACTION_TYPES, type ActionType } from './actions.ts';
-import type { BoardSpace, SpaceKind } from './config.ts';
+import type { BoardSpace } from './config.ts';
 import type { Money, PlayerId, Seat } from './ids.ts';
 
 export type PlayerStatus = 'active' | 'eliminated' | 'disconnected';
@@ -67,8 +67,6 @@ export interface ViewerState {
   /** Action types the engine would accept from this player right now. */
   readonly legalActions: readonly ActionType[];
 }
-
-export type SpaceKindValue = SpaceKind;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

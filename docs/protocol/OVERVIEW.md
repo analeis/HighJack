@@ -61,16 +61,32 @@ One JSON object per WebSocket text frame.
 
 ```jsonc
 // client → server
-{ "v": 1, "type": "hello",  "client": "web/0.1.0" }
+{ "v": 1, "type": "hello",  "client": "web/0.2.10", "matchId": "m_…", "token": "…", "resumeFromTick": 41 }
 { "v": 1, "type": "ping",   "nonce": 42 }
 { "v": 1, "type": "action", "seq": 7, "action": { … } }
 
 // server → client
-{ "v": 1, "type": "welcome", "session": "…", "protocolVersion": "1.0.0", "heartbeatMs": 30000 }
-{ "v": 1, "type": "pong",    "nonce": 42 }
-{ "v": 1, "type": "event",   "tick": 12, "event": { … } }
-{ "v": 1, "type": "error",   "error": { "code": "…", "message": "…" }, "ackSeq": 7 }
+{ "v": 1, "type": "welcome",  "session": "…", "protocolVersion": "1.2.0", "heartbeatMs": 30000 }
+{ "v": 1, "type": "pong",     "nonce": 42 }
+{ "v": 1, "type": "error",    "error": { "code": "…", "message": "…" }, "ackSeq": 7 }
+{ "v": 1, "type": "ack",      "ackSeq": 7, "nextSeq": 8, "tick": 42, "snapshot": { … } }
+{ "v": 1, "type": "snapshot", "snapshot": { … }, "config": { … }, "nextSeq": 8, "resync": false }
+{ "v": 1, "type": "catchup",  "events": [ { "tick": 41, "event": { … } } ], "cursor": 42 }
+{ "v": 1, "type": "transition", "tick": 42, "events": [ { "tick": 42, "event": { … } } ],
+                           "you": { "playerId": "pl_…", "legalActions": [ "roll_dice" ] } }
 ```
+
+**The legacy `event` frame.** Before v0.2.2 the server sent one `event` per
+frame. It now sends a single batched `transition` frame, and the client still
+_tolerates_ a bare `event` — the protocol's major version is still 1, so a
+client and a server from different v0.2.x releases interoperate. The server does
+not emit `event`, and the shared contract keeps it only for that tolerance.
+
+**The `you` block.** `transition` and `ack` carry a per-recipient `you` block
+with the legal actions _for that player_. It is computed by the engine at the
+same instant as the frame, so a client never has to re-derive the rules. A
+transition therefore differs per recipient, which is why it cannot be a single
+shared frame.
 
 Design notes:
 

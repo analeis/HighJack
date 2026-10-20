@@ -50,7 +50,14 @@ function walk(dir: string): void {
     if (!isKebabCase(entry.name)) {
       problems.push(`${rel}: filename must be kebab-case`);
     }
-    const size = statSync(full).size;
+    // A broken symlink makes statSync throw, which would abort the gate with
+    // an opaque stack trace instead of naming the file that is broken.
+    const stat = statSync(full, { throwIfNoEntry: false });
+    if (!stat) {
+      problems.push(`${rel}: cannot be read (a broken symlink?)`);
+      continue;
+    }
+    const size = stat.size;
     if (size > MAX_FILE_BYTES) {
       problems.push(
         `${rel}: ${(size / 1024).toFixed(1)} KB exceeds ${MAX_FILE_BYTES / 1024} KB ceiling (document an exception in assets/PROVENANCE.md or optimize)`,

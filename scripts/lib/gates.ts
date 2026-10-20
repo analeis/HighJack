@@ -6,7 +6,7 @@
  * gates are recorded as skipped when their precondition is unmet.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const ROOT = path.resolve(import.meta.dir, '..', '..');
@@ -28,6 +28,14 @@ export interface Gate {
   skip?: () => boolean;
   /** Defaults to true. Set false only for genuinely environment-gated coverage. */
   mandatory?: boolean;
+  /**
+   * How long this gate may run before it is killed, in milliseconds.
+   *
+   * Defaults to fifteen minutes, which every gate in this repository clears in
+   * well under a minute. A gate that needs longer should say so here rather
+   * than by raising the default for every other gate.
+   */
+  timeoutMs?: number;
 }
 
 export interface GateResult {
@@ -36,17 +44,54 @@ export interface GateResult {
   durationMs: number;
   /** Whether skipping this gate is tolerated. Mirrors Gate.mandatory. */
   mandatory: boolean;
+  /**
+   * Why a gate did not run, when it did not.
+   *
+   * The two are different facts and the report used to blur them: a gate whose
+   * precondition was unmet, and a gate that never ran because an earlier one
+   * failed. Only the first is about the environment.
+   */
+  skipReason?: 'precondition' | 'after-failure';
 }
 
-function runCommand(cmd: string[], cwd: string): Promise<number> {
+/**
+ * How long a gate may run before it is killed.
+ *
+ * A gate that hangs used to hang the whole certification, with no diagnosis and
+ * no way out except killing the terminal. That is the worst failure mode a
+ * pipeline can have: it does not say what went wrong, and it does not stop.
+ *
+ * The budget is generous — every gate in this repository finishes in well under
+ * a minute — so the timeout is a backstop against a hang, not a limit on slow
+ * work.
+ */
+const DEFAULT_GATE_TIMEOUT_MS = 15 * 60 * 1000;
+
+interface CommandOutcome {
+  code: number;
+  timedOut: boolean;
+}
+
+function runCommand(cmd: string[], cwd: string, timeoutMs: number): Promise<CommandOutcome> {
   return new Promise((resolve) => {
     const child = spawn(cmd[0]!, cmd.slice(1), {
       cwd,
       stdio: 'inherit',
       env: { ...process.env },
     });
-    child.on('exit', (code) => resolve(code ?? 1));
-    child.on('error', () => resolve(1));
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      // SIGKILL rather than SIGTERM: a gate that ignores a polite request to
+      // stop is exactly the case this exists for.
+      child.kill('SIGKILL');
+    }, timeoutMs);
+    const finish = (code: number): void => {
+      clearTimeout(timer);
+      resolve({ code, timedOut });
+    };
+    child.on('exit', (code) => finish(code ?? 1));
+    child.on('error', () => finish(1));
   });
 }
 
@@ -64,30 +109,58 @@ export async function runGates(gates: Gate[], label: string): Promise<GateResult
     if (gate.skip?.()) {
       if (mandatory) {
         console.error(`${red('SKIP')} ${gate.name} ${dim('(mandatory gate cannot be skipped)')}\n`);
-        results.push({ name: gate.name, status: 'failed', durationMs: 0, mandatory });
+        results.push({
+          name: gate.name,
+          status: 'failed',
+          durationMs: 0,
+          mandatory,
+          skipReason: 'precondition',
+        });
         for (const remaining of gates.slice(gates.indexOf(gate) + 1)) {
           results.push({
             name: remaining.name,
             status: 'skipped',
             durationMs: 0,
             mandatory: remaining.mandatory ?? true,
+            skipReason: 'after-failure',
           });
         }
         break;
       }
       console.log(`${yellow('SKIP')} ${gate.name} ${dim('(optional, precondition unmet)')}`);
-      results.push({ name: gate.name, status: 'skipped', durationMs: 0, mandatory });
+      results.push({
+        name: gate.name,
+        status: 'skipped',
+        durationMs: 0,
+        mandatory,
+        skipReason: 'precondition',
+      });
       continue;
     }
     const start = performance.now();
     process.stdout.write(`${dim('RUN ')} ${gate.name} ${dim(`· ${gate.cmd.join(' ')}`)}\n`);
-    const code = await runCommand(gate.cmd, gate.cwd ? path.join(ROOT, gate.cwd) : ROOT);
+    const outcome = await runCommand(
+      gate.cmd,
+      gate.cwd ? path.join(ROOT, gate.cwd) : ROOT,
+      gate.timeoutMs ?? DEFAULT_GATE_TIMEOUT_MS,
+    );
     const durationMs = Math.round(performance.now() - start);
-    if (code === 0) {
+    if (outcome.timedOut) {
+      console.error(`${red('TIMEOUT')} ${gate.name} ${dim(`(killed after ${durationMs}ms)`)}\n`);
+      console.error(
+        `  the gate "${gate.name}" did not finish and was killed. If it is genuinely slow, ` +
+          'give it a longer budget in scripts/lib/validation-gates.ts.\n',
+      );
+    }
+    if (outcome.code === 0 && !outcome.timedOut) {
       console.log(`${green('OK  ')} ${gate.name} ${dim(`(${durationMs}ms)`)}\n`);
       results.push({ name: gate.name, status: 'passed', durationMs, mandatory });
     } else {
-      console.error(`${red('FAIL')} ${gate.name} ${dim(`(${durationMs}ms, exit ${code})`)}\n`);
+      if (!outcome.timedOut) {
+        console.error(
+          `${red('FAIL')} ${gate.name} ${dim(`(${durationMs}ms, exit ${outcome.code})`)}\n`,
+        );
+      }
       results.push({ name: gate.name, status: 'failed', durationMs, mandatory });
       // Fail fast: later gates depend on earlier ones being sound.
       for (const remaining of gates.slice(gates.indexOf(gate) + 1)) {
@@ -96,6 +169,7 @@ export async function runGates(gates: Gate[], label: string): Promise<GateResult
           status: 'skipped',
           durationMs: 0,
           mandatory: remaining.mandatory ?? true,
+          skipReason: 'after-failure',
         });
       }
       break;
@@ -138,12 +212,4 @@ export function writeReport(payload: Record<string, unknown>): void {
   const file = path.join(dir, 'report.json');
   writeFileSync(file, JSON.stringify(payload, null, 2) + '\n');
   console.log(dim(`\nreport written to ${path.relative(ROOT, file)}`));
-}
-
-/** True when a playwright browser is already available for this machine. */
-export function hasPlaywrightBrowser(): boolean {
-  return (
-    existsSync(path.join(process.env.HOME ?? '', '.cache', 'ms-playwright')) ||
-    process.env.PLAYWRIGHT_BROWSERS_PATH !== undefined
-  );
 }

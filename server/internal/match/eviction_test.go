@@ -129,3 +129,68 @@ func TestActivityRefreshesTheIdleClock(t *testing.T) {
 		t.Fatalf("evicted %d matches after activity, want 0", got)
 	}
 }
+
+// TestTheIdleClockStartsWhenTheLastClientLeaves is the case the old clock got
+// wrong.
+//
+// The clock used to be stamped on every action. A player who connected, sat
+// still for an hour, and then disconnected had a clock that still read from
+// their last move, so the sweep evicted the table on the very next pass — the
+// one moment they were not there was enough to lose it.
+//
+// The clock now starts when the last connected client leaves, so a table that
+// has just become unattended still gets its full window to be reconnected to.
+func TestTheIdleClockStartsWhenTheLastClientLeaves(t *testing.T) {
+	reg := NewRegistry(testLogger(), nil)
+	m, err := reg.Create(context.Background(), game.DefaultConfig())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	_, token, err := m.Join(context.Background(), "Ace")
+	if err != nil {
+		t.Fatalf("join: %v", err)
+	}
+	if _, err := m.Bind("s1", token, "c1", &recordingSink{}); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+
+	// The client's last move was two hours ago. It has been connected ever
+	// since, and is leaving now.
+	m.mu.Lock()
+	m.lastActivity = time.Now().Add(-2 * time.Hour)
+	m.mu.Unlock()
+	m.Disconnect("s1")
+
+	m.mu.Lock()
+	clock := m.lastActivity
+	m.mu.Unlock()
+	if time.Since(clock) > time.Minute {
+		t.Fatalf("the idle clock was not reset when the last client left: it reads %v old", time.Since(clock))
+	}
+
+	// And the table is not reclaimed straight away.
+	if got := reg.EvictIdle(time.Hour); got != 0 {
+		t.Fatalf("evicted %d matches immediately after the last client left, want 0", got)
+	}
+}
+
+// TestAJoinIsActivity proves a claimed seat keeps the table alive even though
+// nobody has connected to it yet.
+func TestAJoinIsActivity(t *testing.T) {
+	reg := NewRegistry(testLogger(), nil)
+	m, err := reg.Create(context.Background(), game.DefaultConfig())
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	m.mu.Lock()
+	m.lastActivity = time.Now().Add(-2 * time.Hour)
+	m.mu.Unlock()
+
+	if _, _, err := m.Join(context.Background(), "Ace"); err != nil {
+		t.Fatalf("join: %v", err)
+	}
+	if got := reg.EvictIdle(time.Hour); got != 0 {
+		t.Fatalf("evicted %d matches after a join, want 0", got)
+	}
+}

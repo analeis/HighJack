@@ -91,7 +91,6 @@ const all = [...validationResults, ...verificationResults];
 const skipped = all.filter((r) => r.status === 'skipped');
 // A skipped *mandatory* gate is already a failure (runGates records it as
 // one). Only optional, environment-gated gates may be skipped.
-const skippedMandatory = skipped.filter((r) => r.mandatory);
 const ok = printSummary(all);
 
 const validated =
@@ -118,20 +117,35 @@ writeReport({
   dirtyPaths: identity.dirty,
   finishedAt: new Date().toISOString(),
   skippedGates: skipped.map((r) => r.name),
+  // Why each gate did not run. A gate whose precondition was unmet is a fact
+  // about the environment; a gate that never ran because an earlier one failed
+  // is a fact about the pipeline. Conflating them made the report hard to act
+  // on.
+  skippedDetails: skipped.map((r) => ({
+    name: r.name,
+    reason: r.skipReason ?? 'unknown',
+    mandatory: r.mandatory,
+  })),
   gates: all,
 });
 
-if (!ok) process.exit(1);
-
-// A mandatory gate that did not run is a release blocker. `certify` exists to
-// produce a CERTIFIED classification; if a mandatory gate was skipped the
-// classification is at best VALIDATED, and the exit code must say so or a
-// release pipeline gating on it will certify an unverified build.
-if (skippedMandatory.length > 0) {
-  console.error(
-    `\n${skippedMandatory.length} mandatory gate(s) did not run: ${skippedMandatory.map((r) => r.name).join(', ')}`,
-  );
-  console.error(`classification is ${classification}, not CERTIFIED`);
+if (!ok) {
+  // The gates that did not run because an earlier one failed are listed
+  // separately from the ones whose precondition was unmet, so a reader is not
+  // left looking for an environment problem that does not exist.
+  const afterFailure = skipped.filter((r) => r.skipReason === 'after-failure');
+  const unmet = skipped.filter((r) => r.skipReason === 'precondition');
+  if (afterFailure.length > 0) {
+    console.error(
+      `\n${afterFailure.length} gate(s) did not run because an earlier gate failed: ` +
+        afterFailure.map((r) => r.name).join(', '),
+    );
+  }
+  if (unmet.length > 0) {
+    console.error(
+      `\n${unmet.length} gate(s) could not run: ` + unmet.map((r) => r.name).join(', '),
+    );
+  }
   process.exit(1);
 }
 

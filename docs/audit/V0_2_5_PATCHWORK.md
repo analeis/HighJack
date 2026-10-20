@@ -12,7 +12,7 @@ deferred, and why — without reading the diffs.
    has been reproduced, not merely reasoned about.
 2. **Every fix carries a regression test** that fails without it. A test that
    cannot fail is not evidence.
-3. **Every release is certified.** 17 gates, no skipped gates, report naming the
+3. **Every release is certified.** 18 gates, no skipped gates, report naming the
    certified tree.
 4. **No oversized refactors.** The register is worked in small releases, and
    architectural questions are not answered by a patch.
@@ -554,3 +554,107 @@ fails that test with a message that names the cause.
   `package.json` with `grep`. It now points at the `VERSION` file, states the
   one-instance constraint and why, and says plainly that
   `HIGHJACK_ALLOWED_ORIGINS` is not optional in production.
+
+## v0.2.12 — hygiene, trimming, and correctness-first optimisation
+
+A dependency and hygiene release. No gameplay change, no protocol change, no
+API change.
+
+### The protocol document described a protocol the server stopped speaking
+
+`docs/protocol/OVERVIEW.md` documented the server→client frames as `welcome`,
+`pong`, `event`, `error`. The server sends seven: those, plus `ack`,
+`snapshot`, `catchup` and `transition`. It also presented the bare `event` frame
+as current, when the server has sent a batched `transition` since v0.2.2, and
+showed `"protocolVersion": "1.0.0"` where the real value is `1.2.0`.
+
+Nothing caught it, because prose is not checked. It is now: a repository check
+reads the frame list out of the shared TypeScript contract — which the Go
+parity suite already holds to the Go implementation — and holds the document to
+it. A frame cannot reach the wire without being documented.
+
+The legacy `event` frame was _not_ removed. It looks like dead code, but the
+client deliberately tolerates it, the protocol's major version is still 1, and
+the shared fixture tests it. The right fix was to document it accurately.
+
+### The idle clock was wrong, and expensive
+
+The clock the eviction sweep reads was stamped on every action. Two problems.
+
+**It was wrong.** A player who connected, sat still for an hour and then
+disconnected had a clock that still read from their last move, so the sweep
+reclaimed the table on the very next pass. The one moment they were not there
+was enough to lose it. The clock now starts when the _last connected client
+leaves_, which is what the sweep is actually asking — how long has this table
+been unattended.
+
+**It was expensive.** After the v0.2.10 trim fix, a clock read was 100% of the
+remaining cost of the commit path. Removing it from the action path and putting
+it where the clock actually starts took the commit path from 76 ns/op to
+41 ns/op.
+
+### The active-player list was built eight times per action
+
+`GameState.ActivePlayers()` allocated from a nil slice (so it reallocated
+log2(n) times on the way) and then sorted. It is called eight times on the
+action path, twice in a row on the same state, and two callers wanted only a
+_count_ and paid for the whole list to get it. It now preallocates, and there is
+a `ActivePlayerCount()` for the callers that only want a number.
+
+### The ring buffer, measured and deferred
+
+The remaining cost in the trim is a copy of the retained window: 1024 events,
+24 KB, about 204 ns each time it runs, which is roughly once every three
+actions. A ring buffer would make it O(1) amortised and remove it entirely —
+about 3% of the action path.
+
+It was not done, because the trim is the code with the subtlest invariant in
+the package (the tick-boundary rule fixed in v0.2.5), and 3% is not worth
+touching it for. The measurement is recorded here so a future release can pick
+it up with a number rather than a hunch.
+
+### Dead surface
+
+Nine exports that nothing used, and a component:
+
+| Removed                           | Where                                                                                                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isActionType`, `isEventType`     | `packages/protocol` — the aggregate validators switch on the type, so these were never called                                                        |
+| `isMoney`, `isPlayerId`, `GameId` | `packages/protocol`                                                                                                                                  |
+| `isValidWager`                    | `packages/protocol` — a validator for an action type that does not exist, whose comment claimed a test used it                                       |
+| `VERSION_INFO`                    | `packages/protocol` — a redundant aggregate of two constants that are exported                                                                       |
+| `SpaceKindValue`                  | `packages/protocol`                                                                                                                                  |
+| `hasPlaywrightBrowser`            | `scripts/lib/gates.ts`                                                                                                                               |
+| `allGates`                        | `scripts/lib/verification-gates.ts`                                                                                                                  |
+| `Engine.RootSeed()`               | `server/internal/game`                                                                                                                               |
+| `Dialog`                          | `packages/ui` — exported, used by nothing, tested by nothing, and with a latent bug: its cancel handler closed over the first `onClose` it was given |
+
+The per-item guards were kept. `isPlayerJoinAction` and its siblings are used
+by `isGameAction`, and `isErrorCode` by `isErrorMessage`; only the top-level
+guards were redundant.
+
+### The scripts
+
+The certification pipeline was audited for better options, and four changes came
+out of it:
+
+- **A gate can no longer hang the pipeline.** It is killed after a budget and
+  the report names it. A pipeline that hangs forever, with no diagnosis, is the
+  worst failure mode one can have.
+- **The report says _why_ a gate did not run.** "Its precondition was unmet"
+  and "an earlier gate failed" are different facts, and the report used to
+  blur them. A block in `certify.ts` that was supposed to catch the first case
+  was unreachable — the exit above it always fired first.
+- **Lint output follows the environment.** In CI it is formatted for GitHub, so
+  a lint failure is an annotation on the offending line of the pull request
+  rather than a wall of text in the job log.
+- **`govulncheck` moved to v1.9.0.**
+
+The bespoke pipeline was kept rather than replaced. A generic task runner would
+not do what it does: an exact-tree certification, a dirty-tree refusal, a
+mandatory-skip rule, a report that names the certified tree, and a mechanical
+check that CI and the pipeline agree.
+
+### Also
+
+- Two audit documents said "17 gates" when there have been 18 since v0.2.10.
