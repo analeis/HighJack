@@ -40,9 +40,8 @@ export const validationGates: Gate[] = [
     // install would silently format with whatever version the registry served
     // that day. The check names the cause instead.
     cmd: [
-      'bash',
-      '-c',
-      'test -d node_modules/oxfmt || { echo "oxfmt: the root dependencies are not installed."; echo "Run \\`bun install\\` at the repository root."; exit 1; }; bunx oxfmt --check .',
+      'bun',
+      'format',
     ],
   },
   {
