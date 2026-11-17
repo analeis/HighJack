@@ -9,30 +9,30 @@ const groups: { status: SystemStatus; title: string; blurb: string }[] = [
     status: 'modeled',
     title: 'Modeled today',
     blurb:
-      'Present in the configuration model, protocol fixtures, and engine foundations — validated and hashed on both client and server.',
+      'Present in the config schema and protocol, but no gameplay yet. The client can validate and hash a match with these settings on.',
   },
   {
     status: 'in-development',
     title: 'In development',
-    blurb: 'Actively being built right now.',
+    blurb: 'Work has started but the system is not playable yet.',
   },
   {
     status: 'planned',
     title: 'Planned',
-    blurb: 'Designed for in the architecture; implementation scheduled by milestone.',
+    blurb: 'Designed for but not started. Not playable.',
   },
 ];
 ---
 
 <BaseLayout
   title="Features — HighJack"
-  description="The HighJack system catalog: property and economy gameplay, trading, auctions, gambling tables, carnival and sports minigames, treasure cards, random events, and configurable victory conditions."
+  description="The HighJack system catalog, with each system marked playable, modeled, in development or planned."
 >
   <header class="max-w-3xl">
     <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">Systems &amp; features</h1>
     <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
-      HighJack is a chassis for table chaos. Each system below is a rule module you can enable per
-      match — and each badge tells you exactly how real it is today.
+      One system is playable today. The rest are marked with their status, so you can see what
+      exists before you plan a table around it.
     </p>
   </header>
 

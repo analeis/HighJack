@@ -83,7 +83,7 @@ export function ActionDock(props: {
           <p role="status" class="mr-2 text-sm text-gold-400">
             {state().winnerId
               ? `${state().players.find((p) => p.id === state().winnerId)?.name ?? 'Winner'} wins (${state().endReason})`
-              : `match ended — ${state().endReason}`}
+              : `Match ended: ${state().endReason}`}
           </p>
         </Show>
 
@@ -94,13 +94,13 @@ export function ActionDock(props: {
           reload. */}
         <ActionButton
           label={me()?.ready ? 'Not ready' : 'Ready'}
-          hint={me()?.ready ? 'withdraw your readiness' : 'mark yourself ready'}
+          hint={me()?.ready ? 'stop being ready' : 'tell the table you are ready'}
           enabled={allowed('player_ready') && !pending()}
           onClick={() => props.onAct('player_ready', { ready: !(me()?.ready ?? false) })}
         />
         <ActionButton
           label="Start"
-          hint="only the host can start, once everyone is ready"
+          hint="only the host can start, and only when everyone is ready"
           enabled={allowed('game_start') && !pending()}
           onClick={() => props.onAct('game_start')}
         />
@@ -126,14 +126,14 @@ export function ActionDock(props: {
           hint={
             space()?.kind === 'property'
               ? `buy ${space()?.name} for ${space()?.price}`
-              : 'no property to buy'
+              : 'no property available'
           }
           enabled={allowed('buy_property') && !pending()}
           onClick={() => props.onAct('buy_property')}
         />
         <ActionButton
           label="Decline"
-          hint="skip this property (not an auction)"
+          hint="leave this property unowned"
           enabled={allowed('decline_buy') && !pending()}
           onClick={() => props.onAct('decline_buy')}
         />
@@ -174,7 +174,7 @@ function ActionButton(props: {
       type="button"
       disabled={!props.enabled}
       title={props.hint}
-      aria-label={`${props.label} — ${props.hint}`}
+      aria-label={`${props.label}: ${props.hint}`}
       onClick={() => void props.onClick()}
       class={
         props.enabled

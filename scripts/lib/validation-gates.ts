@@ -39,10 +39,7 @@ export const validationGates: Gate[] = [
     // the package from the registry when it is not present locally, so a missing
     // install would silently format with whatever version the registry served
     // that day. The check names the cause instead.
-    cmd: [
-      'bun',
-      'format',
-    ],
+    cmd: ['bun', 'format'],
   },
   {
     name: 'lint:oxlint',

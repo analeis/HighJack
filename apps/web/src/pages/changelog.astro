@@ -13,6 +13,42 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.13',
+    date: '2026-11-17',
+    title: 'Clearer words, current dependencies',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The site says what exists',
+        tone: 'gold',
+        items: [
+          'The homepage no longer opens with wagers, auctions and events that are not built. It now leads with the game you can play: dice, property, rent, tax and bankruptcy',
+          'The three "bets" became three facts about how the game works. The game page dropped its tour of trade desks and chip physics, and the rules page no longer promises a rulebook "coming with v0.2"',
+          'The about page keeps the story and drops the purple prose. Every system tagline now says what the system does, and its status badge says whether you can play it',
+          'Inline links are underlined as well as coloured, so they do not depend on colour alone',
+        ],
+      },
+      {
+        label: 'The game screen reads plainly too',
+        tone: 'teal',
+        items: [
+          'The lobby tells you what to do instead of describing the server. Button hints say what happens, with no parentheticals about systems that do not exist',
+          'The dock uses consistent wording for readiness and match end, and labels its buttons with a colon instead of a dash',
+        ],
+      },
+      {
+        label: 'Dependencies and pipeline',
+        tone: 'teal',
+        items: [
+          'Every dependency with a compatible update was bumped, across the root and all four workspaces, plus pgx, x/sync and x/text on the Go side',
+          'Solid 2.0 was investigated and skipped. Both vite-plugin-solid and the Astro Solid integration still require 1.x, so upgrading the framework alone would break the build',
+          'CI installs with a frozen lockfile again, so a tag resolves the same packages every time',
+          'A stale lockfile briefly broke the Astro checker. A clean resolution fixed it, and the setup notes now say why',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.12',
     date: '2026-10-22',
     title: 'The document now describes the protocol, and the gate cannot hang',

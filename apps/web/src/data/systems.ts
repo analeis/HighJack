@@ -27,77 +27,72 @@ export const SYSTEMS: readonly GameSystem[] = [
     name: 'Property & Economy',
     tagline: 'Buy, hold, collect rent',
     description:
-      'The playable economic backbone: buy properties, pay rent to the owner, pay tax to the bank. No debt — miss a payment and your holdings revert to the bank. Development levels are reserved for a later release.',
+      'Buy properties, pay rent to the owner and tax to the bank. If you cannot pay, your holdings go back to the bank. This is the playable part of the game today.',
     status: 'playable',
     configurable: false,
   },
   {
     id: 'trading',
     name: 'Trading & Negotiation',
-    tagline: 'Every deal is personal',
-    description:
-      'Player-to-player trades with offers, counteroffers, and escrowed swaps. Negotiation is where tables are won — or flipped.',
+    tagline: 'Trade with other players',
+    description: 'Swap property and chips with other players. Designed but not playable.',
     status: 'planned',
     configurable: true,
   },
   {
     id: 'auctions',
     name: 'Auctions',
-    tagline: 'Going once, going twice',
-    description:
-      'Contested assets go under the hammer. Open or sealed-bid formats, configurable reserve rules.',
+    tagline: 'Bid for contested property',
+    description: 'Bid on contested property. Designed but not playable.',
     status: 'planned',
     configurable: true,
   },
   {
     id: 'gambling',
     name: 'Gambling Tables',
-    tagline: 'Stakes on stakes',
+    tagline: 'Wager with play chips',
     description:
-      'Optional wager-based subsystems: poker nights, blackjack pits, and a casino floor of quick-play luck games. Play-money only — always.',
+      'Wager play chips on poker and blackjack. Modelled in the config and protocol; no gameplay yet.',
     status: 'modeled',
     configurable: true,
   },
   {
     id: 'carnival',
     name: 'Carnival',
-    tagline: 'Skill-ish sideshows',
-    description:
-      'Skeeball physics, ring tosses, and prize booths. Light, loud, and completely optional.',
+    tagline: 'Short skill games',
+    description: 'Short skill games between turns. Designed but not playable.',
     status: 'planned',
     configurable: true,
   },
   {
     id: 'sports',
     name: 'Sports',
-    tagline: 'Halftime at the table',
-    description:
-      'Quick competitive minigames between turns — penalties, shootouts, sprints. Losers pay up.',
+    tagline: 'Games between turns',
+    description: 'Short competitive games between turns. Designed but not playable.',
     status: 'planned',
     configurable: true,
   },
   {
     id: 'cards',
     name: 'Treasure Cards',
-    tagline: 'Fate, dealt',
+    tagline: 'Draw cards that change the game',
     description:
-      'Draw decks with fortune and misfortune effects. Seeded shuffles keep every draw reproducible.',
+      'Draw cards that help or hurt you. Shuffles are seeded, so every draw can be reproduced. Modelled in config only.',
     status: 'modeled',
     configurable: true,
   },
   {
     id: 'events',
     name: 'Random & Global Events',
-    tagline: 'The table turns',
-    description:
-      'Scheduled chaos: market crashes, jackpot rain, rule twists that hit everyone at once. Interval configurable per match.',
+    tagline: 'Events that affect everyone',
+    description: 'Events that affect every player at set intervals. Modelled in config only.',
     status: 'modeled',
     configurable: true,
   },
   {
     id: 'victory',
     name: 'Victory Conditions',
-    tagline: 'Decide how it ends',
+    tagline: 'Choose how the match ends',
     description:
       'Last player standing, first to target wealth, or best net worth when the round limit hits. Evaluated by the server after every move. Chosen per match.',
     status: 'playable',

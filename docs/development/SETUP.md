@@ -32,6 +32,10 @@ bun install          # installs all workspace dependencies
 go mod download      # backend module cache
 ```
 
+If `astro check` fails with an `emnapi` native-module error after a dependency
+change, the lockfile is stale rather than the versions wrong. Remove `bun.lock`
+and `node_modules`, then `bun install` again to resolve from scratch.
+
 Verify your toolchain:
 
 ```sh

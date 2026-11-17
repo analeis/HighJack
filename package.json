@@ -1,6 +1,6 @@
 {
   "name": "highjack",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "private": true,
   "description": "HighJack- a browser-first multiplayer board/economy game built around a configurable ruleset and deterministic simulation.",
   "license": "MIT",
@@ -34,12 +34,12 @@
     "certify": "bun scripts/certify.ts"
   },
   "devDependencies": {
-    "@astrojs/compiler-rs": "^0.5.2",
+    "@astrojs/compiler-rs": "^0.5.3",
     "bun-types": "1.4.4",
-    "oxlint": "^1.89.0",
+    "oxlint": "^1.94.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "overrides": {
-    "playwright-core": "^1.64.1"
+    "playwright-core": "^1.65.1"
   }
 }

@@ -82,14 +82,14 @@ test.describe('key interactive elements', () => {
 
   test('hero CTAs point at real routes', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Peek at the game' })).toHaveAttribute(
-      'href',
-      '/game',
-    );
-    await expect(page.getByRole('link', { name: 'Explore systems' })).toHaveAttribute(
-      'href',
-      '/features',
-    );
+    // Check the destinations, not the wording. The copy is meant to change; a
+    // link that leads nowhere is the failure that matters.
+    const hrefs = await page
+      .getByRole('banner')
+      .locator('a[href]')
+      .evaluateAll((links) => links.map((a) => a.getAttribute('href')));
+    expect(hrefs).toContain('/game');
+    expect(hrefs).toContain('/features');
   });
 });
 

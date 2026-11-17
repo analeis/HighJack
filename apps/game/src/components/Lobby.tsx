@@ -22,8 +22,8 @@ export function Lobby(props: {
           Open a private table
         </h1>
         <p class="mt-2 mb-4 text-sm leading-relaxed text-muted-400">
-          The server creates the match, validates the board, and owns every dice roll. Share the
-          match id with a second player to play together.
+          Create a table and share its id with anyone you want to play with. The server handles the
+          dice, the money and the rules.
         </p>
         <label class="mb-1 block text-sm font-bold text-cream-300" for="display-name">
           Display name
@@ -36,7 +36,7 @@ export function Lobby(props: {
           onInput={(e) => props.setName(e.currentTarget.value)}
         />
         <Button onClick={props.onEnter} disabled={props.busy} class="w-full">
-          {props.busy ? 'Creating match…' : 'Create a table'}
+          {props.busy ? 'Creating table…' : 'Create a table'}
         </Button>
 
         <div class="my-4 flex items-center gap-3 text-xs uppercase tracking-widest text-muted-500">
@@ -45,9 +45,7 @@ export function Lobby(props: {
           <span class="h-px flex-1 bg-line-subtle" />
         </div>
 
-        {/* Joining an existing table. The client could create a match but had no
-            way to join one, so the advertised second player had to be simulated
-            outside the product. */}
+        {/* Join a table someone else created, using the id they shared. */}
         <label class="mb-1 block text-xs uppercase tracking-widest text-muted-400" for="join-match">
           Match id
         </label>

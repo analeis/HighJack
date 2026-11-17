@@ -658,3 +658,70 @@ check that CI and the pipeline agree.
 ### Also
 
 - Two audit documents said "17 gates" when there have been 18 since v0.2.10.
+
+## v0.2.13 — clear copy, current dependencies
+
+A dependency and presentation release. No gameplay change, no protocol change,
+no API change.
+
+### The UI said things that were not true
+
+The marketing pages described a complete product: side wagers, auction wars,
+treasure cards, casino tables, chip physics and "trade desks". None of those are
+playable. At the bottom of the same pages, a status strip admitted that only the
+board loop exists. Both could not be true, and the confident version was the one
+a new player read first.
+
+The site now leads with what is playable. The hero names the actual game loop.
+The status section sits directly beneath it. "Built on three bets" became three
+facts about how the game works, because "Fortune favors the bold" is not an
+explanation of software. The game page dropped its tour of fictional surfaces.
+The rules page no longer promises a full rulebook "coming with v0.2", four
+releases into v0.2.
+
+The about page keeps its story and loses the purple prose. System taglines now
+say what a system does, and the existing status badges say whether it exists.
+
+This matters beyond tone. A player who arrives expecting auctions and finds a
+board game has been misled, and the next thing they do is leave.
+
+### The game screen
+
+The lobby tells the player what to do rather than describing the server.
+Button hints say what happens, without parentheticals about systems that do not
+exist. Wording is consistent: "Create a table" and "Creating table", "Ready"
+and "stop being ready". Button labels use a colon instead of a dash.
+
+### Accessibility caught a mistake in the rewrite
+
+The first draft used inline links coloured gold against grey text, with no
+underline. Axe failed them with `link-in-text-block` at a 1.28 contrast ratio.
+The links are now underlined, so they are distinguishable without colour. The
+test suite caught the regression before the release, which is the point of the
+test suite.
+
+### A test was rewritten to stop pinning wording
+
+The "hero CTAs point at real routes" test asserted the exact link text. It had
+to be changed every time the copy changed, which meant it was really testing
+the copy. It now checks that the hero links resolve to real routes. That is the
+property worth keeping.
+
+### Dependencies
+
+Every dependency with a compatible update was bumped across the root and all
+four workspaces, plus pgx 5.13, x/sync 0.25 and x/text 0.44 on the Go side.
+
+**Solid 2.0 was investigated and skipped.** The latest `vite-plugin-solid`
+still declares `solid-js: ^1.7.2`, and `@astrojs/solid-js` declares `^1.9.13`.
+There is no coordinated upgrade available, so the framework stays on 1.9.19.
+
+A stale lockfile briefly made `astro check` fail with an emnapi native-module
+error. The versions were fine; repeated installs had left conflicting entries
+in `bun.lock`. Deleting the lockfile and `node_modules` and resolving afresh
+fixed it. `SETUP.md` now says so.
+
+### Pipeline
+
+CI installs with `--frozen-lockfile` again. A tag should resolve the same
+packages on every runner and every day; without the flag it does not.

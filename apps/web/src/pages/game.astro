@@ -4,46 +4,39 @@ import { Badge } from '@highjack/ui';
 ---
 
 <BaseLayout
-  title="The Game — HighJack"
-  description="How a HighJack match is composed: the application surface, the rendered table, and the authoritative deterministic simulation underneath."
+  title="The game — HighJack"
+  description="What HighJack can play today: a private match with dice, property, rent, tax and bankruptcy, decided by an authoritative server."
 >
   <header class="max-w-3xl">
-    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">The game</h1>
+    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">What you can play</h1>
     <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
-      A HighJack match is one thing at every level: a configurable ruleset, executed by an
-      authoritative simulation. Here's how that becomes something you can see and touch.
+      The current release is the core board loop. Create a private match, share its id, and take
+      turns rolling, buying and paying rent. The server decides every outcome.
     </p>
   </header>
 
-  <!-- Anatomy -->
-  <section class="mt-12" aria-labelledby="anatomy-title">
-    <h2 id="anatomy-title" class="m-0 font-display text-2xl font-extrabold">
-      Anatomy of the client
-    </h2>
-    <div class="mt-6 grid gap-4 md:grid-cols-2">
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
-        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">
-          Application layer
-        </p>
-        <h3 class="mb-2 mt-2 font-display text-xl font-bold">Menus · panels · negotiation</h3>
+  <section class="mt-12" aria-labelledby="turn-title">
+    <h2 id="turn-title" class="m-0 font-display text-2xl font-extrabold">How a turn works</h2>
+    <ol class="mt-6 grid gap-3 md:grid-cols-2">
+      <li class="rounded-lg border border-line-subtle bg-surface-raised p-5">
+        <span class="font-mono text-xs text-gold-500">01</span>
+        <h3 class="mb-1 mt-2 font-display text-lg font-bold text-cream-100">You act</h3>
         <p class="m-0 text-sm leading-relaxed text-muted-400">
-          Lobbies, trade desks, auction rooms, casino tables, event tickers, and settings live in a
-          crisp SolidJS interface. Fast, accessible, keyboard-friendly — everything you read and
-          click.
+          Roll the dice, then choose to buy or decline the property you land on. End the turn when
+          you are done.
         </p>
-      </article>
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
-        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Render layer</p>
-        <h3 class="mb-2 mt-2 font-display text-xl font-bold">The board, alive</h3>
+      </li>
+      <li class="rounded-lg border border-line-subtle bg-surface-raised p-5">
+        <span class="font-mono text-xs text-gold-500">02</span>
+        <h3 class="mb-1 mt-2 font-display text-lg font-bold text-cream-100">The server decides</h3>
         <p class="m-0 text-sm leading-relaxed text-muted-400">
-          The board itself is a GPU-rendered PixiJS stage: tactile pieces, dealt cards, chip
-          physics, event effects. The two layers stay cleanly separated — UI never fights pixels.
+          It applies your action, charges rent, awards bonuses and advances the turn. Your browser
+          receives the result and draws it.
         </p>
-      </article>
-    </div>
+      </li>
+    </ol>
   </section>
 
-  <!-- Authority diagram -->
   <section class="mt-12" aria-labelledby="authority-title">
     <h2 id="authority-title" class="m-0 font-display text-2xl font-extrabold">
       Who decides what happens
@@ -53,76 +46,41 @@ import { Badge } from '@highjack/ui';
       tabindex={0}
       aria-label="Action flow diagram, scrollable"
     >
-      <pre class="m-0 min-w-[28rem] font-mono text-xs leading-relaxed text-muted-400 sm:text-sm"><code>Your move
-   ↓
-Action (validated against current state)
-   ↓
-Authoritative engine — one deterministic transition
-   ↓
-Events (what changed)
-   ↓
-New state → everyone sees the same truth</code></pre>
+      <pre class="m-0 min-w-[28rem] font-mono text-xs leading-relaxed text-muted-400 sm:text-sm"><code>Your choice
+    ↓
+Action sent to the server
+    ↓
+Engine applies one transition
+    ↓
+Events describe what changed
+    ↓
+Every player sees the same state</code></pre>
     </div>
     <p class="mt-4 max-w-3xl text-sm leading-relaxed text-muted-400">
-      Clients never decide outcomes; they propose actions. The server's engine validates and applies
-      each one atomically, then broadcasts the events. Deterministic seeds mean any match can be
-      replayed move-for-move — great for debugging, better for trust.
+      The browser only requests and renders. Rolls come from a seeded stream, so the same seed and
+      the same actions reproduce the same match.
     </p>
   </section>
 
-  <!-- Honest status + shell pointer -->
   <section
-    class="mt-12 rounded-lg border border-gold-700/40 bg-gold-700/10 p-6"
+    class="mt-12 rounded-lg border border-line-subtle bg-surface-raised p-6"
     aria-label="Development status"
   >
-    <h2 class="m-0 flex flex-wrap items-center gap-3 font-display text-lg font-bold text-gold-400">
+    <h2 class="m-0 flex flex-wrap items-center gap-3 font-display text-lg font-bold text-cream-100">
       Current status
       <Badge tone="gold">Playable</Badge>
     </h2>
-    <p class="mt-2 mb-0 text-sm leading-relaxed text-cream-300">
-      What exists today: the full board loop — create a private match, share the id, and two to
-      twelve players roll, buy, decline, and pay rent against a server-authoritative engine. The
-      client is a SolidJS app over a GPU-rendered PixiJS stage; it renders authoritative snapshots
-      and never computes the outcome itself. Run it locally with:
+    <p class="mt-2 mb-0 text-sm leading-relaxed text-muted-400">
+      Two to eight players can join one private match. The board loop covers dice, movement,
+      buying, rent, tax, bankruptcy and victory. The client is a Solid app over a canvas board; it
+      renders server state and does not compute outcomes. Run it locally with:
       <code class="ml-1 rounded bg-felt-950 px-2 py-1 font-mono text-xs text-gold-400">
         bun run dev:game
       </code>
     </p>
-  </section>
-
-  <!-- Roadmap teaser -->
-  <section class="mt-12" aria-labelledby="roadmap-title">
-    <h2 id="roadmap-title" class="m-0 font-display text-2xl font-extrabold">
-      The road ahead
-    </h2>
-    <ol class="mt-6 list-none space-y-3 p-0">
-      <li class="flex items-start gap-4 rounded-lg border border-line-subtle bg-surface-raised p-4">
-        <span class="hj-numerals shrink-0 rounded-md bg-teal-600/20 px-2 py-1 text-xs font-bold text-teal-400">
-          v0.1
-        </span>
-        <span class="text-sm text-muted-400">
-          <strong class="text-cream-100">Foundation</strong> — architecture, protocol, design
-          system, website, backend. Shipped.
-        </span>
-      </li>
-      <li class="flex items-start gap-4 rounded-lg border border-line-subtle bg-surface-raised p-4">
-        <span class="hj-numerals shrink-0 rounded-md bg-gold-700/25 px-2 py-1 text-xs font-bold text-gold-400">
-          v0.2
-        </span>
-        <span class="text-sm text-muted-400">
-          <strong class="text-cream-100">First table</strong> — core board loop: movement, property,
-          rent, bankruptcy. Shipped.
-        </span>
-      </li>
-      <li class="flex items-start gap-4 rounded-lg border border-line-subtle bg-surface-raised p-4">
-        <span class="hj-numerals shrink-0 rounded-md bg-felt-700 px-2 py-1 text-xs font-bold text-muted-400">
-          v0.3+
-        </span>
-        <span class="text-sm text-muted-400">
-          <strong class="text-cream-100">The chaos catalog</strong> — trading, auctions, gambling
-          tables, carnival, sports, global events.
-        </span>
-      </li>
-    </ol>
+    <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+      Trading, auctions and the other systems are not playable yet. Their status is listed on the
+      <a class="text-gold-400 underline underline-offset-2 hover:text-gold-500" href="/features">features page</a>.
+    </p>
   </section>
 </BaseLayout>

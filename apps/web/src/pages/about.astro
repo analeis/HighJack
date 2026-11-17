@@ -4,66 +4,57 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 <BaseLayout
   title="About — HighJack"
-  description="Why HighJack exists: a configurable, deterministic, multiplayer board/economy game built in the open."
+  description="Why HighJack exists: a configurable, deterministic, multiplayer board game built in the open."
 >
   <header class="max-w-3xl">
     <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">About HighJack</h1>
     <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
-      HighJack started with a simple frustration: classic property-board games are brilliant social
-      machines locked inside one fixed rulebook. We want the table — and the option to rig it.
+      Most property-board games come with one fixed rulebook. HighJack lets the table choose its
+      own rules before the first roll.
     </p>
   </header>
 
   <section class="mt-12 max-w-3xl" aria-label="Project story">
     <div class="space-y-4 text-md leading-relaxed text-muted-400">
       <p>
-        The name is the thesis. <strong class="text-gold-400">HIGH</strong> — the rush of a stack
-        growing, a card lifting off the table, the jackpot direction.
-        <strong class="text-gold-400">JACK</strong> — the pot, the prize, and the polite little
-        crime of taking both from someone else. One word, two directions of greed.
+        The name is a nod to hitting the jackpot and taking it from someone else. It is play money
+        only. The game is about making calculated risks with people you know.
       </p>
       <p>
-        So the design goal became a game where the group decides what kind of evening it's having:
-        pure economic siege, or property empire laced with poker nights, carnival side-bets, and
-        global events that rain chaos on everyone equally. Every system is a switch. The engine
-        doesn't care which ones you flip — it just runs your table fairly.
+        The current release is one table: dice, property, rent, tax and bankruptcy. The engine
+        decides every outcome on the server from a seeded stream, so the same actions always lead
+        to the same match. That makes results checkable and keeps the browser honest.
       </p>
       <p class="mb-0">
-        Fairly is the operative word. HighJack is built around an authoritative deterministic
-        simulation: outcomes are computed once, server-side, from seeds and actions anyone can
-        re-verify. Play-money only, forever — this is a game about risking fake fortunes with real
-        friends, not a casino.
+        Further systems are designed but not playable yet. Each one is marked with its status on the
+        <a class="text-gold-400 no-underline hover:text-gold-500" href="/features">features page</a>.
       </p>
     </div>
   </section>
 
   <section class="mt-12" aria-labelledby="stack-title">
-    <h2 id="stack-title" class="m-0 font-display text-2xl font-extrabold">
-      Built with
-    </h2>
+    <h2 id="stack-title" class="m-0 font-display text-2xl font-extrabold">Built with</h2>
     <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
-        <h3 class="m-0 font-display font-bold text-cream-100">Astro + SolidJS</h3>
+        <h3 class="m-0 font-display font-bold text-cream-100">Astro and SolidJS</h3>
         <p class="mb-0 mt-1 text-sm text-muted-400">
-          Static-first website; islands only where interaction earns it.
+          The website is static HTML. The game client is a Solid app.
         </p>
       </article>
       <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
         <h3 class="m-0 font-display font-bold text-cream-100">PixiJS</h3>
-        <p class="mb-0 mt-1 text-sm text-muted-400">
-          GPU-rendered boards and pieces behind the application UI.
-        </p>
+        <p class="mb-0 mt-1 text-sm text-muted-400">The board is drawn on a canvas.</p>
       </article>
       <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
-        <h3 class="m-0 font-display font-bold text-cream-100">Go 1.26</h3>
+        <h3 class="m-0 font-display font-bold text-cream-100">Go</h3>
         <p class="mb-0 mt-1 text-sm text-muted-400">
-          Authoritative engine and realtime server as a modular monolith.
+          The rules engine and the WebSocket server run in one process.
         </p>
       </article>
       <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
         <h3 class="m-0 font-display font-bold text-cream-100">Bun</h3>
         <p class="mb-0 mt-1 text-sm text-muted-400">
-          One toolchain for workspaces, tests, and builds.
+          One toolchain for the workspaces, tests and builds.
         </p>
       </article>
     </div>
@@ -73,17 +64,16 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     class="mt-12 max-w-3xl rounded-lg border border-line-subtle bg-felt-900/60 p-6"
     aria-label="Open source"
   >
-    <h2 class="m-0 font-display text-lg font-bold text-cream-100">Open by default</h2>
+    <h2 class="m-0 font-display text-lg font-bold text-cream-100">Open source</h2>
     <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
-      The whole project — engine, protocol, tooling, and this site — is MIT-licensed and developed
-      in the open at
+      The engine, protocol, tooling and this site are MIT-licensed at
       <a
         href="https://github.com/analeis/highjack"
         class="font-bold text-gold-400 hover:text-gold-500"
       >
         github.com/analeis/highjack
       </a>
-      . Architecture decisions live in the repository's docs, so every choice is inspectable.
+      . The architecture notes and audit history are in the repository.
     </p>
   </section>
 </BaseLayout>
