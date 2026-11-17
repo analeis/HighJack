@@ -77,9 +77,9 @@ export function MobileNav(props: { items: NavItem[]; currentPath: string }) {
                     href={item.href}
                     onClick={close}
                     aria-current={props.currentPath === item.href ? 'page' : undefined}
-                    class={`block rounded-md px-3 py-2.5 text-md font-bold ${
+                    class={`relative block rounded-md px-3 py-2.5 text-sm font-semibold ${
                       props.currentPath === item.href
-                        ? 'bg-felt-700 text-gold-400'
+                        ? 'text-cream-100 after:absolute after:bottom-1.5 after:left-3 after:h-px after:w-6 after:bg-gold-500'
                         : 'text-muted-400 hover:bg-felt-700 hover:text-cream-100'
                     }`}
                   >

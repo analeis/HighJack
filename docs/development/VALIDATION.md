@@ -14,19 +14,27 @@ Validation and verification are deliberately separate concerns:
 Single entry point; exits non-zero on the first failed gate.
 
 ```
-validate
-├── format        oxfmt --check (TS/TSX/CSS/MD/JSON/YAML + .astro)
-├── lint          oxlint (packages+apps+scripts) · go vet ./...
-├── gofmt         gofmt -l on server/ reports nothing
-├── typecheck     bun check (root project) · tsc6 (reference) · astro check
-├── test:go       go test ./...
-├── test:ts       vitest in packages/protocol, packages/ui, apps/game
-├── build:web     astro build
-├── build:game    vite build
-├── build:server  go build ./...
-├── assets        scripts/check-assets.ts
-└── repo          scripts/repo-sanity.ts
+validate  (17 gates; the exact definitions live in scripts/lib/validation-gates.ts)
+├── format              bun fmt
+├── lint:oxlint         oxlint (packages + apps + scripts)
+├── lint:gofmt          gofmt -l on server/ reports nothing
+├── lint:govet          go vet ./...
+├── typecheck:ts        bun check -p tsconfig.json
+├── typecheck:reference tsc6 --noEmit -p tsconfig.json
+├── typecheck:astro     astro check (apps/web)
+├── test:ts             vitest in packages/protocol, packages/ui, apps/game
+├── test:go             go test -count=1 -race ./server/...
+├── test:go:db          persistence suite (optional until HIGHJACK_TEST_DATABASE_URL is set)
+├── audit:deps          bun audit
+├── audit:govuln        govulncheck ./server/...
+├── build:web           astro build
+├── build:game          vite build
+├── build:server        go build ./server/cmd/highjack
+├── assets              scripts/check-assets.ts
+└── repo                scripts/repo-sanity.ts
 ```
+
+`certify` adds one verification gate, `verify:browser`, for 18 in total.
 
 ### The toolchain
 

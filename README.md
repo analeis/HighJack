@@ -4,14 +4,14 @@
 
 HighJack combines property/economic gameplay with optional systems: trading, auctions, gambling tables, minigames, treasure cards, and global events; all switchable per-match through a first-class game configuration.
 
-> **Status: v0.2.7 — playable board loop.** The backend, protocol, and tooling are
+> **Status: v0.2.15 — playable board loop.** The backend, protocol, and tooling are
 > the production foundation; the board loop is now a real, playable multiplayer
 > game. A match is a configurable ruleset executed by a deterministic
 > authoritative simulation: the server owns every dice roll, balance, and
 > ownership change, and the client may only render and request. See the
 > [changelog](apps/web/src/pages/changelog.astro) for what is in each release,
 > and [docs/audit/V0_2_5_PATCHWORK.md](docs/audit/V0_2_5_PATCHWORK.md) for the
-> current post-review work.
+> post-review disposition of findings.
 >
 > The current release version is in [`VERSION`](VERSION). It is the single source
 > of truth: the workspace manifests, the game client's build, the server

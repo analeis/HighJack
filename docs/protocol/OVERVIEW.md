@@ -1,6 +1,6 @@
 # Protocol Overview
 
-> Status: v0.2.10. The contract below is implemented, fixture- and
+> Status: v0.2.15. The contract below is implemented, fixture- and
 > field-parity-tested on both sides, and stable for future transport work.
 
 ## Where it lives

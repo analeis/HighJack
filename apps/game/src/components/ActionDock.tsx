@@ -3,6 +3,7 @@ import type { JSX } from 'solid-js';
 import type { ActionType } from '@highjack/protocol';
 import { currentPlayer, gameStore, myHoldings } from '../state/game-store.ts';
 import type { GameView } from '../state/game-store.ts';
+import { endReasonLabel } from './labels.ts';
 
 /**
  * The action dock: the only controls a player has.
@@ -82,8 +83,8 @@ export function ActionDock(props: {
         <Show when={ended()}>
           <p role="status" class="mr-2 text-sm text-gold-400">
             {state().winnerId
-              ? `${state().players.find((p) => p.id === state().winnerId)?.name ?? 'Winner'} wins (${state().endReason})`
-              : `Match ended: ${state().endReason}`}
+              ? `${state().players.find((p) => p.id === state().winnerId)?.name ?? 'Winner'} wins (${endReasonLabel(state().endReason)})`
+              : `Match ended: ${endReasonLabel(state().endReason)}`}
           </p>
         </Show>
 

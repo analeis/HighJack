@@ -70,40 +70,6 @@ build depend on a runtime the job never installed; it worked only because that s
 has no external imports. If you add a Go gate, add it to the workflow and let the
 sanity check confirm it.
 
-## The lint gate, and the root install
-
-`bunx oxlint` and `bunx oxfmt` need the _root_ dependencies. `bunx` falls back
-to fetching a package from the registry when it is not installed locally, so a
-missing install would silently lint and format with whatever version the
-registry served that day. The gate checks for the install first and names the
-cause.
-
-`bun install` at the repository root is therefore required before any gate
-that touches the front end will run.
-
-`scripts/` is linted along with `packages` and `apps`. It holds the
-certification pipeline, so a defect in it would otherwise be found by no gate
-at all.
-
-## CI and the pipeline must agree
-
-`repo sanity` fails if a gate defined in `scripts/lib/validation-gates.ts` is not
-also enforced by `.github/workflows/ci.yml`. The comparison is on substance, not
-spelling: it normalises away output paths and shell control operators, because
-certification builds to a temp directory while CI builds to `./bin`, and a gate may
-report success with `&& echo` while CI prefers `|| { ...; exit 1; }`.
-
-The check exists because the two drifted invisibly. CI's database step once carried
-a `-run` filter that excluded the JSONB round-trip and the interrupted-match policy
-tests while the step still reported success.
-
-The backend job runs the Go toolchain directly — `gofmt`, `go vet`, `govulncheck`,
-`go test -race` and `go build` — with **no JavaScript runtime installed at all**.
-Invoking those through `bun scripts/gate.ts`, as the job previously did, made the Go
-build depend on a runtime the job never installed; it worked only because that script
-happens to have no external imports. If you add a Go gate, add it to the workflow and
-let the sanity check confirm it.
-
 ## Browser harness
 
 The Playwright harness never reuses an existing **game server** or **game

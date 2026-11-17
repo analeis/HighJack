@@ -20,16 +20,16 @@ import { Badge } from '@highjack/ui';
     <h2 id="turn-title" class="m-0 font-display text-2xl text-cream-100 sm:text-3xl">
       How a turn works
     </h2>
-    <div class="mt-8 grid gap-10 md:grid-cols-2">
-      <div class="border-t border-line-subtle pt-5">
+    <ol class="mt-8 grid list-none gap-10 p-0 md:grid-cols-2">
+      <li class="border-t border-line-subtle pt-5">
         <p class="m-0 font-mono text-xs text-gold-500">01</p>
         <h3 class="mb-2 mt-3 font-display text-xl font-semibold text-cream-100">You act</h3>
         <p class="m-0 text-sm leading-relaxed text-muted-400">
           Roll the dice, then choose to buy or decline the property you land on. End the turn when
           you are done.
         </p>
-      </div>
-      <div class="border-t border-line-subtle pt-5">
+      </li>
+      <li class="border-t border-line-subtle pt-5">
         <p class="m-0 font-mono text-xs text-gold-500">02</p>
         <h3 class="mb-2 mt-3 font-display text-xl font-semibold text-cream-100">
           The server decides
@@ -38,8 +38,8 @@ import { Badge } from '@highjack/ui';
           It applies your action, charges rent, awards bonuses and advances the turn. Your browser
           receives the result and draws it.
         </p>
-      </div>
-    </div>
+      </li>
+    </ol>
   </section>
 
   <section class="border-b border-line-subtle py-14" aria-labelledby="authority-title">
@@ -82,7 +82,7 @@ Every player sees the same state</code></pre>
     </p>
     <p class="mb-0 mt-4 text-sm leading-relaxed text-muted-400">
       Trading, auctions and the other systems are not playable yet. Their status is listed on the
-      <a class="text-gold-400 underline underline-offset-2 hover:text-gold-300" href="/features"
+      <a class="text-gold-400 underline underline-offset-2 hover:text-cream-100" href="/features"
         >features page</a
       >.
     </p>

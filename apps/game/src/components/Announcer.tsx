@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { gameStore } from '../state/game-store.ts';
+import { statusLabel } from './labels.ts';
 
 /**
  * The live region that announces turn, dice and connection changes.
@@ -18,7 +19,7 @@ export function Announcer(): JSX.Element {
   const message = () => {
     const v = view();
     if (status() !== 'connected') {
-      return detail() || `Connection ${status()}.`;
+      return detail() || `${statusLabel(status())}.`;
     }
     if (!v) return '';
     const active = v.players.find((p) => p.seat === v.turn.currentSeat && p.status === 'active');

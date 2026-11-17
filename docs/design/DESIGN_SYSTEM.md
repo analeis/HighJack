@@ -1,6 +1,6 @@
 # Design System Reference
 
-> Status: v0.2.10 — implemented in `packages/ui` and consumed by both apps.
+> Status: v0.2.15 — implemented in `packages/ui` and consumed by both apps.
 
 ## Architecture
 
@@ -21,18 +21,18 @@ Values are declared **once** as `--hj-*` custom properties; Tailwind's
 
 ## Token groups
 
-| Group     | Examples                                                 | Notes                                                                                   |
-| --------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Surfaces  | `--hj-color-felt-950…500`, `surface-base/raised/overlay` | The card-table ground and its lifted layers.                                            |
-| Ink       | `cream-100/300`, `muted-400/500`                         | Warm text ramp.                                                                         |
-| Accents   | `gold-*`, `crimson-*`, `teal-*`, `violet-*`              | Gold = primary/reward; crimson = risk only; teal = success only; violet = events, rare. |
-| Lines     | `line-subtle`, `line-strong`                             | Translucent so felt shows through.                                                      |
-| Type      | `--hj-font-display/body/mono`, scale `--hj-text-xs…5xl`  | Minor-third-ish scale tuned for dense game UI.                                          |
-| Space     | 4px base, `--hj-space-1…24`                              |                                                                                         |
-| Radii     | sm 6 · md 10 · lg 16 · xl 24 · pill                      |                                                                                         |
-| Elevation | `shadow-card`, `shadow-raised`, `shadow-gold-glow`       | Warm-tinted two-layer shadows.                                                          |
-| Motion    | durations fast/normal/slow, ease-out & spring            | Reduced-motion collapses all to instant (base layer).                                   |
-| Focus     | `--hj-focus-ring`                                        | Double-ring gold; applied globally via `:focus-visible`.                                |
+| Group     | Examples                                                 | Notes                                                                                        |
+| --------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Surfaces  | `--hj-color-felt-950…500`, `surface-base/raised/overlay` | Near-neutral darks. The felt names persist; green is reserved for the board itself.          |
+| Ink       | `cream-100/300`, `muted-400/500`                         | Warm ivory and warm grey. Every step clears AA on the darkest surface.                       |
+| Accents   | `gold-*`, `crimson-*`, `teal-*`, `violet-*`              | One gold accent: primary action and key numbers. Crimson/teal are semantic; violet rare.     |
+| Lines     | `line-subtle`, `line-strong`                             | Translucent ivory, so the surface shows through.                                             |
+| Type      | `--hj-font-display/body/mono`, scale `--hj-text-xs…5xl`  | Display at weight 600 with tight tracking; labels normal-case; mono only for code-like text. |
+| Space     | 4px base, `--hj-space-1…24`                              |                                                                                              |
+| Radii     | sm 6 · md 10 · lg 16 · xl 24 · pill                      |                                                                                              |
+| Elevation | `shadow-card`, `shadow-raised`, `shadow-gold-glow`       | Warm-tinted two-layer shadows.                                                               |
+| Motion    | durations fast/normal/slow, ease-out & spring            | Reduced-motion collapses all to instant (base layer).                                        |
+| Focus     | `--hj-focus-ring`                                        | Double-ring gold; applied globally via `:focus-visible`.                                     |
 
 ## Components (`@highjack/ui`)
 
@@ -54,8 +54,10 @@ Utility classes: `.hj-skip-link`, `.hj-numerals`, `.hj-felt-bg`.
    them ad hoc.
 3. Component styling uses Tailwind utilities composed from token mappings;
    the base layer holds only element defaults and semantic patterns.
-4. PixiJS rendering never enters this package — it has its own literal
-   mirror of tokens documented at the top of `pixi-stage.ts`.
+4. PixiJS rendering never enters this package — the board has its own literal
+   mirror of tokens in `apps/game/src/engine/board-stage.ts`. `repo sanity`
+   holds that mirror to this file, so a palette change cannot leave the canvas
+   in the old colours.
 
 ## Testing
 

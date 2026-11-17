@@ -10,20 +10,35 @@ import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { Ticker } from 'pixi.js';
 import type { UiPlayer, UiSpace, UiTurn } from '../state/game-store.ts';
 
-// Token mirrors (see packages/ui/src/styles/tokens.css). Keep in sync.
+/**
+ * Literal mirror of the palette in packages/ui/src/styles/tokens.css. PixiJS
+ * cannot read CSS custom properties, so these values are duplicated here and
+ * held to the token file by the repository sanity gate. Do not edit by hand
+ * without updating the tokens first.
+ */
 const COLOR = {
-  felt950: 0x070d0a,
-  felt700: 0x182720,
-  felt600: 0x20342b,
-  gold500: 0xe6b64e,
-  gold700: 0x97752a,
-  cream100: 0xf4efe2,
-  muted400: 0xa9baae,
-  violet500: 0x9d7ff2,
-  crimson500: 0xd65252,
+  felt950: 0x0a0c0b,
+  felt700: 0x222824,
+  felt600: 0x2b322d,
+  felt500: 0x384039,
+  gold500: 0xd4a94f,
+  gold700: 0x8a692e,
+  cream100: 0xf2efe8,
+  muted400: 0xa29e94,
+  violet500: 0xa38ce0,
+  crimson500: 0xd4695f,
 } as const;
 
-const PLAYER_COLORS = [0xe6b64e, 0x9d7ff2, 0x2fb89a, 0xd65252, 0x6aa9e0, 0xe08ab4];
+// Token-backed player colours are taken from the mirror; the two that have no
+// token (blue and pink) are kept as distinct player identifiers.
+const PLAYER_COLORS = [
+  COLOR.gold500,
+  COLOR.violet500,
+  0x2fb89a,
+  COLOR.crimson500,
+  0x6aa9e0,
+  0xe08ab4,
+];
 
 interface Slot {
   cx: number;
@@ -144,7 +159,7 @@ export async function createBoardStage(
         .fill(fill)
         .stroke({
           width: active ? 3 : 1.5,
-          color: active ? COLOR.cream100 : space.kind === 'go' ? COLOR.gold500 : 0x2c4437,
+          color: active ? COLOR.cream100 : space.kind === 'go' ? COLOR.gold500 : COLOR.felt500,
           alpha: 0.9,
         });
       g.position.set(slot.cx, slot.cy);

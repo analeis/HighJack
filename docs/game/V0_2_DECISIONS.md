@@ -1,8 +1,8 @@
 # v0.2.0 Gameplay Decisions
 
 > Version 1 · 2026-09-25 · status: **approved for implementation**.
-> Resolves every open question in `V0_2_BOARD_LOOP_PLAN.md` §13 and
-> directive §2 before dependent systems are built. Proposals from the plan
+> Resolves every open question in `V0_2_BOARD_LOOP_PLAN.md` §13 before
+> dependent systems are built. Proposals from the plan
 > become rules below only where explicitly stated; everything else stays
 > deferred.
 

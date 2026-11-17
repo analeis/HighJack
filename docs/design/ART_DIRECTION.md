@@ -1,6 +1,6 @@
 # Art Direction
 
-> Status: v0.2.10 — the direction below is implemented at token and logo
+> Status: v0.2.15 — the direction below is implemented at token and logo
 > level; illustration-scale artwork is future work.
 
 ## Identity thesis
@@ -18,38 +18,36 @@ carrying an upward-arrow cutout. Nothing else needs to be said.
 
 | We are                   | We are not               |
 | ------------------------ | ------------------------ |
-| Tactile card-table night | Neon Vegas casino floor  |
-| Premium felt & brass     | Corporate SaaS dashboard |
-| Playfully mischievous    | Cartoonish clip-art      |
+| Restrained, near-neutral | Neon Vegas casino floor  |
+| One considered accent    | Corporate SaaS dashboard |
+| Quietly confident        | Cartoonish clip-art      |
 | High-contrast, readable  | Visually noisy           |
 
 ## Color language
 
-- **Felt greens-black** (`--hj-color-felt-*`): the world's ground. Deep,
-  calm, premium.
-- **Cream ink** (`--hj-color-cream-*`): warm paper-white text. Pure white
-  feels sterile against felt.
-- **Jackpot gold** (`--hj-color-gold-*`): THE accent. Reward energy, used
-  for primary actions, wins, and focus. If everything is gold, nothing is.
-- **Risk crimson**: stakes and elimination only.
-- **Fortune teal**: gains, success, live states.
-- **Chaos violet**: random events and wildcard moments only. Rare by
-  design — scarcity keeps it special.
+- **Near-neutral surfaces** (`--hj-color-felt-*`): the ground. The token names
+  are historical; green is now reserved for the board itself.
+- **Warm ivory ink** (`--hj-color-cream-*`, `--hj-color-muted-*`): text and
+  secondary text. Every step clears AA on the darkest surface.
+- **One gold** (`--hj-color-gold-*`): the only accent — the primary action, the
+  active navigation item and key numbers. If everything is gold, nothing is.
+- **Crimson and teal**: semantic signals (risk and success), never decoration.
+- **Violet**: rare, for the occasional special state.
 
 ## Typography
 
-- **Bricolage Grotesque** (display): chunky personality for headings;
-  slightly irreverent without losing legibility.
-- **Space Grotesk** (body/UI): characterful grotesque that stays quiet at
-  small sizes.
-- **Space Mono** (numerals): tabular money counters and tickers; exactness
-  you can feel.
+- **Bricolage Grotesque** (display): headings at weight 600 with tight
+  tracking — confident, not chunky.
+- **Space Grotesk** (body/UI): a quiet grotesque that stays readable at small
+  sizes; section labels are normal-case.
+- **Space Mono** (numerals): tabular money counters and code-like text only.
 
 ## Shape & material
 
-- Radii from tokens (6–24px); cards read as _cards_: rounded rectangles on
-  felt with warm shadows, never gray drop-shadows.
-- Elevation = physical lift off the table (two-layer warm shadow).
+- Quiet corners and barely-there shadows. Sections are separated by whitespace
+  and a thin rule, not by walls of rounded cards; cards remain only where the
+  content is genuinely card-shaped.
+- Elevation is a subtle lift, never a heavy drop shadow.
 - Backgrounds get atmosphere via pure-CSS radial glows (`hj-felt-bg`),
   not texture images.
 

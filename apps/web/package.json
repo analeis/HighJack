@@ -1,6 +1,6 @@
 {
   "name": "@highjack/web",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "HighJack product website.",
   "license": "MIT",
   "type": "module",
@@ -25,9 +25,9 @@
     "@astrojs/check": "^0.9.12",
     "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.1",
-    "@tailwindcss/vite": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.5",
     "astro": "^7.3.2",
-    "tailwindcss": "^4.3.3",
-    "vitest": "^5.0.5"
+    "tailwindcss": "^4.3.5",
+    "vitest": "^5.1.0"
   }
 }

@@ -1,11 +1,5 @@
-// This file holds the registry: the map of live matches, and the capacity
-// rules around it.
-//
-// The registry is the runtime's front door — a match is created here, looked up
-// here, and reclaimed here. It is split out of `match.go` because the capacity
-// policy (the bound, the eviction, and the reason a nil store is normalised) is
-// a concern of its own, and because a file that holds both the registry and the
-// per-match runtime is a file nobody can find anything in.
+// Package match holds the live match registry: the map of matches and the
+// capacity policy that bounds it.
 
 package match
 
@@ -29,9 +23,6 @@ type Registry struct {
 	log     *slog.Logger
 }
 
-// NewRegistry builds an empty registry. store may be nil: matches then run
-// in memory only (development default, as in v0.1) and docs record that
-// limitation.
 // NewRegistry builds a registry.
 //
 // The store is normalised here so that "no persistence" is a genuinely nil

@@ -107,6 +107,8 @@ how the CI database step came to filter out the very tests it was meant to run.
 
 ## Current status
 
-- v0.1.0 Foundation targets **CERTIFIED** on the foundation tree with the
-  database-integration gate exercised locally (documented in TESTING.md)
-  and recorded as optional in CI (no persistent PG service yet).
+- v0.2.15 targets **CERTIFIED** with all 18 gates passing on the exact tree the
+  report names. The database-integration gate is exercised against a real
+  PostgreSQL instance in CI and locally when `HIGHJACK_TEST_DATABASE_URL` is
+  set (see TESTING.md); a skipped optional gate is recorded as skipped, never
+  as passed.

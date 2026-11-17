@@ -4,7 +4,7 @@
 
 | Tool                  | Version    | Notes                                  |
 | --------------------- | ---------- | -------------------------------------- |
-| [Bun](https://bun.sh) | ≥ 1.4.3    | Workspaces, tests, builds, scripts     |
+| [Bun](https://bun.sh) | ≥ 1.4.4    | Workspaces, tests, builds, scripts     |
 | [Go](https://go.dev)  | 1.26.x     | Backend                                |
 | Docker                | any recent | Only for the optional local PostgreSQL |
 
@@ -12,9 +12,10 @@ Node is not required directly (Bun drives everything); CI installs the newest
 active Node LTS for Playwright's driver, which fetches a browser on first e2e
 run.
 
-### Why Bun 1.4.3 and not "whatever is installed"
+### Why Bun 1.4.4 and not "whatever is installed"
 
-The typecheck gate runs `bun check`, which was added in Bun 1.4.3. The
+The typecheck gate runs `bun check`, which was added in Bun 1.4.3; the declared
+floor is 1.4.4, the version the lockfile and `bun-types` are built against. The
 repository used to pin `bun@1.3.14` through the `packageManager` field, and
 CI pinned the same version — a version that cannot run the project's own gate.
 The gate failed in CI with "command not found" while the identical gate passed

@@ -2,8 +2,9 @@
 // The HighJack mark: a card being lifted off a chip — fortune in motion.
 //
 // "HIGH" is the upward lift; "JACK" is the taken pot. One geometric idea,
-// no borrowed iconography. Inline SVG keeps it crisp at any size and
-// themeable via currentColor / CSS variables.
+// no borrowed iconography. Inline SVG keeps it crisp at any size. Colours
+// read the design tokens, with literal fallbacks for contexts that load the
+// mark without the design stylesheet (the favicons use literals outright).
 interface Props {
   class?: string;
 }
@@ -20,8 +21,8 @@ const { class: className } = Astro.props;
 >
   <defs>
     <linearGradient id="hj-card-grad" x1="24" y1="6" x2="44" y2="34" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#f8f4e9"></stop>
-      <stop offset="1" stop-color="#ddd5c2"></stop>
+      <stop stop-color="var(--hj-color-cream-100, #f2efe8)"></stop>
+      <stop offset="1" stop-color="var(--hj-color-cream-300, #d8d3c8)"></stop>
     </linearGradient>
     <linearGradient
       id="hj-chip-grad"
@@ -31,15 +32,15 @@ const { class: className } = Astro.props;
       y2="60"
       gradientUnits="userSpaceOnUse"
     >
-      <stop stop-color="#e6b64e"></stop>
-      <stop offset="1" stop-color="#c99a36"></stop>
+      <stop stop-color="var(--hj-color-gold-400, #e6c272)"></stop>
+      <stop offset="1" stop-color="var(--hj-color-gold-600, #b8893a)"></stop>
     </linearGradient>
   </defs>
 
   <!-- chip -->
   <circle cx="26" cy="47" r="13" fill="url(#hj-chip-grad)"></circle>
-  <circle cx="26" cy="47" r="8.5" fill="#111c17"></circle>
-  <g stroke="#f4efe2" stroke-width="2" stroke-linecap="round">
+  <circle cx="26" cy="47" r="8.5" fill="var(--hj-color-felt-800, #191e1b)"></circle>
+  <g stroke="var(--hj-color-cream-100, #f2efe8)" stroke-width="2" stroke-linecap="round">
     <path d="M26 36v4"></path>
     <path d="M37 47h-4"></path>
     <path d="M15 47h4"></path>
@@ -52,8 +53,15 @@ const { class: className } = Astro.props;
     <path
       d="M40 27 L33.5 19.5 H37 V13 H43 V19.5 H46.5 Z"
       transform="rotate(180 40 20)"
-      fill="#0b1310"
+      fill="var(--hj-color-felt-950, #0a0c0b)"
     ></path>
-    <rect x="34.5" y="28" width="11" height="2.5" rx="1.25" fill="#0b1310"></rect>
+    <rect
+      x="34.5"
+      y="28"
+      width="11"
+      height="2.5"
+      rx="1.25"
+      fill="var(--hj-color-felt-950, #0a0c0b)"
+    ></rect>
   </g>
 </svg>

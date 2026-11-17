@@ -31,7 +31,7 @@ export function TopBar(): JSX.Element {
           status={
             status() === 'connected' ? 'live' : status() === 'reconnecting' ? 'soon' : 'planned'
           }
-          label={`connection ${status()}`}
+          label={`Connection: ${statusLabel(status())}`}
         />
         <span class="text-xs text-muted-500">{statusLabel(status())}</span>
         <Show when={import.meta.env.DEV}>

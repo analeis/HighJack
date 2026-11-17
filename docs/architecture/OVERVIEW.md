@@ -1,6 +1,6 @@
 # HighJack Architecture Overview
 
-> Status: v0.2.10. This document describes what exists today.
+> Status: v0.2.15. This document describes what exists today.
 > Future architecture is labeled explicitly as such.
 
 ## The core idea
@@ -71,10 +71,11 @@ highjack/
 
 ## What does NOT exist yet
 
-Board gameplay, trading, auctions, gambling tables, minigames, events,
-matchmaking, accounts/authentication, chat, replays-as-a-feature. The
+Trading, auctions, gambling tables, minigames, events, public matchmaking,
+accounts/authentication, chat, and replays as a player-facing feature. The
 architectural seams for these exist (engine rulesets, protocol action/event
 envelopes, persistence schema), but nothing pretends they are implemented.
+The board loop itself is playable.
 
 See [GAME_ENGINE.md](./GAME_ENGINE.md), [BACKEND.md](./BACKEND.md),
 [FRONTENDS.md](./FRONTENDS.md) for boundary-level details.

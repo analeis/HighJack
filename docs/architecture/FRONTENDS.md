@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-> Status: v0.2.10. The website is complete for its scope; the game client
+> Status: v0.2.15. The website is complete for its scope; the game client
 > is a playable board loop over the authoritative backend.
 
 ## Two frontends, one boundary
@@ -8,7 +8,7 @@
 | App         | Role                                                                         | Stack                                             |
 | ----------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
 | `apps/web`  | Product website: marketing, docs-flavored content, changelog, config preview | Astro (static) + SolidJS islands + Tailwind v4    |
-| `apps/game` | Future multiplayer client                                                    | SolidJS application surface + PixiJS render stage |
+| `apps/game` | Playable multiplayer client                                                  | SolidJS application surface + PixiJS render stage |
 
 Both consume `@highjack/ui` (design system) and `@highjack/protocol`
 (wire contract). Neither contains domain logic — that belongs to the Go
@@ -30,34 +30,35 @@ Principles:
   playground on `/features`: it builds a real GameConfig and validates it
   with `@highjack/protocol` — the identical schema the engine enforces.
 
-## Game shell (`apps/game`)
+## Game client (`apps/game`)
 
-The shell exists to prove the composition, not to fake gameplay:
+The client renders authoritative snapshots and sends player choices:
 
 ```
 ┌───────────────────────────────────────────────┐
 │ SolidJS application UI                        │
-│  top bar · side panels · action dock · badges │
+│  top bar · side panel · action dock · badges  │
 │                                               │
-│        ↕ shell store (signals only)           │
+│        ↕ game store (signals only)            │
 │                                               │
 │ PixiJS render stage                           │
 │  board ring · pieces/cards · effects          │
-│  (engine/pixi-stage.ts owns the canvas)       │
+│  (engine/board-stage.ts owns the canvas)      │
 └───────────────────────────────────────────────┘
 ```
 
 Rules enforced by structure:
 
 - UI components never touch Pixi internals; the stage never touches DOM.
-- All cross-layer state flows through `src/state/shell-store.ts` signals.
+- All cross-layer state flows through `src/state/game-store.ts` signals.
 - The stage respects `prefers-reduced-motion` (static render instead of
   animated).
-- Disabled controls are labeled as such ("concept preview", "not
-  implemented yet"). Nothing pretends to be playable.
+- The dock renders the engine's per-recipient legal-action list. It does not
+  re-derive affordability, turn ownership or start eligibility, so a control
+  is enabled exactly when the server would accept it.
 
-When real gameplay lands, the same seam carries authoritative snapshots and
-events into the store; panels and stage react independently.
+Snapshots and transitions arrive over the socket into the store; panels and
+stage react independently to the same view.
 
 ## Responsive & accessibility baselines
 
@@ -69,5 +70,7 @@ events into the store; panels and stage react independently.
 
 ## What is deliberately absent
 
-Authentication flows, lobbies, matchmaking, real-time boards, chat,
-payments. The site marks them as future work rather than stubbing them.
+Accounts/authentication, public matchmaking and lobby listings, chat,
+payments, trading, auctions and the other unbuilt systems in GAME_DESIGN.md.
+Private lobbies, real-time boards and reconnect are present. The site marks
+the rest as future work rather than stubbing them.

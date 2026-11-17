@@ -2,6 +2,7 @@ import { Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { gameStore } from '../state/game-store.ts';
 import type { GameView } from '../state/game-store.ts';
+import { endReasonLabel, playerStatusLabel } from './labels.ts';
 
 /**
  * The board surface: the canvas, and the text equivalent of it.
@@ -88,7 +89,7 @@ export function BoardTextEquivalent(): JSX.Element {
                       <td>{board.spaces[p.position]?.name ?? 'off board'}</td>
                       <td>
                         {[
-                          p.status !== 'active' ? p.status : null,
+                          p.status !== 'active' ? playerStatusLabel(p.status) : null,
                           p.isHost ? 'host' : null,
                           p.ready ? 'ready' : 'not ready',
                         ]
@@ -150,7 +151,7 @@ function describePhase(v: GameView): string {
           ? 'In play, rolling.'
           : 'In play.';
     case 'ended':
-      return `Finished${v.endReason ? `: ${v.endReason}` : ''}.`;
+      return `Finished${v.endReason ? `: ${endReasonLabel(v.endReason)}` : ''}.`;
     case 'interrupted':
       return 'Interrupted.';
     default:

@@ -1,10 +1,11 @@
 # HighJack v0.2.x Post-Review Patchwork
 
-Status: **in progress.** Baseline: the v0.2.4 code review (`docs/audit/V0_2_4_CODEBASE_REVIEW.md`).
+Status: **historical record** — every finding was disposed of through v0.2.14.
 
-The review produced a findings register. This document tracks how each finding
-is dispositioned, so an external reviewer can see what was fixed, what was
-deferred, and why — without reading the diffs.
+The findings register is the table below, expanded from the register in
+`V0_2_1_AUDIT.md`. This document tracks how each finding was dispositioned, so
+an external reviewer can see what was fixed, what was deferred, and why —
+without reading the diffs.
 
 ## Rules for this cycle
 
@@ -533,8 +534,8 @@ fails that test with a message that names the cause.
 
 ### Everything else
 
-- `scripts/dev-server-bg.sh` was unreferenced — the Playwright harness stopped
-  using it when it moved to the release build script. Removed.
+- A background dev-server helper was unreferenced — the Playwright harness had
+  stopped using it when it moved to the release build script. Removed.
 - The Frontend CI job now sets up Go. Its browser gate builds and runs the
   real server, so it was depending on whatever Go the runner image happened to
   ship.
@@ -790,3 +791,59 @@ gate definitions themselves were not touched.
 
 RSK-1 and PRS-3 remain deliberately open. Deployment work is not part of this
 release.
+
+## v0.2.15 — finishing the redesign, and making the docs tell the truth (shipped)
+
+A patch release closing the gaps the v0.2.14 audit found. No engine, protocol
+or gate-definition changes.
+
+### The canvas mirror
+
+v0.2.14 rewrote `tokens.css` but left the PixiJS renderer in the retired
+palette. `board-stage.ts` declared its colours a "token mirror" with a comment
+asking readers to keep them in sync; a comment is not a mechanism. The mirror
+now matches the tokens, the inline felt literal was folded into the map, and
+`repo sanity` compares every mirror entry against `--hj-color-*` — the same
+pattern that holds the protocol document to the wire contract. The logo, both
+favicons and `theme-color` were updated too, so the changelog's claim that no
+surface keeps the old palette is now true.
+
+### Small correctness fixes
+
+- Five links used `hover:text-gold-300`, which no token defines, so they had no
+  hover state. They now brighten to ivory.
+- The side panel's four section headings had been downgraded to paragraphs in
+  v0.2.14. They are `<h2>` again; the landmark had never changed, which is why
+  the browser suite stayed green.
+- The two numbered turn steps are an ordered list again, and the mobile drawer
+  marks the current route with the same gold underline as the desktop header.
+- Engine values no longer surface as player text: connection state, player
+  state and end reasons are named in one module and used by the header, the
+  banner, the live region, the dock and the screen-reader board. The
+  screen-reader description itself was kept — it is the board for a player who
+  cannot see the canvas.
+
+### Documentation
+
+The audit found 3,782 lines across 22 documents, 12 stale status lines, a
+33-line duplicated section and seven dangling references, including a baseline
+document that never existed. Current documents' status lines are now held to
+`VERSION` by `repo sanity`, with audit records and `V0_2_*` decision documents
+explicitly exempt as historical. The duplicate section and dangling references
+were removed, the architecture and design docs now describe the playable game
+and the new palette, and the gate list in VALIDATION.md matches the 17 + 1
+gates that actually run.
+
+Comments were trimmed, not bulk-deleted: the defect-record comments that carry
+a fix's rationale are load-bearing evidence. Only a stale duplicate doc
+comment, an orphaned comment block and a file-narration header were removed.
+
+The four dependency ranges that disagreed across workspaces (vitest,
+tailwindcss, @tailwindcss/vite, vite-plugin-solid) were aligned to the highest
+declared version; the lockfile was refreshed and frozen install still passes.
+
+RSK-1 and PRS-3 remain deliberately open. SQLite was evaluated and rejected:
+the persistence layer uses no SQL-side JSON, advisory locks or `RETURNING`, so
+a switch is viable, but it would rewrite three migrations, four test files
+whose isolation is schema-based, the CI database job and the certified report
+for no unblocked functional gain. Deployment remains out of scope.

@@ -1,6 +1,6 @@
 # UI Principles
 
-How we make interface decisions across the website and (future) game
+How we make interface decisions across the website and the game
 client. When two options are equally easy, these break ties.
 
 ## 1. The table is honest

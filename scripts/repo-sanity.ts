@@ -155,6 +155,44 @@ for (const doc of walkMarkdown(path.join(ROOT, 'docs'))) {
   }
 }
 
+// ---- the canvas colour mirror ---------------------------------------------------
+
+// PixiJS cannot read CSS custom properties, so the board renderer carries a
+// literal mirror of the palette tokens. A comment saying "keep in sync" is not
+// a mechanism: v0.2.14 rewrote the tokens and the board kept rendering in the
+// retired palette for a whole release. Hold the mirror to the token file the
+// same way the protocol document is held to its contract.
+const tokensPath = path.join(ROOT, 'packages', 'ui', 'src', 'styles', 'tokens.css');
+const stagePath = path.join(ROOT, 'apps', 'game', 'src', 'engine', 'board-stage.ts');
+if (existsSync(tokensPath) && existsSync(stagePath)) {
+  const tokenSource = readFileSync(tokensPath, 'utf8');
+  const stageSource = readFileSync(stagePath, 'utf8');
+
+  const tokenColors = new Map<string, string>();
+  for (const m of tokenSource.matchAll(/--hj-color-([a-z]+-\d+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
+    tokenColors.set(m[1] ?? '', (m[2] ?? '').toLowerCase());
+  }
+
+  const colorBlock = stageSource.match(/const COLOR\s*=\s*\{([\s\S]*?)\}\s*as const;/)?.[1] ?? '';
+  for (const m of colorBlock.matchAll(/(\w+):\s*0x([0-9a-fA-F]{6}),/g)) {
+    const key = m[1] ?? '';
+    // camelCase mirror key → kebab-case token name: felt950 → felt-950.
+    const token = key.replace(/^([a-z]+)(\d+)$/, '$1-$2');
+    const actual = `#${(m[2] ?? '').toLowerCase()}`;
+    const expected = tokenColors.get(token);
+    if (!expected) {
+      problems.push(
+        `board-stage.ts COLOR.${key} has no matching --hj-color-${token} token in tokens.css`,
+      );
+    } else if (expected !== actual) {
+      problems.push(
+        `board-stage.ts COLOR.${key} is ${actual}, but --hj-color-${token} is ${expected}: ` +
+          'the canvas must use the shipped palette',
+      );
+    }
+  }
+}
+
 // ---- CI / pipeline agreement ---------------------------------------------------
 
 // Every gate the pipeline defines must also be enforced by CI.
@@ -249,18 +287,20 @@ if (existsSync(protocolDocPath) && existsSync(messagesPath)) {
 
 // ---- the toolchain the gates need --------------------------------------------
 
-// The typecheck gate runs `bun check`, which was added in Bun 1.4.3.
+// The typecheck gate runs `bun check`, which was added in Bun 1.4.3. The
+// declared floor is 1.4.4 — the version the lockfile and bun-types are built
+// against — so a patch release of Bun cannot silently change the checker.
 //
 // The repository used to pin `bun@1.3.14` in `packageManager`, and CI pinned
 // the same version. The gate therefore failed in CI with "command not found"
-// while the identical gate passed locally on 1.4.3 — a green local run that
-// proved nothing about the release, which is the exact failure mode this
-// project has spent a release cycle fighting.
+// while the identical gate passed locally — a green local run that proved
+// nothing about the release, which is the exact failure mode this project has
+// spent a release cycle fighting.
 //
 // These checks make that impossible to reintroduce silently: the requirement is
 // declared once, in `engines.bun`, and the workflow may not pin anything below
 // it.
-const MINIMUM_BUN = '1.4.3';
+const MINIMUM_BUN = '1.4.4';
 
 function compareVersions(a: string, b: string): number {
   const pa = a.split('.').map((n) => Number(n) || 0);
@@ -287,7 +327,8 @@ if (existsSync(rootManifestPath)) {
     if (compareVersions(pinned, MINIMUM_BUN) < 0) {
       problems.push(
         `packageManager pins bun ${pinned}, but the gates need ${MINIMUM_BUN} or later ` +
-          '(`bun check` was added in 1.4.3). State the minimum in engines.bun instead.',
+          '(`bun check` was added in 1.4.3; the declared floor is 1.4.4). ' +
+          'State the minimum in engines.bun instead.',
       );
     }
   }
@@ -319,7 +360,8 @@ if (existsSync(workflowPath)) {
     if (compareVersions(pinned, MINIMUM_BUN) < 0) {
       problems.push(
         `the workflow pins bun ${pinned}, but the typecheck gate needs ${MINIMUM_BUN} or later ` +
-          "(`bun check` was added in 1.4.3). Use 'latest' or a version at or above it.",
+          '(`bun check` was added in 1.4.3; the declared floor is 1.4.4). ' +
+          "Use 'latest' or a version at or above it.",
       );
     }
   }
@@ -417,6 +459,30 @@ if (!/^\d+\.\d+\.\d+$/.test(releaseVersion)) {
   } catch {
     // No tag reachable: this repository has never been released. Nothing to
     // check.
+  }
+
+  // A document's status line says which release it describes. Every release
+  // left a trail of stale ones — README said v0.2.7 and the architecture docs
+  // said v0.2.0 four releases after the board loop shipped — and no gate
+  // noticed, because the link checker only follows markdown links. Hold every
+  // current doc's status line to VERSION. Audit records and V0_2_* decisions
+  // are historical and are allowed to name the release they describe.
+  const statusDocs = [
+    path.join(ROOT, 'README.md'),
+    ...walkMarkdown(path.join(ROOT, 'docs')).filter(
+      (f) => !f.includes(`${path.sep}audit${path.sep}`) && !path.basename(f).startsWith('V0_2_'),
+    ),
+  ];
+  for (const doc of statusDocs) {
+    if (!existsSync(doc)) continue;
+    const content = readFileSync(doc, 'utf8');
+    for (const m of content.matchAll(/status:\s*\*{0,2}v?(\d+\.\d+\.\d+)/gi)) {
+      if (m[1] !== releaseVersion) {
+        problems.push(
+          `${path.relative(ROOT, doc)} states status v${m[1]}, but VERSION is ${releaseVersion}`,
+        );
+      }
+    }
   }
 }
 

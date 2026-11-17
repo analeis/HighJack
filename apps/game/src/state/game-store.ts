@@ -229,14 +229,6 @@ function markApplied(tick: number): void {
   }
 }
 
-/** Applies authoritative events through the pure reducer. */
-/**
- * Applies authoritative events.
- *
- * A tick is applied at most once. The server documents at-least-once delivery and
- * names the tick as the dedup key, but the client implemented no dedup at all, so
- * the first re-delivery charged a rent twice or marked a property bought twice.
- */
 /**
  * Replace the legal actions the engine reported for this connection.
  *
@@ -248,6 +240,13 @@ export function applyLegalActions(actions: readonly ActionType[]): void {
   setView((prev) => (prev ? { ...prev, legalActions: actions } : prev));
 }
 
+/**
+ * Applies authoritative events through the pure reducer.
+ *
+ * A tick is applied at most once. The server documents at-least-once delivery and
+ * names the tick as the dedup key, but the client implemented no dedup at all, so
+ * the first re-delivery charged a rent twice or marked a property bought twice.
+ */
 export function applyEvents(events: readonly { tick: number; event: GameEvent }[]): void {
   if (events.length === 0) return;
   // A transition arrives as one batch whose events all share a tick, so the first

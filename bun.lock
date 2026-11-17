@@ -13,7 +13,7 @@
     },
     "apps/game": {
       "name": "@highjack/game",
-      "version": "0.2.12",
+      "version": "0.2.15",
       "dependencies": {
         "@fontsource-variable/space-grotesk": "^5.3.0",
         "@highjack/protocol": "workspace:*",
@@ -26,13 +26,13 @@
       "devDependencies": {
         "@testing-library/jest-dom": "^7.0.1",
         "vite": "^8.3.8",
-        "vite-plugin-solid": "^2.11.14",
-        "vitest": "^5.0.5",
+        "vite-plugin-solid": "^2.11.16",
+        "vitest": "^5.1.0",
       },
     },
     "apps/web": {
       "name": "@highjack/web",
-      "version": "0.2.12",
+      "version": "0.2.15",
       "dependencies": {
         "@astrojs/solid-js": "^7.1.6",
         "@fontsource-variable/bricolage-grotesque": "^5.3.0",
@@ -46,22 +46,22 @@
         "@astrojs/check": "^0.9.12",
         "@axe-core/playwright": "^4.14.0",
         "@playwright/test": "^1.65.1",
-        "@tailwindcss/vite": "^4.3.3",
+        "@tailwindcss/vite": "^4.3.5",
         "astro": "^7.3.2",
-        "tailwindcss": "^4.3.3",
-        "vitest": "^5.0.5",
+        "tailwindcss": "^4.3.5",
+        "vitest": "^5.1.0",
       },
     },
     "packages/protocol": {
       "name": "@highjack/protocol",
-      "version": "0.2.12",
+      "version": "0.2.15",
       "devDependencies": {
         "vitest": "^5.1.0",
       },
     },
     "packages/ui": {
       "name": "@highjack/ui",
-      "version": "0.2.12",
+      "version": "0.2.15",
       "dependencies": {
         "tailwindcss": "^4.3.5",
       },
@@ -71,7 +71,7 @@
         "@testing-library/user-event": "^14.6.12",
         "jsdom": "^31.0.1",
         "vite-plugin-solid": "^2.11.16",
-        "vitest": "^5.0.5",
+        "vitest": "^5.1.0",
       },
       "peerDependencies": {
         "solid-js": "^1.9.0",

@@ -13,6 +13,38 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.15',
+    date: '2026-11-17',
+    title: 'The board catches up',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The redesign, finished',
+        tone: 'gold',
+        items: [
+          'The canvas board now uses the shipped palette. Its colours are still literals, because PixiJS cannot read CSS variables, but a repository check holds that mirror to the token file so the board cannot drift again',
+          'The logo, both favicons and the browser theme colour use the new palette too. No surface is left rendering in the retired greens and golds',
+          'Five links had a hover colour that did not exist as a token, so nothing happened on hover. They now brighten to ivory. The side panel has its headings back, the turn steps are a list again, and the mobile navigation marks the current page the same way the desktop one does',
+        ],
+      },
+      {
+        label: 'Words, not wire values',
+        tone: 'teal',
+        items: [
+          'Connection state, player state and the reason a match ended read as plain English everywhere — including the screen-reader board and the live region. The engine values stay underneath the interface',
+        ],
+      },
+      {
+        label: 'Documentation that earns its place',
+        tone: 'teal',
+        items: [
+          'A check now holds every current document’s status line to the release version. The stale ones said v0.2.7 and v0.2.0 long after those releases shipped',
+          'Duplicated and dangling documentation was trimmed, the architecture and design docs now describe the game that exists, and the four dependency ranges that disagreed across workspaces were aligned',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.14',
     date: '2026-11-17',
     title: 'A quieter, more considered interface',
@@ -23,7 +55,7 @@ const entries: Entry[] = [
         tone: 'gold',
         items: [
           'A new palette: near-neutral surfaces, warm ivory text and a single gold accent. Green is no longer applied everywhere; it is reserved for the board itself',
-          'Headings are lighter and tighter, labels are normal-case, and the blurred colour blobs and card-on-card layout are gone. Sections are separated by space and a thin rule',
+          'Headings are lighter and tighter, section labels are normal-case (a few small mono eyebrows remain as accents), and the blurred colour blobs and card-on-card layout are gone. Sections are separated by space and a thin rule',
           'The hero leads with the game you can play and a quiet board motif. A band of four facts replaces a paragraph of claims, and the navigation is four destinations plus a source link',
         ],
       },

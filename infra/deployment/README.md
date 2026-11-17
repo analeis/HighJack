@@ -95,4 +95,4 @@ applied — a late addition that would never run is an error, not a silent skip.
 
 Redis, Kubernetes, service mesh, separate realtime cluster. The server is a
 single stateful-ish process by design until gameplay requires more; premature
-infrastructure is an explicit non-goal (see directive §37).
+infrastructure is an explicit non-goal for v0.2.
