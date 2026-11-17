@@ -13,14 +13,14 @@ export function StatusBanner(): JSX.Element {
       <Show when={status() !== 'connected'}>
         <span
           role="status"
-          class="rounded-pill border border-gold-700/50 bg-felt-950/85 px-4 py-1.5 font-mono text-xs font-bold uppercase tracking-widest text-gold-400 shadow-card"
+          class="rounded-pill border border-gold-700/50 bg-felt-950/90 px-4 py-1.5 text-xs font-semibold text-gold-400 shadow-raised"
         >
           {statusLabel(status())}
         </span>
       </Show>
       <Show when={gameStore.resynced()}>
-        <span class="rounded-pill border border-crimson-600/50 bg-felt-950/85 px-4 py-1.5 font-mono text-xs font-bold uppercase tracking-widest text-crimson-400 shadow-card">
-          state resynced from server
+        <span class="rounded-pill border border-crimson-600/50 bg-felt-950/90 px-4 py-1.5 text-xs font-semibold text-crimson-400 shadow-raised">
+          Caught up with the server
         </span>
       </Show>
     </div>

@@ -725,3 +725,68 @@ fixed it. `SETUP.md` now says so.
 
 CI installs with `--frozen-lockfile` again. A tag should resolve the same
 packages on every runner and every day; without the flag it does not.
+
+## v0.2.14 — interface redesign and floating toolchains (shipped)
+
+This release changed no engine behaviour. It is a deliberate redesign of both
+user-facing surfaces and a small cleanup of the workspace tooling, carried out
+under the same 18-gate certification as every correctness fix.
+
+### The redesign
+
+The previous interface was technically accessible — every foreground colour
+cleared WCAG AA — but it looked like a template: every section was a rounded
+bordered card, every label was uppercase monospace with wide tracking, headings
+were all `font-extrabold`, and the hero carried a blurred coloured blob. Colour
+was decoration rather than information.
+
+The new design tokens keep one near-neutral surface scale, one warm ivory ink
+scale, and a single gold accent. Green is no longer applied to the whole site;
+it is reserved for the board itself. Every foreground token was measured against
+the new background and still clears AA (ivory 17:1, muted 7.3:1, gold 9:1).
+Typography uses a lighter display weight with tighter tracking, normal-case
+labels, and a mono face only where text is genuinely code-like.
+
+- **Marketing:** a two-column hero with a CSS-composed board motif, a band of
+  four scannable facts, and sections separated by whitespace and a thin rule
+  instead of card walls. The navigation is four destinations plus a source
+  link, with a 2 px gold underline for the current route. The footer now says
+  the project has "a playable board loop".
+- **Game:** one primary action at a time, filled gold, with supporting actions
+  outlined. Engine vocabulary was replaced with player vocabulary in the panel
+  and dock (`active / eliminated / disconnected` → `Playing / Out / Away`, no
+  `tick`, plain round counts). The connection state is a dot and a word in the
+  top bar; the frame counter is now DEV-only.
+
+Every structural constraint the browser tests rely on was preserved: the
+`h1` and `main` landmarks, the navigation links, the config playground, the
+hero CTA hrefs, the live two-browser board flow, and zero serious or critical
+axe violations.
+
+### Floating toolchains in CI
+
+The commit brief asked to float action versions "where available". No action
+in use has a `latest` tag — the major tag (`@v7`, `@v2`) _is_ its floating ref,
+and `@main` would run unreleased action code. After two releases lost to
+toolchain drift, tracking an action's development branch is the wrong direction.
+The majors stay pinned; the **tool versions** float instead:
+
+- `bun-version: latest` (already in place),
+- `go-version: stable` in both jobs (a pinned patch drifted into GO-2026-6859),
+- `node-version: 'lts/*'` for Playwright's driver.
+
+`SETUP.md` records the decision and the reasoning.
+
+### Scripts
+
+Modest cleanup rather than a rewrite, because the certification's CI-agreement
+check depends on the gate definitions staying as they are. The root `test` and
+`build` scripts now use one workspace `--filter` expression instead of repeated
+path lists, a new `check:all` script folds the three static checks together, and
+`SETUP.md` documents the script graph — including why `validate` and `certify`
+share one gate-list definition. The script is not named `check`, because that
+would shadow Bun's built-in `bun check` typechecker used by `typecheck:ts`. The
+gate definitions themselves were not touched.
+
+RSK-1 and PRS-3 remain deliberately open. Deployment work is not part of this
+release.

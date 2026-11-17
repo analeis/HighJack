@@ -10,7 +10,8 @@ export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: 'bg-gold-500 text-felt-950 hover:bg-gold-400 active:bg-gold-600 shadow-card font-bold',
+  primary:
+    'bg-gold-500 text-felt-950 hover:bg-gold-400 active:bg-gold-600 shadow-card font-semibold',
   secondary:
     'bg-surface-raised text-cream-100 border border-line-strong hover:bg-surface-overlay hover:border-gold-700 active:bg-felt-800',
   ghost: 'bg-transparent text-muted-400 hover:text-cream-100 hover:bg-felt-800',

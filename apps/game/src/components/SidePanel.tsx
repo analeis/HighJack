@@ -1,15 +1,28 @@
 import { Show } from 'solid-js';
 import type { JSX } from 'solid-js';
-import { Badge, Money } from '@highjack/ui';
+import { Money } from '@highjack/ui';
 import { currentPlayer, myHoldings } from '../state/game-store.ts';
 import type { GameView } from '../state/game-store.ts';
 
+/** Words a player uses, not the engine's enum values. */
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'active':
+      return 'Playing';
+    case 'eliminated':
+      return 'Out';
+    case 'disconnected':
+      return 'Away';
+    default:
+      return status;
+  }
+}
+
 /**
- * The side panel: the full match information.
+ * The side panel: the match at a glance.
  *
- * It is hidden on narrow viewports, where the status strip in the action dock
- * carries the same facts. Both read the same view, so neither is a second
- * source of truth.
+ * Hidden on narrow viewports, where the strip in the dock carries the same
+ * facts. Both read the same view, so neither is a second source of truth.
  */
 export function SidePanel(props: { state: GameView }): JSX.Element {
   const state = () => props.state;
@@ -19,46 +32,33 @@ export function SidePanel(props: { state: GameView }): JSX.Element {
   return (
     <aside
       aria-label="Match information"
-      class="absolute inset-y-0 left-0 z-10 hidden w-72 flex-col gap-4 overflow-y-auto border-r border-line-subtle bg-felt-900/95 p-4 md:flex"
+      class="absolute inset-y-0 left-0 z-10 hidden w-72 flex-col gap-6 overflow-y-auto border-r border-line-subtle bg-felt-950/95 p-6 md:flex"
     >
       <section>
-        <h2 class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Turn</h2>
-        <p class="mt-2 mb-0 text-sm text-cream-300">
-          {turnPlayer()?.name ?? '—'}
-          <Show
-            when={turnPlayer()}
-            fallback={<span class="text-muted-500"> (no active player)</span>}
-          >
-            <span class="text-muted-500"> · {turnPhaseLabel(state().turn.phase)}</span>
-          </Show>
+        <p class="m-0 text-xs text-muted-500">Now playing</p>
+        <p class="mb-0 mt-1 font-display text-2xl text-cream-100">
+          {turnPlayer()?.name ?? 'No one'}
         </p>
-        <p class="mt-1 mb-0 font-mono text-xs text-muted-500">
-          round {state().turn.round} · tick {state().tick}
+        <p class="mb-0 mt-1 text-sm text-muted-400">
+          Round {state().turn.round} · {turnPhaseLabel(state().turn.phase)}
         </p>
         <Show when={state().turn.doublesStreak > 0}>
-          <p class="mt-1 mb-0 font-mono text-xs text-gold-400">
-            doubles ×{state().turn.doublesStreak}
-            {state().turn.awardExtraRoll ? ' · extra roll earned' : ''}
+          <p class="mb-0 mt-2 text-sm text-gold-400">
+            {state().turn.doublesStreak === 1
+              ? 'A double'
+              : `${state().turn.doublesStreak} doubles in a row`}
           </p>
         </Show>
       </section>
 
       <section>
-        <h2 class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">You</h2>
-        <Show
-          when={me()}
-          fallback={<p class="mt-2 mb-0 text-sm text-muted-500">not bound to a seat</p>}
-        >
+        <p class="m-0 border-t border-line-subtle pt-5 text-xs text-muted-500">Your seat</p>
+        <Show when={me()} fallback={<p class="mb-0 mt-3 text-sm text-muted-500">Not seated</p>}>
           {(p) => (
-            <dl class="m-0 mt-2 space-y-1.5 text-sm">
+            <dl class="m-0 mt-3 space-y-2 text-sm">
               <Row label="Seat" value={String(p().seat)} />
               <Row label="Chips" value={<Money amount={p().money} />} />
-              <Row
-                label="Status"
-                value={
-                  <Badge tone={p().status === 'active' ? 'teal' : 'crimson'}>{p().status}</Badge>
-                }
-              />
+              <Row label="State" value={statusLabel(p().status)} />
               <Row label="Holdings" value={String(holdings().length)} />
             </dl>
           )}
@@ -66,18 +66,16 @@ export function SidePanel(props: { state: GameView }): JSX.Element {
       </section>
 
       <section>
-        <h2 class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Table</h2>
-        <ul class="mb-0 mt-2 list-none space-y-1.5 p-0 text-sm">
+        <p class="m-0 border-t border-line-subtle pt-5 text-xs text-muted-500">Players</p>
+        <ul class="mb-0 mt-3 list-none space-y-2 p-0 text-sm">
           {state().players.map((p) => (
             <li
               class="flex items-center justify-between gap-2"
-              classList={{
-                'text-cream-100': p.seat === state().turn.currentSeat,
-              }}
+              classList={{ 'text-cream-100': p.seat === state().turn.currentSeat }}
             >
               <span class="truncate">
                 {p.name}
-                {p.isHost ? ' ★' : ''}
+                {p.isHost ? ' · host' : ''}
               </span>
               <span class="hj-numerals text-muted-400">{p.money.toLocaleString('en-US')}</span>
             </li>
@@ -88,8 +86,8 @@ export function SidePanel(props: { state: GameView }): JSX.Element {
       <Show when={state().lastRoll}>
         {(roll) => (
           <section>
-            <h2 class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Last roll</h2>
-            <p class="mt-2 mb-0 font-display text-2xl font-extrabold text-cream-100">
+            <p class="m-0 border-t border-line-subtle pt-5 text-xs text-muted-500">Last roll</p>
+            <p class="mb-0 mt-2 font-display text-3xl text-cream-100">
               {roll().die1} + {roll().die2} = {roll().die1 + roll().die2}
             </p>
           </section>
@@ -111,12 +109,12 @@ function Row(props: { label: string; value: JSX.Element }): JSX.Element {
 function turnPhaseLabel(phase: string): string {
   switch (phase) {
     case 'await_roll':
-      return 'awaiting roll';
+      return 'roll when ready';
     case 'await_buy_decision':
-      return 'property decision';
+      return 'buy or pass';
     case 'turn_over':
-      return 'ready to end turn';
+      return 'turn finished';
     default:
-      return phase;
+      return '';
   }
 }

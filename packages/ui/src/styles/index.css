@@ -111,7 +111,8 @@
   h3,
   h4 {
     font-family: var(--hj-font-display);
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: -0.03em;
     text-wrap: balance;
   }
 
@@ -163,11 +164,12 @@
     letter-spacing: 0.02em;
   }
 
-  /* Subtle felt texture used behind hero sections. Pure CSS: no assets. */
+  /* One quiet wash behind the page. No blobs, no coloured haze. */
   .hj-felt-bg {
-    background:
-      radial-gradient(1200px 600px at 50% -10%, rgba(230, 182, 78, 0.07), transparent 60%),
-      radial-gradient(900px 500px at 85% 110%, rgba(157, 127, 242, 0.06), transparent 55%),
-      linear-gradient(180deg, var(--hj-color-felt-900) 0%, var(--hj-color-felt-950) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--hj-color-felt-900) 0%,
+      var(--hj-color-felt-950) 40rem
+    );
   }
 }

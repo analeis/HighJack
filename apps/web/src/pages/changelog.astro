@@ -13,6 +13,40 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.14',
+    date: '2026-11-17',
+    title: 'A quieter, more considered interface',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The site',
+        tone: 'gold',
+        items: [
+          'A new palette: near-neutral surfaces, warm ivory text and a single gold accent. Green is no longer applied everywhere; it is reserved for the board itself',
+          'Headings are lighter and tighter, labels are normal-case, and the blurred colour blobs and card-on-card layout are gone. Sections are separated by space and a thin rule',
+          'The hero leads with the game you can play and a quiet board motif. A band of four facts replaces a paragraph of claims, and the navigation is four destinations plus a source link',
+        ],
+      },
+      {
+        label: 'The game screen',
+        tone: 'teal',
+        items: [
+          'One clear primary action at a time: the move that advances the game is filled gold, supporting actions are outlined, and the lobby and dock share the same hierarchy',
+          'The interface speaks the language of players. Engine states became Playing, Out and Away, ticks are gone, and section labels read as plain sentences',
+          'The connection state is a small dot and a word in the top bar, and the frame counter is shown only in development builds',
+        ],
+      },
+      {
+        label: 'Tooling',
+        tone: 'teal',
+        items: [
+          'CI floats its toolchains: the newest stable Go, the newest active Node LTS, and the latest Bun. Pinned patches had twice drifted into failures that looked like code problems',
+          'The workspace scripts are simpler: one filter drives the tests and the builds, a single check command runs every static gate, and the setup notes map out the script graph',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.13',
     date: '2026-11-17',
     title: 'Clearer words, current dependencies',
@@ -525,21 +559,21 @@ const entries: Entry[] = [
   title="Changelog — HighJack"
   description="Every HighJack milestone, documented honestly: what shipped, what's next."
 >
-  <header class="max-w-3xl">
-    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">Changelog</h1>
-    <p class="mt-4 mb-0 text-lg text-muted-400">
-      We ship foundations before fireworks. Every milestone lands here.
+  <header class="border-b border-line-subtle pb-12">
+    <h1 class="m-0 font-display text-4xl sm:text-5xl">Changelog</h1>
+    <p class="mt-5 mb-0 text-lg text-muted-400">
+      Every milestone, documented honestly: what shipped, what changed and why.
     </p>
   </header>
 
-  <div class="mt-10 flex max-w-3xl flex-col gap-6">
+  <div class="flex max-w-3xl flex-col">
     {entries.map((entry) => (
       <article
-        class="rounded-xl border border-line-subtle bg-surface-raised p-6 shadow-card sm:p-8"
+        class="border-b border-line-subtle py-10"
         aria-labelledby={`release-${entry.version}`}
       >
         <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-          <h2 id={`release-${entry.version}`} class="m-0 font-display text-2xl font-extrabold">
+          <h2 id={`release-${entry.version}`} class="m-0 font-display text-2xl text-cream-100">
             v{entry.version} — {entry.title}
           </h2>
           <Badge tone={entry.status === 'released' ? 'teal' : 'gold'}>
@@ -552,7 +586,7 @@ const entries: Entry[] = [
         {entry.highlights.map((group) => (
           <section class="mt-5">
             <h3
-              class={`m-0 font-mono text-xs uppercase tracking-widest ${group.tone === 'teal' ? 'text-teal-400' : group.tone === 'gold' ? 'text-gold-500' : 'text-muted-400'}`}
+              class={`m-0 text-sm font-semibold ${group.tone === 'teal' ? 'text-teal-400' : group.tone === 'gold' ? 'text-gold-500' : 'text-muted-400'}`}
             >
               {group.label}
             </h3>

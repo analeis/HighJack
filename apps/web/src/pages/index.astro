@@ -1,6 +1,5 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Logo from '../components/Logo.astro';
 import SystemCard from '../components/SystemCard.astro';
 import { Badge } from '@highjack/ui';
 import { SYSTEMS } from '../data/systems';
@@ -10,111 +9,160 @@ import { SYSTEMS } from '../data/systems';
   title="HighJack — a multiplayer board game"
   description="Roll, buy properties and collect rent in a private match. One authoritative server decides every outcome."
 >
-  <section
-    class="relative overflow-hidden rounded-xl border border-line-subtle bg-felt-900/60 px-6 py-14 text-center shadow-raised sm:px-10 md:py-20"
-    aria-labelledby="hero-title"
-  >
+  <section class="border-b border-line-subtle" aria-labelledby="hero-title">
     <div
-      class="pointer-events-none absolute -top-24 left-1/2 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-gold-500/10 blur-3xl"
-      aria-hidden="true"
-    ></div>
-    <div class="relative mx-auto flex max-w-2xl flex-col items-center gap-6">
-      <Logo class="h-20 w-20 drop-shadow-[0_8px_24px_rgba(230,182,78,0.25)] md:h-24 md:w-24" />
-      <h1
-        id="hero-title"
-        class="m-0 font-display text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl"
-      >
-        A board game without disputed rolls
-      </h1>
-      <p class="m-0 text-lg leading-relaxed text-muted-400">
-        HighJack puts dice, property and rent on one authoritative server. Create a private match,
-        share the id, and take turns in your browser. Every outcome is decided once, by the engine,
-        for everyone at the table.
+      class="mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-8 md:grid-cols-[1.15fr_0.85fr] md:items-center md:py-24"
+    >
+      <div>
+        <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">
+          v0.2 · Playable board loop
+        </p>
+        <h1
+          id="hero-title"
+          class="mb-0 mt-4 font-display text-4xl leading-[1.08] text-cream-100 sm:text-5xl lg:text-6xl"
+        >
+          A board game without disputed rolls
+        </h1>
+        <p class="mb-0 mt-6 max-w-xl text-lg leading-relaxed text-muted-400">
+          HighJack puts dice, property and rent on one authoritative server. Create a private
+          match, share the id, and take turns in your browser. Every outcome is decided once, for
+          everyone at the table.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a
+            href="/game"
+            class="rounded-md bg-gold-500 px-6 py-3 text-sm font-semibold text-felt-950 no-underline transition-colors hover:bg-gold-400"
+          >
+            See what you can play
+          </a>
+          <a
+            href="/rules"
+            class="rounded-md border border-line-strong px-6 py-3 text-sm font-semibold text-cream-100 no-underline transition-colors hover:border-cream-300"
+          >
+            Read the rules
+          </a>
+        </div>
+      </div>
+
+      {/* A quiet board motif. Pure CSS, and hidden from assistive technology. */}
+      <div class="hidden md:block" aria-hidden="true">
+        <div class="grid grid-cols-4 gap-2 opacity-80">
+          {
+            Array.from({ length: 16 }, (_, i) => (
+              <div
+                class:list={[
+                  'aspect-square rounded-sm border border-line-subtle',
+                  i === 5 || i === 10 ? 'bg-gold-500/15' : 'bg-felt-800',
+                ]}
+              >
+                <div class="flex h-full items-center justify-center">
+                  <div
+                    class:list={[
+                      'h-2 w-2 rounded-full',
+                      i === 5 ? 'bg-gold-500' : i === 10 ? 'bg-cream-300' : 'bg-felt-600',
+                    ]}
+                  />
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="border-b border-line-subtle" aria-label="Match facts">
+    <div class="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-5 py-10 sm:px-8 md:grid-cols-4">
+      <div>
+        <p class="m-0 font-display text-4xl text-cream-100">2–8</p>
+        <p class="mb-0 mt-1 text-sm text-muted-400">players per private table</p>
+      </div>
+      <div>
+        <p class="m-0 font-display text-4xl text-cream-100">1</p>
+        <p class="mb-0 mt-1 text-sm text-muted-400">server decides every outcome</p>
+      </div>
+      <div>
+        <p class="m-0 font-display text-4xl text-cream-100">3</p>
+        <p class="mb-0 mt-1 text-sm text-muted-400">ways to win a match</p>
+      </div>
+      <div>
+        <p class="m-0 font-display text-4xl text-cream-100">0</p>
+        <p class="mb-0 mt-1 text-sm text-muted-400">accounts required to play</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="border-b border-line-subtle py-16" aria-labelledby="today-title">
+    <div class="mx-auto max-w-6xl px-5 sm:px-8">
+      <h2 id="today-title" class="m-0 font-display text-2xl text-cream-100 sm:text-3xl">
+        What works today
+      </h2>
+      <p class="mb-0 mt-4 max-w-3xl text-base leading-relaxed text-muted-400">
+        The current release covers rolling, movement, buying, rent, tax, bankruptcy and
+        last-player-standing victory. Trading, auctions and casino tables are designed but not
+        built. The
+        <a
+          class="text-gold-400 underline underline-offset-2 hover:text-gold-300"
+          href="/features">features page</a
+        >
+        marks each system with its real status.
       </p>
-      <div class="flex flex-wrap items-center justify-center gap-3">
-        <a
-          href="/game"
-          class="rounded-md bg-gold-500 px-6 py-3 font-bold text-felt-950 no-underline shadow-card transition-colors duration-fast hover:bg-gold-400"
-        >
-          See what you can play
-        </a>
-        <a
-          href="/rules"
-          class="rounded-md border border-line-strong bg-surface-raised px-6 py-3 font-bold text-cream-100 no-underline transition-colors duration-fast hover:border-gold-700 hover:text-gold-400"
-        >
-          Read the rules
+    </div>
+  </section>
+
+  <section class="border-b border-line-subtle py-16" aria-labelledby="how-title">
+    <div class="mx-auto max-w-6xl px-5 sm:px-8">
+      <h2 id="how-title" class="m-0 font-display text-2xl text-cream-100 sm:text-3xl">
+        How the game works
+      </h2>
+      <div class="mt-8 grid gap-8 md:grid-cols-3 md:gap-10">
+        <div>
+          <h3 class="m-0 font-display text-lg font-semibold text-cream-100">One referee</h3>
+          <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+            The server rolls the dice, applies purchases and charges rent. The browser draws the
+            result and sends your choices. Nobody can edit their own balance.
+          </p>
+        </div>
+        <div>
+          <h3 class="m-0 font-display text-lg font-semibold text-cream-100">Private tables</h3>
+          <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+            Create a match, copy its id and share it with the people you want to play with. There
+            is no account and no public matchmaking.
+          </p>
+        </div>
+        <div>
+          <h3 class="m-0 font-display text-lg font-semibold text-cream-100">Replayable</h3>
+          <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+            Rolls come from a seeded stream. The same seed and the same actions produce the same
+            match, so any result can be checked afterwards.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="py-16" aria-labelledby="systems-title">
+    <div class="mx-auto max-w-6xl px-5 sm:px-8">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 id="systems-title" class="m-0 font-display text-2xl text-cream-100 sm:text-3xl">
+            Systems in the catalog
+          </h2>
+          <p class="mb-0 mt-3 max-w-2xl text-sm leading-relaxed text-muted-400">
+            Property and economy is playable. The rest are modelled or planned, and each tile says
+            which.
+          </p>
+        </div>
+        <a href="/features" class="text-sm font-semibold text-gold-400 no-underline hover:text-gold-300">
+          All systems →
         </a>
       </div>
-      <p class="m-0 mt-2 inline-flex items-center gap-2 text-sm text-muted-500">
-        <Badge tone="gold">Playable</Badge>
-        Core board loop: dice, property, rent, tax and bankruptcy.
+      <div class="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {SYSTEMS.slice(0, 6).map((system) => <SystemCard system={system} />)}
+      </div>
+      <p class="mb-0 mt-8 text-xs text-muted-500">
+        <Badge tone="neutral">Status</Badge> Playable · Modeled · In development · Planned
       </p>
-    </div>
-  </section>
-
-  <section
-    class="mt-12 rounded-lg border border-line-subtle bg-surface-raised p-6"
-    aria-labelledby="today-title"
-  >
-    <h2 id="today-title" class="m-0 font-display text-lg font-bold text-cream-100">
-      What works today
-    </h2>
-    <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
-      Two to eight players share a private match over a WebSocket. The current release covers
-      rolling, movement, buying, rent, tax, bankruptcy and last-player-standing victory. Trading,
-      auctions and casino tables are designed but not built. The
-      <a class="text-gold-400 underline underline-offset-2 hover:text-gold-500" href="/features">features page</a>
-      marks each system with its real status.
-    </p>
-  </section>
-
-  <section class="mt-16" aria-labelledby="how-title">
-    <h2 id="how-title" class="m-0 font-display text-2xl font-extrabold sm:text-3xl">
-      How the game works
-    </h2>
-    <div class="mt-8 grid gap-4 md:grid-cols-3">
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
-        <h3 class="m-0 font-display text-xl font-bold">One referee</h3>
-        <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
-          The server rolls the dice, applies purchases and charges rent. The browser draws the
-          result and sends your choices. Nobody can edit their own balance.
-        </p>
-      </article>
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
-        <h3 class="m-0 font-display text-xl font-bold">Private tables</h3>
-        <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
-          Create a match, copy its id and share it with the people you want to play with. There is
-          no account and no public matchmaking.
-        </p>
-      </article>
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-6 shadow-card">
-        <h3 class="m-0 font-display text-xl font-bold">Replayable by design</h3>
-        <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
-          Rolls come from a seeded stream. The same seed and the same actions produce the same
-          match, so any result can be checked afterwards.
-        </p>
-      </article>
-    </div>
-  </section>
-
-  <section class="mt-16" aria-labelledby="systems-title">
-    <div class="flex items-end justify-between gap-4">
-      <h2 id="systems-title" class="m-0 font-display text-2xl font-extrabold sm:text-3xl">
-        Systems in the catalog
-      </h2>
-      <a
-        href="/features"
-        class="shrink-0 text-sm font-bold text-gold-400 no-underline hover:text-gold-500"
-      >
-        All systems →
-      </a>
-    </div>
-    <p class="mb-0 mt-3 max-w-2xl text-sm leading-relaxed text-muted-400">
-      Property and economy is playable. The other systems are modelled or planned, and each card
-      on the features page says which.
-    </p>
-    <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {SYSTEMS.slice(0, 6).map((system) => <SystemCard system={system} />)}
     </div>
   </section>
 </BaseLayout>

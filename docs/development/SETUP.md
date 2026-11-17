@@ -8,8 +8,9 @@
 | [Go](https://go.dev)  | 1.26.x     | Backend                                |
 | Docker                | any recent | Only for the optional local PostgreSQL |
 
-Node is not required directly (Bun drives everything); Playwright will
-fetch a browser on first e2e run.
+Node is not required directly (Bun drives everything); CI installs the newest
+active Node LTS for Playwright's driver, which fetches a browser on first e2e
+run.
 
 ### Why Bun 1.4.3 and not "whatever is installed"
 
@@ -23,6 +24,21 @@ nothing about the release.
 So there is no `packageManager` field now. The requirement is stated as a
 minimum in `engines.bun`, and CI installs the newest Bun, so a regression in the
 newest release surfaces immediately rather than at the next pin bump.
+
+### Floating toolchains in CI
+
+CI floats its tool versions but keeps `uses:` refs on major tags:
+
+| Input          | Value    | Why                                                                   |
+| -------------- | -------- | --------------------------------------------------------------------- |
+| `bun-version`  | `latest` | Needs `bun check`; an old pin once failed the typecheck gate in CI    |
+| `go-version`   | `stable` | A pinned patch drifted into advisory GO-2026-6859 and broke a release |
+| `node-version` | `lts/*`  | New enough for Playwright without tracking Node's bleeding edge       |
+
+A GitHub Action has no `latest` tag — its major tag (`@v7`, `@v2`) _is_ the
+floating ref, updated to the latest release in that major. Tracking `@main`
+would run unreleased action code, which is the opposite of the reliability this
+project needs after two toolchain-drift releases, so the majors stay pinned.
 
 ## Bootstrap
 
@@ -113,6 +129,7 @@ To create one:
 ## Full validation
 
 ```sh
+bun run check:all    # lint + typecheck + format:check — "is this tree clean?"
 bun run test         # every workspace's unit tests, then the Go suite with -race
 bun run typecheck    # bun check, the reference compiler, and astro check
 bun run lint         # oxlint and go vet
@@ -121,6 +138,26 @@ bun run format:check # oxfmt, without writing
 bun run validate     # formatting, lint, typecheck, unit tests, builds, asset & repo sanity
 bun run certify      # validate + browser verification + release classification
 ```
+
+### The script graph
+
+The convenience scripts and the certification gates are deliberately separate:
+
+- `test`, `build` and `check` are developer conveniences. `test` runs each
+  workspace's own `test` through one `--filter` expression; `build` builds both
+  apps and the server through one expression; `check:all` folds the three static
+  checks into one command. (It is not named `check`, because Bun has a built-in
+  `bun check` typechecker that `typecheck:ts` relies on — a script with that name
+  shadows the built-in.) Adding a workspace needs no edit to these.
+- The gates in `scripts/lib/validation-gates.ts` and `verification-gates.ts`
+  are the single definition of what certification checks. They call the
+  workspace-local scripts directly (for example `bun run build` in `apps/web`),
+  not the root conveniences, so a convenience edit cannot weaken a gate.
+- `validate` and `certify` intentionally share one gate-list definition. They
+  import the same arrays; `certify` simply adds browser verification and the
+  release classification. This is what makes it impossible for the two
+  pipelines to drift apart. CI invokes the same gates by name via
+  `bun run gate <name>`.
 
 See [VALIDATION.md](./VALIDATION.md) and [TESTING.md](./TESTING.md).
 

@@ -101,6 +101,7 @@ export function ActionDock(props: {
         <ActionButton
           label="Start"
           hint="only the host can start, and only when everyone is ready"
+          primary={allowed('game_start')}
           enabled={allowed('game_start') && !pending()}
           onClick={() => props.onAct('game_start')}
         />
@@ -115,14 +116,17 @@ export function ActionDock(props: {
             </span>
           )}
         </Show>
+        <span class="mx-1 hidden h-8 w-px bg-line-subtle sm:block" aria-hidden="true" />
         <ActionButton
           label="Roll"
           hint="roll two dice and move"
+          primary={allowed('roll_dice')}
           enabled={allowed('roll_dice') && !pending()}
           onClick={() => props.onAct('roll_dice')}
         />
         <ActionButton
           label="Buy"
+          primary={allowed('buy_property')}
           hint={
             space()?.kind === 'property'
               ? `buy ${space()?.name} for ${space()?.price}`
@@ -139,6 +143,7 @@ export function ActionDock(props: {
         />
         <ActionButton
           label="End turn"
+          primary={allowed('end_turn')}
           hint="pass the turn to the next player"
           enabled={allowed('end_turn') && !pending()}
           onClick={() => props.onAct('end_turn')}
@@ -167,8 +172,19 @@ function ActionButton(props: {
   label: string;
   hint: string;
   enabled: boolean;
+  /** The action that moves the game forward; only one is primary at a time. */
+  primary?: boolean;
   onClick: () => void;
 }): JSX.Element {
+  const classes = () => {
+    if (!props.enabled) {
+      return 'min-h-11 cursor-not-allowed rounded-md border border-line-subtle px-5 py-2 font-display text-sm font-semibold text-muted-500 opacity-60';
+    }
+    if (props.primary) {
+      return 'min-h-11 cursor-pointer rounded-md bg-gold-500 px-5 py-2 font-display text-sm font-semibold text-felt-950 transition-colors hover:bg-gold-400';
+    }
+    return 'min-h-11 cursor-pointer rounded-md border border-line-strong px-5 py-2 font-display text-sm font-semibold text-cream-100 transition-colors hover:border-cream-300';
+  };
   return (
     <button
       type="button"
@@ -176,11 +192,7 @@ function ActionButton(props: {
       title={props.hint}
       aria-label={`${props.label}: ${props.hint}`}
       onClick={() => void props.onClick()}
-      class={
-        props.enabled
-          ? 'min-h-11 cursor-pointer rounded-md bg-gold-500 px-5 py-2 font-display text-sm font-bold text-felt-950 shadow-card transition-colors hover:bg-gold-400'
-          : 'min-h-11 cursor-not-allowed rounded-md border border-line-subtle bg-surface-raised px-5 py-2 font-display text-sm font-bold text-muted-500 opacity-70'
-      }
+      class={classes()}
     >
       {props.label}
     </button>

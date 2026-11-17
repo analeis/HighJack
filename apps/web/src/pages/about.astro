@@ -6,70 +6,70 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   title="About — HighJack"
   description="Why HighJack exists: a configurable, deterministic, multiplayer board game built in the open."
 >
-  <header class="max-w-3xl">
-    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">About HighJack</h1>
-    <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
+  <header class="border-b border-line-subtle pb-12">
+    <h1 class="m-0 font-display text-4xl sm:text-5xl">About HighJack</h1>
+    <p class="mb-0 mt-5 max-w-2xl text-lg leading-relaxed text-muted-400">
       Most property-board games come with one fixed rulebook. HighJack lets the table choose its
       own rules before the first roll.
     </p>
   </header>
 
-  <section class="mt-12 max-w-3xl" aria-label="Project story">
-    <div class="space-y-4 text-md leading-relaxed text-muted-400">
-      <p>
+  <section class="border-b border-line-subtle py-14" aria-label="Project story">
+    <div class="max-w-3xl space-y-5 text-base leading-relaxed text-muted-400">
+      <p class="m-0">
         The name is a nod to hitting the jackpot and taking it from someone else. It is play money
         only. The game is about making calculated risks with people you know.
       </p>
-      <p>
+      <p class="m-0">
         The current release is one table: dice, property, rent, tax and bankruptcy. The engine
         decides every outcome on the server from a seeded stream, so the same actions always lead
         to the same match. That makes results checkable and keeps the browser honest.
       </p>
-      <p class="mb-0">
-        Further systems are designed but not playable yet. Each one is marked with its status on the
-        <a class="text-gold-400 no-underline hover:text-gold-500" href="/features">features page</a>.
+      <p class="m-0">
+        Further systems are designed but not playable yet. Each one is marked with its status on
+        the
+        <a class="text-gold-400 underline underline-offset-2 hover:text-gold-300" href="/features"
+          >features page</a
+        >.
       </p>
     </div>
   </section>
 
-  <section class="mt-12" aria-labelledby="stack-title">
-    <h2 id="stack-title" class="m-0 font-display text-2xl font-extrabold">Built with</h2>
-    <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
-        <h3 class="m-0 font-display font-bold text-cream-100">Astro and SolidJS</h3>
-        <p class="mb-0 mt-1 text-sm text-muted-400">
+  <section class="border-b border-line-subtle py-14" aria-labelledby="stack-title">
+    <h2 id="stack-title" class="m-0 font-display text-2xl text-cream-100 sm:text-3xl">Built with</h2>
+    <div class="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="border-t border-line-subtle pt-4">
+        <h3 class="m-0 font-display text-base font-semibold text-cream-100">Astro and SolidJS</h3>
+        <p class="mb-0 mt-2 text-sm text-muted-400">
           The website is static HTML. The game client is a Solid app.
         </p>
-      </article>
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
-        <h3 class="m-0 font-display font-bold text-cream-100">PixiJS</h3>
-        <p class="mb-0 mt-1 text-sm text-muted-400">The board is drawn on a canvas.</p>
-      </article>
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
-        <h3 class="m-0 font-display font-bold text-cream-100">Go</h3>
-        <p class="mb-0 mt-1 text-sm text-muted-400">
+      </div>
+      <div class="border-t border-line-subtle pt-4">
+        <h3 class="m-0 font-display text-base font-semibold text-cream-100">PixiJS</h3>
+        <p class="mb-0 mt-2 text-sm text-muted-400">The board is drawn on a canvas.</p>
+      </div>
+      <div class="border-t border-line-subtle pt-4">
+        <h3 class="m-0 font-display text-base font-semibold text-cream-100">Go</h3>
+        <p class="mb-0 mt-2 text-sm text-muted-400">
           The rules engine and the WebSocket server run in one process.
         </p>
-      </article>
-      <article class="rounded-lg border border-line-subtle bg-surface-raised p-5 shadow-card">
-        <h3 class="m-0 font-display font-bold text-cream-100">Bun</h3>
-        <p class="mb-0 mt-1 text-sm text-muted-400">
+      </div>
+      <div class="border-t border-line-subtle pt-4">
+        <h3 class="m-0 font-display text-base font-semibold text-cream-100">Bun</h3>
+        <p class="mb-0 mt-2 text-sm text-muted-400">
           One toolchain for the workspaces, tests and builds.
         </p>
-      </article>
+      </div>
     </div>
   </section>
 
-  <section
-    class="mt-12 max-w-3xl rounded-lg border border-line-subtle bg-felt-900/60 p-6"
-    aria-label="Open source"
-  >
-    <h2 class="m-0 font-display text-lg font-bold text-cream-100">Open source</h2>
-    <p class="mb-0 mt-2 text-sm leading-relaxed text-muted-400">
+  <section class="py-14" aria-label="Open source">
+    <h2 class="m-0 font-display text-lg font-semibold text-cream-100">Open source</h2>
+    <p class="mb-0 mt-3 max-w-3xl text-sm leading-relaxed text-muted-400">
       The engine, protocol, tooling and this site are MIT-licensed at
       <a
         href="https://github.com/analeis/highjack"
-        class="font-bold text-gold-400 hover:text-gold-500"
+        class="text-gold-400 underline underline-offset-2 hover:text-gold-300"
       >
         github.com/analeis/highjack
       </a>

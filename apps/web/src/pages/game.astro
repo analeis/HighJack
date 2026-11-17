@@ -7,46 +7,51 @@ import { Badge } from '@highjack/ui';
   title="The game — HighJack"
   description="What HighJack can play today: a private match with dice, property, rent, tax and bankruptcy, decided by an authoritative server."
 >
-  <header class="max-w-3xl">
-    <h1 class="m-0 font-display text-3xl font-extrabold sm:text-4xl">What you can play</h1>
-    <p class="mt-4 mb-0 text-lg leading-relaxed text-muted-400">
+  <header class="border-b border-line-subtle pb-12">
+    <p class="m-0 font-mono text-xs uppercase tracking-widest text-gold-500">Playable now</p>
+    <h1 class="mb-0 mt-4 font-display text-4xl sm:text-5xl">What you can play</h1>
+    <p class="mb-0 mt-5 max-w-2xl text-lg leading-relaxed text-muted-400">
       The current release is the core board loop. Create a private match, share its id, and take
       turns rolling, buying and paying rent. The server decides every outcome.
     </p>
   </header>
 
-  <section class="mt-12" aria-labelledby="turn-title">
-    <h2 id="turn-title" class="m-0 font-display text-2xl font-extrabold">How a turn works</h2>
-    <ol class="mt-6 grid gap-3 md:grid-cols-2">
-      <li class="rounded-lg border border-line-subtle bg-surface-raised p-5">
-        <span class="font-mono text-xs text-gold-500">01</span>
-        <h3 class="mb-1 mt-2 font-display text-lg font-bold text-cream-100">You act</h3>
+  <section class="border-b border-line-subtle py-14" aria-labelledby="turn-title">
+    <h2 id="turn-title" class="m-0 font-display text-2xl text-cream-100 sm:text-3xl">
+      How a turn works
+    </h2>
+    <div class="mt-8 grid gap-10 md:grid-cols-2">
+      <div class="border-t border-line-subtle pt-5">
+        <p class="m-0 font-mono text-xs text-gold-500">01</p>
+        <h3 class="mb-2 mt-3 font-display text-xl font-semibold text-cream-100">You act</h3>
         <p class="m-0 text-sm leading-relaxed text-muted-400">
           Roll the dice, then choose to buy or decline the property you land on. End the turn when
           you are done.
         </p>
-      </li>
-      <li class="rounded-lg border border-line-subtle bg-surface-raised p-5">
-        <span class="font-mono text-xs text-gold-500">02</span>
-        <h3 class="mb-1 mt-2 font-display text-lg font-bold text-cream-100">The server decides</h3>
+      </div>
+      <div class="border-t border-line-subtle pt-5">
+        <p class="m-0 font-mono text-xs text-gold-500">02</p>
+        <h3 class="mb-2 mt-3 font-display text-xl font-semibold text-cream-100">
+          The server decides
+        </h3>
         <p class="m-0 text-sm leading-relaxed text-muted-400">
           It applies your action, charges rent, awards bonuses and advances the turn. Your browser
           receives the result and draws it.
         </p>
-      </li>
-    </ol>
+      </div>
+    </div>
   </section>
 
-  <section class="mt-12" aria-labelledby="authority-title">
-    <h2 id="authority-title" class="m-0 font-display text-2xl font-extrabold">
+  <section class="border-b border-line-subtle py-14" aria-labelledby="authority-title">
+    <h2 id="authority-title" class="m-0 font-display text-2xl text-cream-100 sm:text-3xl">
       Who decides what happens
     </h2>
     <div
-      class="mt-6 overflow-x-auto rounded-lg border border-line-subtle bg-felt-900/50 p-6 shadow-card"
+      class="mt-6 overflow-x-auto border-l-2 border-l-gold-500 py-2 pl-6"
       tabindex={0}
       aria-label="Action flow diagram, scrollable"
     >
-      <pre class="m-0 min-w-[28rem] font-mono text-xs leading-relaxed text-muted-400 sm:text-sm"><code>Your choice
+      <pre class="m-0 min-w-[28rem] font-mono text-xs leading-loose text-muted-400 sm:text-sm"><code>Your choice
     ↓
 Action sent to the server
     ↓
@@ -56,31 +61,30 @@ Events describe what changed
     ↓
 Every player sees the same state</code></pre>
     </div>
-    <p class="mt-4 max-w-3xl text-sm leading-relaxed text-muted-400">
+    <p class="mt-5 max-w-3xl text-sm leading-relaxed text-muted-400">
       The browser only requests and renders. Rolls come from a seeded stream, so the same seed and
       the same actions reproduce the same match.
     </p>
   </section>
 
-  <section
-    class="mt-12 rounded-lg border border-line-subtle bg-surface-raised p-6"
-    aria-label="Development status"
-  >
-    <h2 class="m-0 flex flex-wrap items-center gap-3 font-display text-lg font-bold text-cream-100">
+  <section class="border-l-2 border-l-gold-500 py-2 pl-6 my-14" aria-label="Development status">
+    <h2 class="m-0 flex flex-wrap items-center gap-3 font-display text-lg font-semibold text-cream-100">
       Current status
       <Badge tone="gold">Playable</Badge>
     </h2>
-    <p class="mt-2 mb-0 text-sm leading-relaxed text-muted-400">
+    <p class="mt-3 mb-0 max-w-3xl text-sm leading-relaxed text-muted-400">
       Two to eight players can join one private match. The board loop covers dice, movement,
       buying, rent, tax, bankruptcy and victory. The client is a Solid app over a canvas board; it
       renders server state and does not compute outcomes. Run it locally with:
-      <code class="ml-1 rounded bg-felt-950 px-2 py-1 font-mono text-xs text-gold-400">
+      <code class="ml-1 rounded bg-felt-800 px-2 py-1 font-mono text-xs text-gold-400">
         bun run dev:game
       </code>
     </p>
-    <p class="mb-0 mt-3 text-sm leading-relaxed text-muted-400">
+    <p class="mb-0 mt-4 text-sm leading-relaxed text-muted-400">
       Trading, auctions and the other systems are not playable yet. Their status is listed on the
-      <a class="text-gold-400 underline underline-offset-2 hover:text-gold-500" href="/features">features page</a>.
+      <a class="text-gold-400 underline underline-offset-2 hover:text-gold-300" href="/features"
+        >features page</a
+      >.
     </p>
   </section>
 </BaseLayout>
