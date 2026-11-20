@@ -1,6 +1,6 @@
 {
   "name": "@highjack/game",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "description": "HighJack game client shell: SolidJS application surface over a PixiJS render layer.",
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,10 @@
     "tailwindcss": "^4.3.5"
   },
   "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
     "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/user-event": "^14.6.12",
+    "jsdom": "^31.0.1",
     "vite": "^8.3.8",
     "vite-plugin-solid": "^2.11.16",
     "vitest": "^5.1.0"

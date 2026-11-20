@@ -25,8 +25,8 @@ const RELEASE_VERSION = readFileSync(
  * and request.
  */
 
-const SERVER = 'http://127.0.0.1:8080';
-const GAME_URL = 'http://127.0.0.1:5173';
+const SERVER = `http://127.0.0.1:${process.env.HIGHJACK_E2E_SERVER_PORT ?? '8080'}`;
+const GAME_URL = `http://127.0.0.1:${process.env.HIGHJACK_E2E_GAME_PORT ?? '5173'}`;
 
 async function openLobby(page: Page, name: string) {
   await page.goto(GAME_URL, { waitUntil: 'domcontentloaded' });

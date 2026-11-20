@@ -4,7 +4,17 @@ import { defineConfig, devices } from '@playwright/test';
  * Browser verification for the HighJack website.
  * Serves the production build (astro preview) and runs route, navigation,
  * console-error, responsive, and accessibility checks.
+ *
+ * The ports default to the release layout but can be moved for local runs
+ * (for example when another project already owns 8080). The game spec reads
+ * the same variables, so the server, the client and the assertions stay on
+ * one configuration.
  */
+const WEB_PORT = process.env.HIGHJACK_E2E_WEB_PORT ?? '4321';
+const GAME_PORT = process.env.HIGHJACK_E2E_GAME_PORT ?? '5173';
+const SERVER_PORT = process.env.HIGHJACK_E2E_SERVER_PORT ?? '8080';
+const origin = (port: string) => `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -12,7 +22,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4321',
+    baseURL: origin(WEB_PORT),
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
@@ -31,9 +41,8 @@ export default defineConfig({
     // process to manage while it polls the URL. The leftover daemon is
     // stopped by the next run's first step; steady state never exceeds one.
     {
-      command:
-        'bun run preview stop >/dev/null 2>&1; bun run preview --host 127.0.0.1 --port 4321; tail -f /dev/null',
-      url: 'http://127.0.0.1:4321',
+      command: `bun run preview stop >/dev/null 2>&1; bun run preview --host 127.0.0.1 --port ${WEB_PORT}; tail -f /dev/null`,
+      url: origin(WEB_PORT),
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
@@ -41,9 +50,8 @@ export default defineConfig({
     // the same `vite preview` the release ships. It is a second origin from
     // the website, so the Go server below is told to accept it.
     {
-      command:
-        'cd ../game && bun run preview --host 127.0.0.1 --port 5173 --strictPort; tail -f /dev/null',
-      url: 'http://127.0.0.1:5173',
+      command: `cd ../game && bun run preview --host 127.0.0.1 --port ${GAME_PORT} --strictPort; tail -f /dev/null`,
+      url: origin(GAME_PORT),
       // See the note above: a stale preview is worse than a slow start.
       reuseExistingServer: false,
       timeout: 60_000,
@@ -62,7 +70,7 @@ export default defineConfig({
       // identify itself.
       command:
         'cd ../.. && ./scripts/build-server.sh && ./bin/highjack-server 2>/tmp/highjack-e2e-server.log; tail -f /dev/null',
-      url: 'http://127.0.0.1:8080/health',
+      url: `${origin(SERVER_PORT)}/health`,
       // The game server is the oracle for every assertion in the game suite. A
       // `go run` process left over from an earlier build answers /health happily
       // while running entirely different rules, so a green run would certify
@@ -71,11 +79,11 @@ export default defineConfig({
       timeout: 120_000,
       env: {
         HIGHJACK_ENV: 'test',
-        HIGHJACK_ADDR: '127.0.0.1:8080',
+        HIGHJACK_ADDR: `127.0.0.1:${SERVER_PORT}`,
         HIGHJACK_LOG_LEVEL: 'warn',
         // The game client runs on a different origin (Vite preview port),
         // so the lobby accepts those origins explicitly.
-        HIGHJACK_ALLOWED_ORIGINS: 'http://127.0.0.1:5173,http://localhost:5173',
+        HIGHJACK_ALLOWED_ORIGINS: `${origin(GAME_PORT)},http://localhost:${GAME_PORT}`,
       },
     },
   ],

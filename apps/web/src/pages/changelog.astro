@@ -13,6 +13,32 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.16',
+    date: '2026-11-20',
+    title: 'A net under the interface',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The game UI is tested now',
+        tone: 'gold',
+        items: [
+          'The player-facing surface has unit tests for the first time. They cover the action dock’s one-primary-at-a-time hierarchy, the side panel headings, the header’s release and match line, the lobby’s pinned labels, the status banner and the live region',
+          'The screen-reader board has its own tests, so the engine words that used to leak into it are now held out by a gate rather than by a promise',
+          'The label module is tested directly: every connection state, player state and end reason must read as plain English, including an unknown value arriving from a newer server',
+          'Component tests opt into jsdom per file; the store and network tests keep the faster node environment. No gate definition changed',
+          'The browser harness ports can now be moved with environment variables, so a local run no longer collides with another project holding port 8080',
+        ],
+      },
+      {
+        label: 'Why this matters',
+        tone: 'teal',
+        items: [
+          'The last two releases changed every visible surface, but the only net over those changes was the browser suite. The audit found thirteen game UI modules with no unit tests. That gap is closed for the player-facing ones',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.15',
     date: '2026-11-17',
     title: 'The board catches up',

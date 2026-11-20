@@ -1,6 +1,6 @@
 # The Game Engine Boundary
 
-> Status: v0.2.15 Board Loop — the lifecycle ruleset and the full board loop
+> Status: v0.2.16 Board Loop — the lifecycle ruleset and the full board loop
 > (dice, movement, landing, purchase, rent, tax, insolvency, victory) are
 > implemented and tested. Chaos-catalog systems remain unimplemented by
 > design.

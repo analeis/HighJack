@@ -29,11 +29,13 @@
   roles, aria states, and keyboard behavior — not implementation details.
   They run under jsdom with `@solidjs/testing-library` and automatic cleanup
   (`packages/ui/test/setup.ts`).
-- `apps/game` runs under the **node** environment, not jsdom, and has neither
-  `@solidjs/testing-library` nor a setup file. Its tests cover the store and the
-  network layer. **The `App.tsx` UI has no component tests**; its behaviour is
-  covered by the browser suite instead. Do not assume otherwise when adding
-  coverage.
+- `apps/game` state and network tests run under the **node** environment;
+  component tests opt into jsdom with a per-file docblock and use the same
+  testing-library and cleanup setup as `packages/ui`. Together they cover the
+  player-facing surface: the dock's action hierarchy, the side panel, the
+  header, the lobby, the status banner, the live region, the screen-reader board
+  and the shared label module. `App.tsx` itself is covered by the browser suite
+  rather than a component test, because it owns the socket lifecycle.
 - No snapshot tests of markup; assert what a user or screen reader gets.
 
 ## The lint gate, and the root install

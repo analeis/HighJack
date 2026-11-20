@@ -847,3 +847,49 @@ the persistence layer uses no SQL-side JSON, advisory locks or `RETURNING`, so
 a switch is viable, but it would rewrite three migrations, four test files
 whose isolation is schema-based, the CI database job and the certified report
 for no unblocked functional gain. Deployment remains out of scope.
+
+## v0.2.16 — a net under the interface (shipped)
+
+The audit found that the game client's entire rendered surface had no unit
+tests: the browser suite was the only net over two releases of UI changes. This
+release adds one without touching a gate definition or the engine.
+
+### What was added
+
+Seven component test files plus a direct test of the shared label module,
+built on `@solidjs/testing-library` and jsdom (`apps/game/test/setup.ts`). The
+existing store and network tests keep the node environment; component tests
+opt into jsdom with a per-file docblock, so `test:ts` still runs one command.
+
+The tests encode the regressions the last two releases fixed:
+
+- the dock has exactly one filled primary action, and a pass action stays
+  secondary;
+- the side panel keeps its four `<h2>` headings — a plain styled `<p>` looks
+  the same but cannot be reached with the heading keys;
+- the header states the release and the match on every viewport, and updates
+  when the connection changes after mount;
+- the lobby keeps the labels and busy wording the browser suite pins;
+- the status banner and live region use player words, and the live region is
+  mounted before it has anything to announce;
+- the screen-reader board keeps its headings and tables and never emits a raw
+  status or end reason.
+
+Fixtures live in one module (`apps/game/test/fixtures.ts`) so a component test
+does not rebuild a snapshot by hand. `gameStore.reset()` runs before every
+case; without it a leaked view would let one case satisfy another's assertions.
+
+`App.tsx` is still covered by the browser suite rather than a component test,
+because it owns the socket lifecycle. TESTING.md says so rather than implying
+the whole client is unit-tested.
+
+The browser harness ports are now overridable (`HIGHJACK_E2E_WEB_PORT`,
+`HIGHJACK_E2E_GAME_PORT`, `HIGHJACK_E2E_SERVER_PORT`). Defaults are unchanged,
+so CI is unaffected; the change came from a local run where an unrelated
+project held port 8080 and the harness correctly refused to reuse it.
+
+### Not in this release
+
+The first tier of engine test maturity (recorded scenario files, property-based
+tests, replay and invariant fuzzing) is the next milestone. RSK-1 and PRS-3
+remain open decisions; no deployment or database work was done.

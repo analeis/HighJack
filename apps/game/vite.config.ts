@@ -21,9 +21,12 @@ export default defineConfig({
     ),
   },
   test: {
-    include: ['test/**/*.test.ts'],
+    // Component tests are .tsx and opt into jsdom with a per-file docblock;
+    // the state and network tests keep the faster node environment.
+    include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
     environment: 'node',
     globals: true,
+    setupFiles: ['test/setup.ts'],
   },
   resolve: {
     conditions: ['development', 'browser'],
