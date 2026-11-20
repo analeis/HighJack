@@ -1,6 +1,6 @@
 # The Game Engine Boundary
 
-> Status: v0.2.16 Board Loop — the lifecycle ruleset and the full board loop
+> Status: v0.2.17 Board Loop — the lifecycle ruleset and the full board loop
 > (dice, movement, landing, purchase, rent, tax, insolvency, victory) are
 > implemented and tested. Chaos-catalog systems remain unimplemented by
 > design.
@@ -39,13 +39,17 @@ New State
 1. **Atomicity** — a failed `Apply` leaves state untouched (tested).
 2. **Determinism** — same seed + same action sequence ⇒ identical state
    bytes and event log (tested).
-3. **Tick discipline** — exactly one tick per applied action.
-4. **Events correspond to transitions** — a no-op action emits nothing.
+3. **Tick discipline** — exactly one tick per applied action (tested by
+   `invariant_fuzz_test.go`).
+4. **Events correspond to transitions** — a no-op action emits nothing; the
+   engine refuses redundant changes, and every accepted action emits at least
+   one event stamped with the new tick (tested by `invariant_fuzz_test.go`).
 5. **No hidden randomness** — handlers receive an `Rng`; nothing else in
    domain logic generates numbers. Every roll consumes exactly two draws
-   in fixed order, whatever the outcome.
+   in fixed order, whatever the outcome (tested by `invariant_fuzz_test.go`).
 6. **Value-typed ownership** — `RuntimeSpace` stores owner as a value, not
-   a pointer, so `Clone` is a true deep copy with no aliasing.
+   a pointer, so `Clone` is a true deep copy with no aliasing (tested by
+   `invariant_fuzz_test.go`).
 
 ## Deterministic RNG design
 

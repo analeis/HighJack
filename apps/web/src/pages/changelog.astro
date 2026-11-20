@@ -13,6 +13,31 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.17',
+    date: '2026-11-20',
+    title: 'Fuzzing the rules',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The guarantees with no test',
+        tone: 'gold',
+        items: [
+          'Four engine guarantees were documented but untested: exactly one tick per accepted action, no event from an action that changes nothing, exactly two dice draws in fixed order, and a clone that never aliases the original',
+          'Go’s built-in fuzzer now drives seeded action sequences and checks those properties after every transition. It uses only the standard library, so no dependency, gate or CI definition changed',
+          'A short fuzzing session covered well over a hundred thousand executions without a finding. The durable corpus lives in the test file, so any future failure reproduces from a single seed',
+        ],
+      },
+      {
+        label: 'Also',
+        tone: 'teal',
+        items: [
+          'Removed a dead helper closure from the board determinism test; the live per-action variant was the one actually running',
+          'The test roadmap now says which tiers exist rather than presenting all four as future work',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.16',
     date: '2026-11-20',
     title: 'A net under the interface',

@@ -635,30 +635,8 @@ func TestInvalidActionsLeaveStateUntouched(t *testing.T) {
 // TestBoardDeterminism reruns a scripted multi-turn match twice and
 // requires byte-identical states and event logs.
 func TestBoardDeterminism(t *testing.T) {
-	run := func() (string, []string) {
-		root := Seed{0x0B}
-		e, state := testMatchEngine(t, DefaultConfig(), root)
-		ids, state := startBoardMatch(t, e, state, "A", "B", "C")
-		var log []string
-		for round := 0; round < 4 && state.Phase == PhasePlaying; round++ {
-			for _, id := range ids {
-				if state.Phase != PhasePlaying {
-					break
-				}
-				p := state.PlayerByID(id)
-				if p == nil || !p.Active() || p.Seat != state.Turn.CurrentSeat {
-					continue
-				}
-				state = finishTurn(t, e, state, id)
-				// finishTurn consumes whole turns; re-derive the log from
-				// per-action application instead for exactness.
-				_ = log
-			}
-		}
-		return mustJSON(t, state), log
-	}
-	_ = run
-	// Precise per-action logging variant.
+	// Replay per action so the event log is exact; a helper that consumes whole
+	// turns cannot reconstruct it, so there is one logging variant, not two.
 	runLogged := func() (string, []string) {
 		root := Seed{0x0B}
 		e, state := testMatchEngine(t, DefaultConfig(), root)

@@ -112,17 +112,21 @@ Then:  state has one player at seat 0 holding 1500, host flag set,
        one player_joined event at tick 1
 ```
 
-Roadmap for future suites (in priority order):
+Suite maturity (in priority order):
 
 1. **Table-driven scenario files** — recorded `(seed, actions) → events`
-   cases reviewed like specs.
+   cases reviewed like specs. Not done: the existing board scenarios are
+   inline Go tests, and re-encoding them as files would duplicate coverage.
 2. **Property-based tests** — randomized-but-seeded action sequences
    checked against invariants (money conservation, ownership uniqueness,
-   phase legality).
+   phase legality). Partly covered by the seeded walks in `board_test.go`
+   and `legality_test.go`.
 3. **Replay tests** — event logs re-applied to genesis state must
-   reproduce final state hashes.
-4. **Invariant fuzzing** — long random simulations asserting the invariant
-   list in GAME_ENGINE.md never breaks.
+   reproduce final state hashes. Not done; the durable event payload keeps
+   the seed a replay verifier would need.
+4. **Invariant fuzzing** — done in `server/internal/game/invariant_fuzz_test.go`
+   with Go's native `testing.F`. The corpus seeds run inside `test:go`; a
+   longer local fuzzing session is an investigation, never a new gate.
 
 ## Integration conventions
 

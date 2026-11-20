@@ -893,3 +893,49 @@ project held port 8080 and the harness correctly refused to reuse it.
 The first tier of engine test maturity (recorded scenario files, property-based
 tests, replay and invariant fuzzing) is the next milestone. RSK-1 and PRS-3
 remain open decisions; no deployment or database work was done.
+
+## v0.2.17 — fuzzing the rules (shipped)
+
+The fourth tier of engine test maturity, using Go's native `testing.F`. No
+dependency, no gate change, no production code change.
+
+### The gap
+
+Four guarantees in `GAME_ENGINE.md` had no dedicated test: tick discipline
+(exactly one tick per accepted action), no-op actions emitting nothing, exactly
+two RNG draws per roll in fixed order, and `Clone` deep-copying ownership
+without aliasing. The existing suites cover atomicity, determinism, chip
+conservation and structural invariants; the new targets assert those as
+properties rather than re-implementing them.
+
+### What was added
+
+`server/internal/game/invariant_fuzz_test.go`:
+
+- `FuzzApplyInvariants` drives legal action sequences from a seed and decision
+  bytes. Every advertised action must be accepted, advance exactly one tick,
+  emit at least one event stamped with that tick, and leave the board
+  structurally intact. At each step an unadvertised action is probed: it must
+  be refused without mutating state.
+- `FuzzRollConsumesTwoDraws` checks the dice against the first two draws of the
+  per-tick stream.
+- `FuzzCloneDoesNotAlias` mutates a clone's owner, balance, turn and winner and
+  asserts the original is unchanged. The winner pointer was the historical
+  leak; the value-typed owner is the control case.
+
+The corpus uses the seeds of the two existing deterministic walks plus a few
+extra values, so historical defect paths stay guarded. A local fuzzing session
+of roughly 20 seconds per target (well over 100,000 executions in total) found
+no failure; nothing was added to the repository by that investigation. Fuzz
+corpus runs inside the existing `test:go` gate — a longer session is a one-off
+investigation, never a new gate, which keeps CI/pipeline agreement intact.
+
+A dead closure in `TestBoardDeterminism` (assigned to `_` and never called) was
+removed; the live per-action logging variant was already the one under test.
+`GAME_ENGINE.md` and `TESTING.md` now state which maturity tiers exist.
+
+### Not in this release
+
+Recorded scenario files and replay tests remain undone; both overlap existing
+inline scenarios and determinism tests, and replay should be its own considered
+commit. RSK-1 and PRS-3 remain open decisions. No deployment or database work.
