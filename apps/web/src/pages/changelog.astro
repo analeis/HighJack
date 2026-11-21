@@ -13,6 +13,30 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.22',
+    date: '2026-11-21',
+    title: 'Honest dependency placement',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Workspace hygiene',
+        tone: 'gold',
+        items: [
+          'The game client listed Tailwind and its Vite plugin as runtime dependencies, though only the build config imports them. They are dev dependencies now, matching the website',
+          'The README said Bun ≥ 1.3, but the toolchain requires ≥ 1.4.4 — the typecheck gate uses a command that does not exist in 1.3. A new developer following the README could hit a broken toolchain on day one',
+          'The lockfile metadata was refreshed to the current release, and a frozen install still resolves cleanly',
+        ],
+      },
+      {
+        label: 'What did not change',
+        tone: 'teal',
+        items: [
+          'The workspace layout was audited in depth and found already native and correct: the filter expressions, the workspace protocol, the single lockfile, and the deliberately separate build scripts and gates all stay as they are',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.21',
     date: '2026-11-21',
     title: 'A test that finally runs',

@@ -1144,3 +1144,41 @@ The remaining deferred items are unchanged. RSK-1 remains the largest known
 risk and a deployment-topology decision; PRS-3, auth, live-match restore and
 the v0.3 Chaos catalog need product decisions. `staticcheck` as a gate is the
 one item answerable inside the repository and remains a decision.
+
+## v0.2.22 — honest dependency placement (shipped)
+
+A package-management cleanup scoped to what the audit found, after verifying
+that the workspace layout itself is already native and correct.
+
+### The audit
+
+All five manifests, the lockfile, every build/test config, the gate definitions
+and CI were reviewed, and the `--filter` behaviour verified against Bun 1.4.5.
+The following are deliberate and were left unchanged: the `workspaces` globs
+and `workspace:*` protocol; the path-based `--filter` expressions (they
+auto-discover new workspaces); `bunx` reserved for binaries only; the absence
+of a `packageManager` pin with the floor stated in `engines.bun`; the
+`playwright-core` override and the `typescript`/`bun-types`/`compiler-rs` root
+pins; and the separation of gate definitions from developer convenience
+scripts. Adding `catalog:` ranges or a `bunfig.toml` would add churn with no
+functional benefit at this repo size.
+
+### The two real findings
+
+- `apps/game/package.json` declared `@tailwindcss/vite` and `tailwindcss` as
+  runtime `dependencies`, but only `vite.config.ts` imports them — they are
+  build-time tooling. The website already lists both under `devDependencies`.
+  Moved to match. No runtime effect; classification hygiene.
+- `README.md` required Bun ≥ 1.3, while `engines.bun`, `SETUP.md` and
+  `repo-sanity.ts` require ≥ 1.4.4 and `bun check` (added in 1.4.3) would not
+  exist in 1.3. Corrected to ≥ 1.4.4.
+
+`bun install` refreshed the stale workspace version metadata in `bun.lock`;
+`bun install --frozen-lockfile` still resolves with no changes.
+
+### Scope note
+
+The version cascade (VERSION, five manifests, nine current-doc status lines,
+changelog, this record) dominates the file count; the two substantive edits are
+small. The cascade is the cost of the repository's version convention, not of
+the cleanup. No gate, CI, workspace script or dependency range changed.

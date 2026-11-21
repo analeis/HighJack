@@ -1,6 +1,6 @@
 # Backend Architecture
 
-> Status: v0.2.21 Board Loop. The HTTP surface, realtime transport,
+> Status: v0.2.22 Board Loop. The HTTP surface, realtime transport,
 > configuration, logging, persistence, and the authoritative match runtime
 > exist and are tested. Private multiplayer matches are playable end to end.
 > Account authentication is still not implemented.

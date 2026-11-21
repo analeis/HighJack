@@ -4,7 +4,7 @@
 
 HighJack combines property/economic gameplay with optional systems: trading, auctions, gambling tables, minigames, treasure cards, and global events; all switchable per-match through a first-class game configuration.
 
-> **Status: v0.2.21 — playable board loop.** The backend, protocol, and tooling are
+> **Status: v0.2.22 — playable board loop.** The backend, protocol, and tooling are
 > the production foundation; the board loop is now a real, playable multiplayer
 > game. A match is a configurable ruleset executed by a deterministic
 > authoritative simulation: the server owns every dice roll, balance, and
@@ -34,7 +34,7 @@ HighJack combines property/economic gameplay with optional systems: trading, auc
 
 ## Quick start
 
-Requirements: [Bun](https://bun.sh) ≥ 1.3, [Go](https://go.dev) 1.26, Docker (only for the optional local database).
+Requirements: [Bun](https://bun.sh) ≥ 1.4.4, [Go](https://go.dev) 1.26, Docker (only for the optional local database).
 
 ```sh
 bun install          # install workspace dependencies
