@@ -18,6 +18,7 @@ import (
 
 	"github.com/analeis/highjack/server/internal/api"
 	"github.com/analeis/highjack/server/internal/config"
+	"github.com/analeis/highjack/server/internal/game"
 	"github.com/analeis/highjack/server/internal/match"
 	"github.com/analeis/highjack/server/internal/realtime"
 
@@ -594,8 +595,44 @@ type table struct {
 
 func startedMatch(t *testing.T) table {
 	t.Helper()
+	return startedMatchWithConfig(t, nil)
+}
+
+// allPropertyConfig returns a valid board with go at space 0 and affordable
+// properties everywhere else. The opening roll is always 2–12 from position 0,
+// so it lands on an unowned, affordable property and the engine is forced to
+// offer a buy decision on the very first action. That makes the purchase test
+// deterministic without predicting a dice roll or controlling the match seed:
+// the test drives the real HTTP + WS server the same way any client does.
+func allPropertyConfig() *game.GameConfig {
+	cfg := game.DefaultConfig()
+	spaces := make([]game.BoardSpace, 0, game.MaxBoardSpaces)
+	spaces = append(spaces, game.BoardSpace{ID: "go", Kind: game.SpaceGo, Name: "Start"})
+	for i := 1; i < game.MaxBoardSpaces; i++ {
+		spaces = append(spaces, game.BoardSpace{
+			ID:    fmt.Sprintf("p%d", i),
+			Kind:  game.SpaceProperty,
+			Name:  fmt.Sprintf("Property %d", i),
+			Group: "Test",
+			Price: 100,
+			Rent:  10,
+		})
+	}
+	cfg.Board.Spaces = spaces
+	return &cfg
+}
+
+// startedMatchWithConfig starts a two-player match with an optional config
+// override. A nil override posts no body, which is the default-board path the
+// other tests use.
+func startedMatchWithConfig(t *testing.T, cfg *game.GameConfig) table {
+	t.Helper()
 	ts := newTestServer(t)
-	created := ts.post(t, "/matches", nil)
+	var body any
+	if cfg != nil {
+		body = map[string]any{"config": cfg}
+	}
+	created := ts.post(t, "/matches", body)
 	matchID, _ := created["matchId"].(string)
 	if matchID == "" {
 		t.Fatalf("no matchId in create response: %v", created)
@@ -653,26 +690,6 @@ func act(t *testing.T, tab table) *client {
 		t.Fatalf("action rejected mid-play: %v", msg)
 	}
 	return actor
-}
-
-// playUntil advances real turns until pred holds or the budget runs out. Dice
-// come from a per-match random root, so tests discover outcomes by playing
-// rather than predicting a roll.
-func playUntil(t *testing.T, tab table, budget int, pred func(table) bool) {
-	t.Helper()
-	for i := 0; i < budget; i++ {
-		if pred(tab) {
-			return
-		}
-		if tab.reference(t)["phase"] != "playing" {
-			break
-		}
-		act(t, tab)
-	}
-	if pred(tab) {
-		return
-	}
-	t.Skip("scenario did not arise within the action budget")
 }
 
 // --- the flow this file always claimed to cover ----------------------------
@@ -751,7 +768,7 @@ func TestInvalidActionMutatesNothingForAnyClient(t *testing.T) {
 	bit := tab.byName["Bit"]
 
 	if holder(t, tab) == bit {
-		t.Skip("Bit holds the turn; cannot test an out-of-turn rejection here")
+		t.Fatal("Bit holds the turn at start; the out-of-turn rejection this test asserts cannot be exercised")
 	}
 	// Measure only what this action publishes.
 	bit.measureFromNow()
@@ -791,12 +808,22 @@ func TestInvalidActionMutatesNothingForAnyClient(t *testing.T) {
 // same amount the server applied. This is the assertion the missing second client
 // previously made impossible.
 func TestPurchaseIsDeliveredToBothClientsExactlyOnce(t *testing.T) {
-	tab := startedMatch(t)
+	tab := startedMatchWithConfig(t, allPropertyConfig())
 
-	playUntil(t, tab, 800, func(tb table) bool {
-		return tb.reference(t)["phase"] != "playing" ||
-			turnPhase(t, tb.reference(t)) == "await_buy_decision"
-	})
+	// The all-property board forces a buy decision on the opening roll. A
+	// missed scenario is a hard failure now: a t.Skip here would silently drop
+	// every "exactly once" assertion below and leave a green suite claiming to
+	// have verified delivery it never checked.
+	if phase := turnPhase(t, tab.reference(t)); phase != "await_roll" {
+		t.Fatalf("match did not start awaiting a roll: %q", phase)
+	}
+	opener := holder(t, tab)
+	if ack := opener.action("roll_dice"); ack["type"] != "ack" {
+		t.Fatalf("opening roll rejected: %v", ack)
+	}
+	if phase := turnPhase(t, tab.reference(t)); phase != "await_buy_decision" {
+		t.Fatalf("all-property board did not offer a buy decision on the first roll: %q", phase)
+	}
 
 	actor := holder(t, tab)
 	peer := peerOf(tab, actor)
@@ -864,10 +891,12 @@ func TestPurchaseIsDeliveredToBothClientsExactlyOnce(t *testing.T) {
 func TestDuplicateSequenceIsNotRepublishedToThePeer(t *testing.T) {
 	tab := startedMatch(t)
 
-	playUntil(t, tab, 800, func(tb table) bool {
-		return tb.reference(t)["phase"] != "playing" ||
-			turnPhase(t, tb.reference(t)) == "await_roll"
-	})
+	// A fresh match always starts awaiting a roll, so the roll this test
+	// duplicates is available without a random walk. Fail loudly if that ever
+	// stops holding rather than skipping the delivery assertions below.
+	if phase := turnPhase(t, tab.reference(t)); phase != "await_roll" {
+		t.Fatalf("match did not start awaiting a roll: %q", phase)
+	}
 
 	actor := holder(t, tab)
 	peer := peerOf(tab, actor)
@@ -939,7 +968,7 @@ func TestAlternatingActionsKeepBothClientsConverged(t *testing.T) {
 		played++
 	}
 	if played == 0 {
-		t.Skip("no transition was played")
+		t.Fatal("no transition was played; a fresh match must accept at least one action")
 	}
 
 	ref := tab.reference(t)

@@ -1,6 +1,6 @@
 # Game Design — Current State
 
-> Status: **v0.2.18 Board Loop**. This document separates what is **decided
+> Status: **v0.2.19 Board Loop**. This document separates what is **decided
 > and implemented** (modeled in code and tested), what is **directional**
 > (design intent), and what is **undecided**. The website's copy is
 > constrained to match this file. Board-level rule decisions are recorded

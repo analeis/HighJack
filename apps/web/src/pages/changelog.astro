@@ -13,6 +13,30 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.19',
+    date: '2026-11-21',
+    title: 'No silent skips',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The delivery tests always run',
+        tone: 'gold',
+        items: [
+          'Two multiplayer tests could skip when a dice-driven scenario did not arise, silently dropping the assertions that a purchase or a retried action reaches the other client exactly once. A green suite said nothing about those paths',
+          'The purchase test now uses a board of affordable properties, which forces a buy decision on the opening roll. The duplicate-sequence test starts from a state where a roll is always legal. No random walk and no control over the match seed',
+          'The remaining defensive skips became hard failures: if a precondition stops holding, the test fails instead of quietly skipping its assertions',
+        ],
+      },
+      {
+        label: 'Scope',
+        tone: 'teal',
+        items: [
+          'One test file, standard library only. No production code, dependency, gate or CI change. Five consecutive race-detector runs stay green',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.18',
     date: '2026-11-21',
     title: 'The replay verifier',

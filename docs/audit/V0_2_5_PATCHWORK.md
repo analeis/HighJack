@@ -982,3 +982,56 @@ Table-driven scenario files remain undone (they would duplicate the inline
 board scenarios). The conditional-skip gaps in `multiplayer_test.go` need a
 production seed seam to fix properly, so they stay. RSK-1 and PRS-3 remain
 open decisions. No deployment or database work.
+
+## v0.2.19 — no silent skips (shipped)
+
+A test-only fix closing a hole where two multiplayer regression tests could
+silently skip, dropping the very assertions they exist to make.
+
+### The gap
+
+`playUntil` in `multiplayer_test.go` ended in
+`t.Skip("scenario did not arise within the action budget")`. Match roots come
+from `crypto/rand`, so whether a buy decision or an await-roll state arose was
+dice-dependent. When the 800-action walk missed it, the whole test was marked
+`SKIP` and none of its delivery assertions ran:
+
+- `TestPurchaseIsDeliveredToBothClientsExactlyOnce` — ack accepted, tick +1,
+  buyer debited, `property_bought` delivered to the peer exactly once, other
+  balances unchanged;
+- `TestDuplicateSequenceIsNotRepublishedToThePeer` — roll ack, `dice_rolled`
+  exactly once, a retried sequence re-acked without re-delivery and with no
+  tick advance.
+
+Those are the assertions written for the second-client duplication bug. A
+green run that skipped them certified nothing about the behaviour.
+
+### What was added
+
+One file, `server/internal/realtime/multiplayer_test.go`:
+
+- `startedMatchWithConfig(t, cfg)` posts a full config override to
+  `POST /matches`; `startedMatch` stays a thin wrapper so the other tests are
+  untouched.
+- `allPropertyConfig()` builds a valid board with go at space 0 and affordable
+  properties elsewhere. The opening roll is always 2–12, so it lands on an
+  unowned affordable property and the engine must offer a buy decision on the
+  first action — the test drives the real HTTP + WS server exactly as a client
+  would. The purchase test asserts that phase after the roll with `t.Fatalf`.
+- The duplicate-sequence test asserts the initial await-roll state with
+  `t.Fatalf` instead of walking.
+- `playUntil` is deleted, and two other defensive skips whose preconditions
+  cannot legitimately fail became hard failures. No `t.Skip` remains in the
+  file.
+
+### Verification and limits
+
+Five consecutive `go test -race ./server/internal/realtime/` runs stayed green.
+The change cannot "fail on the unfixed tree" in the strict sense: with a
+budget of 800 the old walk almost always reached its predicate (0 skips in
+measurement). The durable guarantee is that the assertions can no longer be
+bypassed — a missed scenario is now a hard failure, not a skip. This follows
+the project's precedent for de-flaking (TST-1) and the v0.2.16–18 pattern of
+one stdlib-only test file with no production, dependency, gate or CI change.
+
+RSK-1 and PRS-3 remain open decisions. No deployment or database work.
