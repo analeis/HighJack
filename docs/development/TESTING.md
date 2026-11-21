@@ -20,6 +20,7 @@
 | Protocol + config (TS)   | Vitest                                    | `packages/protocol/test`                                | yes                                                 |
 | UI primitives (TS)       | Vitest + @solidjs/testing-library + jsdom | `packages/ui/test`                                      | yes                                                 |
 | Game client store + net  | Vitest                                    | `apps/game/test`                                        | yes                                                 |
+| Website catalog labels   | Vitest                                    | `apps/web/test`                                         | yes (in `test:ts` gate)                             |
 | Website e2e + a11y       | Playwright + axe                          | `apps/web/e2e`                                          | via `bun run test:e2e` / certify only               |
 | Game UI e2e              | Playwright against the **real Go server** | `apps/web/e2e/game.spec.ts`                             | via `bun run test:e2e` / certify only               |
 

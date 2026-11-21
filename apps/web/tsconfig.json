@@ -7,6 +7,6 @@
     "noEmit": true,
     "moduleResolution": "bundler"
   },
-  "include": ["src/**/*", "e2e/**/*", "astro.config.mjs"],
+  "include": ["src/**/*", "test/**/*", "e2e/**/*", "astro.config.mjs"],
   "exclude": ["dist"]
 }

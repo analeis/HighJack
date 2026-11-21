@@ -15,7 +15,7 @@ DEVELOPMENT ──▶ VALIDATED ──▶ VERIFIED ──▶ CERTIFIED ──▶
 
 | Category             | Gate                                                                                                         | Mandatory                             | Tool                                  |
 | -------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ------------------------------------- |
-| Formatting           | no formatting diffs                                                                                          | ✔                                     | oxfmt --check, gofmt -l               |
+| Formatting           | no formatting diffs                                                                                          | ✔                                     | bun fmt --check, gofmt -l             |
 | Static analysis      | lint + vet + staticcheck clean                                                                               | ✔                                     | oxlint, go vet, staticcheck           |
 | Types                | typecheck clean                                                                                              | ✔                                     | tsc, astro check                      |
 | Unit tests           | all suites green                                                                                             | ✔                                     | vitest, go test                       |

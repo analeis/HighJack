@@ -1,6 +1,6 @@
 # Art Direction
 
-> Status: v0.2.23 — the direction below is implemented at token and logo
+> Status: v0.2.24 — the direction below is implemented at token and logo
 > level; illustration-scale artwork is future work.
 
 ## Identity thesis

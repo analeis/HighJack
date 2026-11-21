@@ -1221,3 +1221,49 @@ correctness, the largest known risk and a blocker for horizontal scaling),
 PRS-3, auth/accounts, live-match restore, the v0.3 Chaos catalog, trusted-proxy
 handling, metrics/tracing and the deployment/RELEASED record all need a
 topology, product or deployment decision that the repository cannot supply.
+
+## v0.2.24 — gates that check what they claim (shipped)
+
+Two certification-integrity gaps, one commit, because both are the same defect
+class: a gate whose behaviour diverges from its name and its documentation.
+
+### The format gate wrote files
+
+`format` ran `bun format` (the writing formatter; `bun fmt --help` shows `--check`
+is required not to write). CI calls it at `ci.yml:60` in a step literally named
+"Format check", but an unformatted tree passed because the gate silently fixed
+it. The soundness consequence is real: `certify.ts:66` captures tree identity
+before gates run (`:84`), so a gate that mutates the tree can produce a report
+naming a tree that is not the one the later gates tested — contradicting
+`CERTIFICATION.md`'s definition of `tree`. `CERTIFICATION.md:18` even claimed
+`oxfmt --check`, which was never what the gate ran.
+
+Changed to `bun run format:check` (`bun fmt --check`): exits 1 on a file needing
+formatting and never writes. Proven by planting an unformatted `fmt_probe.ts`:
+the gate failed and the file was unchanged; removing it restored green.
+
+### test:ts omitted apps/web
+
+`test:ts` hardcoded `packages/protocol, packages/ui, apps/game`. Root `bun run
+test` filters `./apps/*` and includes web, so a future web unit test would run
+locally but never in certification or CI. The exclusion's old reason — `bunx
+vitest run` exits 1 with zero tests — is already solved by `apps/web/package.json`'s
+`vitest run --passWithNoTests`. Measured: `bunx vitest run` in web exits 1, the
+script form exits 0. Appended web to the gate with that flag, scoped so the
+other three suites are unchanged.
+
+Added `apps/web/test/systems.test.ts` (status labels + catalog uniqueness, pure
+logic, no new deps) and `test/**/*` to web's tsconfig. The new test passes both
+vitest and the astro typecheck.
+
+### Mechanical guards
+
+`repo-sanity.ts` now asserts (a) the format gate uses check mode and (b) every
+workspace declaring a `test` script appears in the `test:ts` gate. Reverting
+either gate fix makes `bun run gate repo` fail with a named message; restoring
+them makes it pass. Docs updated: VALIDATION.md gate list and classification
+levels (the unused `VERIFIED` level was removed), CERTIFICATION.md format row,
+TESTING.md test map.
+
+No new dependency, no change to gate names, and CI still invokes every gate by
+name. The version cascade is recorded in the changelog and this section.

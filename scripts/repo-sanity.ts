@@ -245,6 +245,50 @@ if (existsSync(workflowPath)) {
   }
 }
 
+// ---- gates must check what they claim ----------------------------------------
+
+// Two gates that looked honest were not: `format` ran the writing formatter
+// (silently fixing files during a certification that named the pre-fix tree),
+// and `test:ts` hardcoded three workspaces so a new web unit test would run
+// locally but never in certification or CI. Hold both to their claims here,
+// using the same gate definitions the pipeline runs.
+const formatGate = validationGates.find((g) => g.name === 'format');
+if (formatGate) {
+  const text = formatGate.cmd.join(' ');
+  if (!/--check\b|format:check\b/.test(text)) {
+    problems.push(
+      'the format gate must use check mode (bun fmt --check / format:check): ' +
+        'a gate that writes files can certify a tree it then changed',
+    );
+  }
+}
+
+const tsTestGate = validationGates.find((g) => g.name === 'test:ts');
+if (tsTestGate) {
+  const covered = new Set(tsTestGate.cmd.join(' ').match(/(?:apps|packages)\/[\w-]+/g) ?? []);
+  for (const group of ['apps', 'packages']) {
+    const groupDir = path.join(ROOT, group);
+    if (!existsSync(groupDir)) continue;
+    for (const name of readdirSync(groupDir)) {
+      const manifestPath = path.join(groupDir, name, 'package.json');
+      if (!existsSync(manifestPath)) continue;
+      let declaresTest = false;
+      try {
+        declaresTest = Boolean(JSON.parse(readFileSync(manifestPath, 'utf8')).scripts?.test);
+      } catch {
+        // An unreadable manifest is caught by the manifest checks below.
+      }
+      const rel = `${group}/${name}`;
+      if (declaresTest && !covered.has(rel)) {
+        problems.push(
+          `${rel} declares a test script but the test:ts gate does not run it: ` +
+            'add it to the gate so certification covers every unit suite',
+        );
+      }
+    }
+  }
+}
+
 // ---- the protocol document must describe the protocol ------------------------
 
 // The protocol overview described the v0.1 wire protocol: it listed four

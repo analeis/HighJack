@@ -23,7 +23,7 @@ validate  (18 gates; the exact definitions live in scripts/lib/validation-gates.
 ├── typecheck:ts        bun check -p tsconfig.json
 ├── typecheck:reference tsc6 --noEmit -p tsconfig.json
 ├── typecheck:astro     astro check (apps/web)
-├── test:ts             vitest in packages/protocol, packages/ui, apps/game
+├── test:ts             vitest in packages/protocol, packages/ui, apps/game, apps/web (--passWithNoTests)
 ├── test:go             go test -count=1 -race ./server/...
 ├── test:go:db          persistence suite (optional until HIGHJACK_TEST_DATABASE_URL is set)
 ├── audit:deps          bun audit
@@ -83,7 +83,7 @@ Runs everything above **plus**:
    mobile, no console errors, axe accessibility scans pass on key pages,
    responsive smoke checks.
 3. Writes `verification/report.json`: timestamped gate results + final
-   classification (`DEVELOPMENT` / `VALIDATED` / `VERIFIED` / `CERTIFIED`).
+   classification (`DEVELOPMENT` / `VALIDATED` / `CERTIFIED`).
 
 The report is reproducible for a given commit: same tree ⇒ same results.
 

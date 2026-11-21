@@ -13,6 +13,30 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.24',
+    date: '2026-11-21',
+    title: 'Gates that check what they claim',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The format gate now really checks',
+        tone: 'gold',
+        items: [
+          'It ran the writing formatter, so an unformatted file was silently fixed and the build still passed — despite the step being named “Format check”. Worse, certification captures the tree before gates run, so that gate could produce a report naming a tree it had then changed',
+          'It now runs the check-only form, which fails on a file that needs formatting and never writes. Proven by planting an unformatted file: the gate failed and left it untouched',
+        ],
+      },
+      {
+        label: 'Every workspace suite is certified',
+        tone: 'teal',
+        items: [
+          'The TypeScript test gate listed three workspaces, omitting the website. Root test runs covered it; certification and CI did not. The website is now included, with a first unit test for its status labels and system catalog',
+          'Repository sanity now holds both properties mechanically: the format gate must be check-only, and every workspace with a test script must appear in the TypeScript test gate. Both were proven to fail on the old definitions',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.23',
     date: '2026-11-21',
     title: 'The stricter check is now a gate',

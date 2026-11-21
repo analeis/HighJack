@@ -35,11 +35,14 @@ const databaseGate: Gate = {
 export const validationGates: Gate[] = [
   {
     name: 'format',
-    // The root dependencies have to be installed. `bunx` falls back to fetching
-    // the package from the registry when it is not present locally, so a missing
-    // install would silently format with whatever version the registry served
-    // that day. The check names the cause instead.
-    cmd: ['bun', 'format'],
+    // This must be the check-only form, never the writing `bun fmt`. certify.ts
+    // captures the tree identity before gates run, so a gate that rewrote files
+    // would produce a report naming a tree that is not the one the later gates
+    // tested. `format:check` is `bun fmt --check`: it exits 1 on a file that
+    // needs formatting and never writes. The root dependency has to be present
+    // or the check fails loudly rather than fetching a formatter from the
+    // registry and formatting with whatever version it served that day.
+    cmd: ['bun', 'run', 'format:check'],
   },
   {
     name: 'lint:oxlint',
@@ -102,10 +105,16 @@ export const validationGates: Gate[] = [
   { name: 'typecheck:astro', cmd: ['bun', 'run', 'check'], cwd: 'apps/web' },
   {
     name: 'test:ts',
+    // Every workspace that declares a `test` script must be covered here, or a
+    // test that runs locally via the root filtered `test` would never run in
+    // certification or CI. repo sanity enforces that coverage mechanically.
+    // web is appended separately with --passWithNoTests: it has no unit tests
+    // today, but its vitest config excludes the Playwright specs, so adding a
+    // unit test later starts running it here without any gate change.
     cmd: [
       'bash',
       '-c',
-      'for d in packages/protocol packages/ui apps/game; do (cd $d && bunx vitest run) || exit 1; done',
+      'for d in packages/protocol packages/ui apps/game; do (cd $d && bunx vitest run) || exit 1; done; (cd apps/web && bunx vitest run --passWithNoTests) || exit 1',
     ],
   },
   // -count=1 defeats the test cache, so a green gate always means the suite
