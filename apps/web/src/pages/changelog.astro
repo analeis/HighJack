@@ -13,6 +13,30 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.23',
+    date: '2026-11-21',
+    title: 'The stricter check is now a gate',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Staticcheck, enforced',
+        tone: 'gold',
+        items: [
+          'The static analysis that found dead code in v0.2.20 is now a release gate. It catches the unused helpers, ineffectual assignments and shadowed arguments that go vet does not',
+          'It runs with a pinned version through the same native go-run-at-version pattern the vulnerability scan uses, so CI needs no new tool install',
+          'The gate was proven to fail: reintroducing an unused function made it report the dead code and stop the build. The one deliberate finding — a typed-nil precondition in a test — carries a documented exemption',
+        ],
+      },
+      {
+        label: 'Certification',
+        tone: 'teal',
+        items: [
+          'Certification now runs 19 gates. The gate definitions, CI invocation and documentation were updated together, and the repository sanity check confirms CI still enforces every gate',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.22',
     date: '2026-11-21',
     title: 'Honest dependency placement',

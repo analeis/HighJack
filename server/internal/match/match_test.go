@@ -1302,6 +1302,7 @@ func TestRegistryWithoutStoreBehavesAsUnconfigured(t *testing.T) {
 
 	// Guard the precondition: this really is a non-nil interface.
 	var asInterface Store = absent
+	//lint:ignore SA4023 the comparison is the precondition: a typed nil in an interface is non-nil by design, which is what this test asserts
 	if asInterface == nil {
 		t.Fatal("precondition broken: a typed nil pointer should produce a non-nil interface")
 	}

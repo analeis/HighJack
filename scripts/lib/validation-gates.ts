@@ -65,6 +65,19 @@ export const validationGates: Gate[] = [
   { name: 'lint:gofmt', cmd: ['bash', '-c', 'test -z "$(gofmt -l ./server)" && echo gofmt clean'] },
   { name: 'lint:govet', cmd: ['go', 'vet', './...'] },
   {
+    name: 'lint:staticcheck',
+    // staticcheck is a stricter Go analyser than vet: it catches dead code,
+    // ineffectual assignments and shadowed arguments that vet does not. It was
+    // run ad hoc in v0.2.20 and found nine issues, including a dead board helper
+    // and a cluster of dead test helpers. Making it a gate keeps that cleanup
+    // from quietly regressing. The single deliberate finding — the typed-nil
+    // precondition in match_test.go — carries a documented lint:ignore.
+    //
+    // Pinned with `go run <tool>@<version>`, the same native pattern the
+    // govulncheck gate uses, so the tool needs no CI install step.
+    cmd: ['go', 'run', 'honnef.co/go/tools/cmd/staticcheck@2026.2.2', './server/...'],
+  },
+  {
     name: 'typecheck:ts',
     // `bun check` is Bun's own typechecker: it reads the same tsconfig, reports
     // the same errors, and needs no TypeScript package at all. It is about

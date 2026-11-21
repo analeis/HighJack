@@ -14,11 +14,12 @@ Validation and verification are deliberately separate concerns:
 Single entry point; exits non-zero on the first failed gate.
 
 ```
-validate  (17 gates; the exact definitions live in scripts/lib/validation-gates.ts)
+validate  (18 gates; the exact definitions live in scripts/lib/validation-gates.ts)
 ├── format              bun fmt
 ├── lint:oxlint         oxlint (packages + apps + scripts)
 ├── lint:gofmt          gofmt -l on server/ reports nothing
 ├── lint:govet          go vet ./...
+├── lint:staticcheck    staticcheck ./server/... (pinned via go run @version)
 ├── typecheck:ts        bun check -p tsconfig.json
 ├── typecheck:reference tsc6 --noEmit -p tsconfig.json
 ├── typecheck:astro     astro check (apps/web)
@@ -34,7 +35,7 @@ validate  (17 gates; the exact definitions live in scripts/lib/validation-gates.
 └── repo                scripts/repo-sanity.ts
 ```
 
-`certify` adds one verification gate, `verify:browser`, for 18 in total.
+`certify` adds one verification gate, `verify:browser`, for 19 in total.
 
 ### The toolchain
 

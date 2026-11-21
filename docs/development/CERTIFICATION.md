@@ -16,7 +16,7 @@ DEVELOPMENT ──▶ VALIDATED ──▶ VERIFIED ──▶ CERTIFIED ──▶
 | Category             | Gate                                                                                                         | Mandatory                             | Tool                                  |
 | -------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ------------------------------------- |
 | Formatting           | no formatting diffs                                                                                          | ✔                                     | oxfmt --check, gofmt -l               |
-| Static analysis      | lint + vet clean                                                                                             | ✔                                     | oxlint, go vet                        |
+| Static analysis      | lint + vet + staticcheck clean                                                                               | ✔                                     | oxlint, go vet, staticcheck           |
 | Types                | typecheck clean                                                                                              | ✔                                     | tsc, astro check                      |
 | Unit tests           | all suites green                                                                                             | ✔                                     | vitest, go test                       |
 | Integration          | hermetic HTTP/WS/protocol suites green                                                                       | ✔                                     | go test                               |
@@ -107,7 +107,7 @@ how the CI database step came to filter out the very tests it was meant to run.
 
 ## Current status
 
-- v0.2.15 targets **CERTIFIED** with all 18 gates passing on the exact tree the
+- v0.2.23 targets **CERTIFIED** with all 19 gates passing on the exact tree the
   report names. The database-integration gate is exercised against a real
   PostgreSQL instance in CI and locally when `HIGHJACK_TEST_DATABASE_URL` is
   set (see TESTING.md); a skipped optional gate is recorded as skipped, never

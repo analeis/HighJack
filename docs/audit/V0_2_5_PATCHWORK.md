@@ -1182,3 +1182,42 @@ The version cascade (VERSION, five manifests, nine current-doc status lines,
 changelog, this record) dominates the file count; the two substantive edits are
 small. The cascade is the cost of the repository's version convention, not of
 the cleanup. No gate, CI, workspace script or dependency range changed.
+
+## v0.2.23 — staticcheck becomes a gate (shipped)
+
+The one deferred item answerable entirely inside the repository, taken after
+v0.2.20 reduced staticcheck findings from nine to one. It turns that cleanup
+into a permanent guarantee.
+
+### The change
+
+- New validation gate `lint:staticcheck` in `scripts/lib/validation-gates.ts`,
+  running `go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./server/...`.
+  This is the same native `go run <tool>@<version>` pattern the `audit:govuln`
+  gate already uses, so no CI install step or new dependency is needed.
+- The backend CI job restates the pinned command, as it does for the other Go
+  gates (no JS runtime there). The repository-sanity agreement check confirms
+  the gate is enforced by CI.
+- The single remaining finding, SA4023 on the typed-nil precondition in
+  `TestRegistryWithoutStoreBehavesAsUnconfigured`, carries a `lint:ignore` with
+  its reason: the "never true" comparison is exactly what the test asserts.
+
+Gate count goes from 18 to 19: 18 validation gates plus `verify:browser`.
+VALIDATION.md and CERTIFICATION.md were updated together; the stale
+`v0.2.15 targets CERTIFIED` line in CERTIFICATION.md was corrected to v0.2.23.
+
+### Evidence
+
+`bun scripts/gate.ts lint:staticcheck` passes on the clean tree. To prove it is
+not vacuous, a dead function was temporarily added to `board.go`; the gate
+reported `func deadProbe is unused (U1000)` and failed. The file was restored
+and the gate re-verified green. Repository sanity passes, so the new gate is
+mechanically tied to CI.
+
+### Still open
+
+This is the last repo-decidable improvement. RSK-1 (multi-instance
+correctness, the largest known risk and a blocker for horizontal scaling),
+PRS-3, auth/accounts, live-match restore, the v0.3 Chaos catalog, trusted-proxy
+handling, metrics/tracing and the deployment/RELEASED record all need a
+topology, product or deployment decision that the repository cannot supply.
