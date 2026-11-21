@@ -172,13 +172,6 @@ func assertLegal(t *testing.T, state *GameState, cfg *GameConfig, actor PlayerID
 	}
 }
 
-func moneyOf(state *GameState, id PlayerID) Money {
-	if p := state.PlayerByID(id); p != nil {
-		return p.Money
-	}
-	return 0
-}
-
 // joinAndReadyN joins and readies, returning the ids.
 func joinAndReadyN(t *testing.T, e *Engine, state *GameState, names ...string) ([]PlayerID, *GameState) {
 	t.Helper()

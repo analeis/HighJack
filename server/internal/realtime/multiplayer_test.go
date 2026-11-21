@@ -87,9 +87,6 @@ type client struct {
 	token   string
 	seq     int64
 	t       *testing.T
-	// inbox buffers frames that arrive out of the order a test reads
-	// them (events are broadcast before the ack, to every client).
-	inbox []map[string]any
 
 	// view is the most recent authoritative state this client has actually
 	// received — from its bind snapshot, an ack, or an explicit resync. Tests
@@ -366,50 +363,6 @@ func (c *client) delivery() map[string]int {
 		out[k] = v
 	}
 	return out
-}
-
-// take scans the inbox for a frame of kind; the caller falls back to the
-// socket when it is absent. Frames are never dropped, so delivery order
-// between events, acks, and snapshots cannot make a test flaky.
-func (c *client) take(kind string) (map[string]any, bool) {
-	for i, m := range c.inbox {
-		if m["type"] == kind {
-			c.inbox = append(c.inbox[:i], c.inbox[i+1:]...)
-			return m, true
-		}
-	}
-	return nil, false
-}
-
-func (c *client) expect(kind string) map[string]any {
-	c.t.Helper()
-	if msg, ok := c.take(kind); ok {
-		return msg
-	}
-	for i := 0; i < 16; i++ {
-		msg := c.read()
-		if msg["type"] == kind {
-			return msg
-		}
-		c.inbox = append(c.inbox, msg)
-	}
-	c.t.Fatalf("never received %q", kind)
-	return nil
-}
-
-// awaitEvent waits for a specific event type.
-func (c *client) awaitEvent(kind string) map[string]any {
-	c.t.Helper()
-	for i := 0; i < 16; i++ {
-		msg := c.expect("event")
-		ev, _ := msg["event"].(map[string]any)
-		if ev["type"] == kind {
-			return ev
-		}
-		c.inbox = append(c.inbox, msg)
-	}
-	c.t.Fatalf("never received %q event", kind)
-	return nil
 }
 
 // pullSnapshot reads the next snapshot frame and installs it as the view.

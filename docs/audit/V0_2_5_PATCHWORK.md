@@ -1035,3 +1035,61 @@ the project's precedent for de-flaking (TST-1) and the v0.2.16–18 pattern of
 one stdlib-only test file with no production, dependency, gate or CI change.
 
 RSK-1 and PRS-3 remain open decisions. No deployment or database work.
+
+## v0.2.20 — clean under a stricter light (shipped)
+
+A test-and-cleanup-only release. The three verification tools were run over
+the server as an extra check beyond the gates; the actionable findings were
+removed, and the non-actionable ones were triaged in writing rather than
+"fixed" to make a number go to zero.
+
+### The tool run
+
+- `govulncheck ./server/...` — no vulnerabilities. This matches the existing
+  `audit:govuln` gate.
+- `go vet ./...` — clean. This is the actual `lint:govet` gate; it was already
+  green, so the certification was never at risk.
+- `staticcheck ./server/...` — 9 findings before, 1 after.
+- `golangci-lint run ./server/...` (default linters, no config) — 16 findings
+  before, 7 after.
+
+Neither staticcheck nor golangci-lint is a release gate. Adding one would
+require a gate definition, a CI step and a CI-agreement update — a larger
+change whose value this cleanup establishes before deciding on it.
+
+### Removed
+
+- `BoardState.spaceByIndex` in `board.go` — never called; its only `fmt` use
+  went with it, so the file now has no imports.
+- `moneyOf` in `legality_test.go` — never called.
+- `client.take`, `client.expect`, `client.awaitEvent` and the `inbox` field in
+  `multiplayer_test.go` — a self-contained dead chain (each called only by the
+  next, `awaitEvent` by nobody).
+- An ineffectual assignment in `board_test.go`.
+- The unused `ctx` parameter of `Match.reconcileCommit` and its one caller. The
+  function deliberately builds a fresh `context.WithTimeout(context.Background(),
+  …)`: the caller's context may have expired during the failed commit, so a
+  read-back bounded by it would fail before consulting the cursor. That reason
+  is now a comment, so a future reader does not "fix" it by threading `ctx`
+  through.
+- A stray copy of the `reconcileCommit` doc comment in `ratelimiter.go`. The
+  comment documents a v0.2.1 divergence defect (memory one tick behind the
+  database, then a primary-key collision bricking the match). It was moved to
+  the function it describes rather than deleted — defect rationale is earned
+  documentation.
+
+### Deliberately left
+
+- `SA4023` on `match_test.go:1305`: the typed-nil `asInterface == nil`
+  comparison is the precondition of `TestRegistryWithoutStoreBehavesAsUnconfigured`.
+  It is "never true" by design, which is what the test asserts.
+- Two `reflect.Ptr` inlining hints and three `QF1008` embedded-field suggestions
+  are style-only and not worth churning stable code.
+
+### Limits
+
+This release has no regression test that fails on the unfixed tree: removing
+dead code changes no behaviour. The compiler, `go test -race`, the gate suite
+and the linter re-run are the evidence. The remaining deferred items are
+unchanged: RSK-1 and PRS-3 are open decisions, table-driven scenario files
+would duplicate existing coverage, and no deployment or database work was done.

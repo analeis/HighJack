@@ -389,7 +389,7 @@ func (m *Match) ApplyAction(ctx context.Context, sessionID string, seq int64, ac
 	// the client may retry the same sequence.
 	if m.store != nil {
 		if perr := m.store.CommitTransition(ctx, m.id, next, events); perr != nil {
-			return ActionResult{DomainCode: protocol.CodeInternalError, Err: perr}, m.reconcileCommit(ctx, prev, perr)
+			return ActionResult{DomainCode: protocol.CodeInternalError, Err: perr}, m.reconcileCommit(prev, perr)
 		}
 	}
 
@@ -655,7 +655,30 @@ func transitionFrame(events []EventEnvelope) (map[string]any, bool) {
 	}, true
 }
 
-func (m *Match) reconcileCommit(ctx context.Context, prev *game.GameState, cause error) error {
+// reconcileCommit resolves a commit whose outcome is unknown and returns the
+// error the caller should report.
+//
+// A commit that returns an error did not necessarily fail. The 5s deadline can
+// expire while COMMIT is in flight, and the connection can drop after the server
+// made the transaction durable but before the result reached us. Treating that as
+// "did not happen" and reverting memory is what created a permanent divergence:
+// memory sat one tick behind the database, the next transition's INSERT then
+// collided on the (match_id, tick, seq) primary key, and every later action failed
+// the same way, bricking the match.
+//
+// So the durable cursor is read back. If it moved, the transition committed and
+// memory is corrected to agree; if it did not, memory is restored. Either way the
+// caller is told the truth.
+//
+// Called with m.mu held, like the rest of ApplyAction. The read-back is a network
+// round trip, so it is bounded by reconcileTimeout and happens on a caller that
+// is already serialised per match; the alternative — releasing the lock and
+// re-taking it — would let two transitions interleave around the ambiguity, which
+// is a far worse failure than a bounded stall.
+func (m *Match) reconcileCommit(prev *game.GameState, cause error) error {
+	// A fresh context, not the caller's: the commit may have failed because the
+	// caller's deadline expired, and a read-back bounded by that same deadline
+	// would fail before it could consult the cursor.
 	ctx, cancel := context.WithTimeout(context.Background(), reconcileTimeout)
 	defer cancel()
 	row, err := m.store.LoadMatch(ctx, m.id)

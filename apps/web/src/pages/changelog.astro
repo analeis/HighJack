@@ -13,6 +13,31 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.20',
+    date: '2026-11-21',
+    title: 'Clean under a stricter light',
+    status: 'released',
+    highlights: [
+      {
+        label: 'Dead code, removed',
+        tone: 'gold',
+        items: [
+          'Running staticcheck and golangci-lint over the server found dead code left behind by earlier refactors: an unused board helper, an unused test helper, and a cluster of unused client-test helpers and buffering field',
+          'A stray nineteen-line comment describing the commit-reconciliation logic had been left in the rate-limiter file when that code moved. It is now with the function it documents, where it belongs',
+          'An ignored context parameter was removed. Its function deliberately builds a fresh timeout because the caller’s context may have expired during the failed commit — that reason is now written down next to it',
+        ],
+      },
+      {
+        label: 'What the tools did and did not say',
+        tone: 'teal',
+        items: [
+          'govulncheck found no vulnerabilities, and the go vet gate was already clean. The stricter tools cut staticcheck findings from nine to one and golangci-lint from sixteen to seven',
+          'The remaining findings were inspected and left alone: a typed-nil comparison that is the deliberate point of a regression test, and style-only suggestions. Neither tool is a release gate; the change adds no gate or CI step',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.19',
     date: '2026-11-21',
     title: 'No silent skips',

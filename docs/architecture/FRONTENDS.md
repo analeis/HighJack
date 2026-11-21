@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-> Status: v0.2.19. The website is complete for its scope; the game client
+> Status: v0.2.20. The website is complete for its scope; the game client
 > is a playable board loop over the authoritative backend.
 
 ## Two frontends, one boundary

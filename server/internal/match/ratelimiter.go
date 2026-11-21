@@ -76,24 +76,3 @@ func (r *RateLimiter) tracked() int {
 // sweepEvery is the number of Allow calls between eviction sweeps. Amortised so
 // the cost is O(1) per call rather than O(keys) on every call.
 const sweepEvery = 64
-
-// reconcileCommit resolves a commit whose outcome is unknown and returns the
-// error the caller should report.
-//
-// A commit that returns an error did not necessarily fail. The 5s deadline can
-// expire while COMMIT is in flight, and the connection can drop after the server
-// made the transaction durable but before the result reached us. Treating that as
-// "did not happen" and reverting memory is what created a permanent divergence:
-// memory sat one tick behind the database, the next transition's INSERT then
-// collided on the (match_id, tick, seq) primary key, and every later action failed
-// the same way, bricking the match.
-//
-// So the durable cursor is read back. If it moved, the transition committed and
-// memory is corrected to agree; if it did not, memory is restored. Either way the
-// caller is told the truth.
-//
-// Called with m.mu held, like the rest of ApplyAction. The read-back is a network
-// round trip, so it is bounded by reconcileTimeout and happens on a caller that
-// is already serialised per match; the alternative — releasing the lock and
-// re-taking it — would let two transitions interleave around the ambiguity, which
-// is a far worse failure than a bounded stall.

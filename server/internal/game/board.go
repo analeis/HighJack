@@ -1,7 +1,5 @@
 package game
 
-import "fmt"
-
 // TurnPhase names the stage of the current player's turn inside
 // PhasePlaying. It is turn-local state, not a match lifecycle phase: the
 // match phase graph (lobby → playing → ended) is untouched by v0.2.
@@ -71,16 +69,6 @@ func newBoardRuntime(cfg *GameConfig) BoardState {
 		}
 	}
 	return BoardState{Spaces: spaces}
-}
-
-// spaceByIndex returns the space at a board position. Positions are always
-// kept modulo len(spaces) by movement, so an out-of-range index indicates
-// corrupted state.
-func (b BoardState) spaceByIndex(pos int) (RuntimeSpace, error) {
-	if len(b.Spaces) == 0 || pos < 0 || pos >= len(b.Spaces) {
-		return RuntimeSpace{}, fmt.Errorf("game: board position %d out of range", pos)
-	}
-	return b.Spaces[pos], nil
 }
 
 // PropertiesOf returns the spaces owned by a player in board order.

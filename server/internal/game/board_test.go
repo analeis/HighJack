@@ -341,7 +341,7 @@ func TestLandingOnGoCollectsOnce(t *testing.T) {
 	e, state := testMatchEngine(t, DefaultConfig(), root)
 	ids, state := startBoardMatch(t, e, state, "A", "B")
 
-	state, events := aimRoll(t, e, root, state, ids[0], 0)
+	_, events := aimRoll(t, e, root, state, ids[0], 0)
 	d := rollEvent(t, events)
 	if d.ToSpace != "go" {
 		t.Fatalf("aimed at go, landed %q", d.ToSpace)
