@@ -13,6 +13,30 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.21',
+    date: '2026-11-21',
+    title: 'A test that finally runs',
+    status: 'released',
+    highlights: [
+      {
+        label: 'ENG-5 is actually tested now',
+        tone: 'gold',
+        items: [
+          'The regression test for tying wealth by lowest seat had skipped since the day it was written. It discarded the state after a player rejoined, so the seat/slice divergence it was meant to build never existed',
+          'The joined state is now kept and the divergence is asserted directly. The test fails if the engine scans players in slice order instead of seat order — verified by temporarily breaking the tie-break and watching it catch the wrong winner',
+          'Three more defensive skips became hard failures, so a precondition that stops holding fails the suite instead of quietly dropping the assertions',
+        ],
+      },
+      {
+        label: 'Scope',
+        tone: 'teal',
+        items: [
+          'One engine test family, standard library only. No production code, dependency, gate or CI change',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.20',
     date: '2026-11-21',
     title: 'Clean under a stricter light',

@@ -202,7 +202,7 @@ func TestDeclineIsOfferedEvenWhenUnaffordable(t *testing.T) {
 		}
 	}
 	if target < 0 {
-		t.Skip("no unowned property on the default board")
+		t.Fatal("the default board must have an unowned property for this path")
 	}
 	holder.Position = target
 	holder.Money = 0

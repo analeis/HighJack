@@ -359,21 +359,28 @@ func TestWealthTieIsBrokenByLowestSeat(t *testing.T) {
 	// than the players who joined first.
 	ids, state := joinAndReady(t, e, state, "Ace", "Bit", "Cid")
 	state, _ = mustApply(t, e, state, ids[0], PlayerLeaveAction{})
-	_, events := mustApply(t, e, state, "", PlayerJoinAction{DisplayName: "Dee"})
+	// The joined state must be captured: it is the rejoin that puts the newcomer
+	// in the lowest vacated seat while leaving them last in the slice. Discarding
+	// it used to keep the pre-rejoin slice, so the divergence never existed and
+	// this test silently skipped from the day it was written (v0.2.1).
+	state, events := mustApply(t, e, state, "", PlayerJoinAction{DisplayName: "Dee"})
 	newcomer := events[0].(*PlayerJoinedEvent).PlayerID
 
-	// Confirm the two orders actually differ, or the test proves nothing.
+	// Confirm the two orders actually differ, or the test proves nothing. These
+	// are hard assertions now: a skipped assertion is not evidence, and a
+	// regression in seat assignment should fail the suite rather than vanish.
 	lowestSeat := state.Players[0]
 	for _, p := range state.Players {
 		if p.Seat < lowestSeat.Seat {
 			lowestSeat = p
 		}
 	}
-	if lowestSeat.ID == newcomer {
-		t.Skip("seat order and slice order coincide; nothing to distinguish")
+	if lowestSeat.ID != newcomer {
+		t.Fatalf("rejoin did not take the lowest vacated seat: newcomer %s, lowest seat %s (%s)",
+			newcomer, lowestSeat.ID, lowestSeat.Name)
 	}
 	if state.Players[0].ID == lowestSeat.ID {
-		t.Skip("lobby orders coincide; nothing to distinguish")
+		t.Fatal("slice order and seat order coincide; the tie-break rule cannot be distinguished")
 	}
 
 	// Equal net worth for everyone still in the lobby, then ask which player the
@@ -407,7 +414,7 @@ func TestCloneDeepCopiesWinnerID(t *testing.T) {
 		t.Fatalf("expected the match to end, got %q", state.Phase)
 	}
 	if state.WinnerID == nil {
-		t.Skip("no winner recorded for this path")
+		t.Fatal("two players and a leave must record a winner for this path")
 	}
 
 	a := state.Clone()

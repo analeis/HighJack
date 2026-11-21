@@ -1093,3 +1093,54 @@ dead code changes no behaviour. The compiler, `go test -race`, the gate suite
 and the linter re-run are the evidence. The remaining deferred items are
 unchanged: RSK-1 and PRS-3 are open decisions, table-driven scenario files
 would duplicate existing coverage, and no deployment or database work was done.
+
+## v0.2.21 — a test that finally runs (shipped)
+
+A test-only fix closing the last silently-skipped regression the v0.2.19
+sweep missed, because that release touched only the realtime suite.
+
+### The gap
+
+`TestWealthTieIsBrokenByLowestSeat` in `audit_regression_test.go` (written in
+v0.2.1 for finding ENG-5) had printed `--- SKIP` since the day it was written.
+Two defects in the test, both confirmed by execution:
+
+- `:362` discarded the joined state (`_, events :=` instead of `state, events :=`).
+  The divergence it meant to build never materialized: the pre-rejoin slice
+  remained, so the "orders coincide" guard fired.
+- Even with the state captured, the skip condition at `:372` was inverted. The
+  rejoiner _does_ take the lowest vacated seat — that is the divergence, not a
+  reason to skip.
+
+The guarantee is real: `richestActive` (`board.go:100-118`) must break wealth
+ties by lowest seat via `ActivePlayers()`'s seat sort, not by slice order.
+After a lobby departure and rejoin the two orders differ, and scanning the
+slice awarded a tied victory to the wrong player.
+
+### What changed
+
+- The rejoin's state is captured, and the divergence is asserted directly: the
+  newcomer must hold the lowest seat while not being first in the slice. Both
+  former `t.Skip` calls are hard failures.
+- `TestCloneDeepCopiesWinnerID` and `TestDeclineIsOfferedEvenWhenUnaffordable`
+  had defensive skips whose preconditions cannot legitimately fail; they are
+  hard failures too. No `t.Skip` remains in either engine test file.
+
+### Evidence
+
+All three tests now print `--- PASS` (the first printed `--- SKIP` before). To
+prove the revived test is not vacuous, the production tie-break was temporarily
+changed to scan `state.Players` instead of `state.ActivePlayers()`; the test
+failed with "tie went to seat 1 (Bit) but the lowest seat is 0 (Dee)". The
+production file was then restored and re-verified green.
+
+No production code, dependency, gate or CI change. The durable guarantee is
+that the ENG-5 assertion can no longer be bypassed and would fail if the
+seat-sort regressed.
+
+### Still open
+
+The remaining deferred items are unchanged. RSK-1 remains the largest known
+risk and a deployment-topology decision; PRS-3, auth, live-match restore and
+the v0.3 Chaos catalog need product decisions. `staticcheck` as a gate is the
+one item answerable inside the repository and remains a decision.

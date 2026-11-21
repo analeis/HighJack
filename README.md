@@ -4,7 +4,7 @@
 
 HighJack combines property/economic gameplay with optional systems: trading, auctions, gambling tables, minigames, treasure cards, and global events; all switchable per-match through a first-class game configuration.
 
-> **Status: v0.2.20 — playable board loop.** The backend, protocol, and tooling are
+> **Status: v0.2.21 — playable board loop.** The backend, protocol, and tooling are
 > the production foundation; the board loop is now a real, playable multiplayer
 > game. A match is a configurable ruleset executed by a deterministic
 > authoritative simulation: the server owns every dice roll, balance, and

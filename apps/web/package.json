@@ -1,6 +1,6 @@
 {
   "name": "@highjack/web",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "description": "HighJack product website.",
   "license": "MIT",
   "type": "module",

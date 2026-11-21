@@ -1,6 +1,6 @@
 # Design System Reference
 
-> Status: v0.2.20 — implemented in `packages/ui` and consumed by both apps.
+> Status: v0.2.21 — implemented in `packages/ui` and consumed by both apps.
 
 ## Architecture
 
