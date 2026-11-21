@@ -939,3 +939,46 @@ removed; the live per-action logging variant was already the one under test.
 Recorded scenario files and replay tests remain undone; both overlap existing
 inline scenarios and determinism tests, and replay should be its own considered
 commit. RSK-1 and PRS-3 remain open decisions. No deployment or database work.
+
+## v0.2.18 — the replay verifier (shipped)
+
+The smallest of the deferred maturity tiers, deliberately kept as its own
+commit. One new test file, standard library only; no production code, no
+dependency, no gate or CI change.
+
+### The gap
+
+The engine retains data whose only stated purpose was future replay: the root
+seed in the snapshot, seed-derived player ids (`DeriveMatchPlayerID`), a
+match seed derivable from the root (`DeriveMatchSeed`), and a durable event
+payload that keeps the seed (`MarshalEvent`, `event_encode_test.go:34-42`).
+Nothing consumed it. The two determinism tests build actions in test code, so
+they never prove the retained log is _sufficient_.
+
+### What was added
+
+`server/internal/game/replay_verifier_test.go`:
+
+- `TestReplayVerifierReproducesFinalStateAndEventLog` records a scripted match
+  into synthetic `match_events` rows `(tick, seq, kind, payload)` plus a final
+  `MarshalGameState` snapshot, then rebuilds the match from genesis. The
+  verifier groups rows by tick, treats the `seq 0` event as the action's
+  primary event, and reconstructs each of the eight action types from it —
+  decoding actor ids from payloads where present, and deriving the actor from
+  state for `game_started` (host) and `turn_advanced` (current seat). It
+  re-executes with `Engine.Apply` and requires byte-identical event payloads
+  and final state.
+- `TestReplayVerifierDetectsTamperedEvent` changes a recorded `game_started`
+  payload and asserts the verifier reports a mismatch. Without this, a
+  verifier that ignored the payload would pass vacuously.
+
+The verifier reads the durable _format_ and proves the replay algorithm. The
+real log lives in PostgreSQL behind pgx and is read by the gated persistence
+suite; the test says so in its header rather than implying database coverage.
+
+### Not in this release
+
+Table-driven scenario files remain undone (they would duplicate the inline
+board scenarios). The conditional-skip gaps in `multiplayer_test.go` need a
+production seed seam to fix properly, so they stay. RSK-1 and PRS-3 remain
+open decisions. No deployment or database work.

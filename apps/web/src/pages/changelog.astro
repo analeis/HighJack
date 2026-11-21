@@ -13,6 +13,30 @@ interface Entry {
 // Changelog entries, newest first. Keep in sync with git tags.
 const entries: Entry[] = [
   {
+    version: '0.2.18',
+    date: '2026-11-21',
+    title: 'The replay verifier',
+    status: 'released',
+    highlights: [
+      {
+        label: 'The retained data now has a consumer',
+        tone: 'gold',
+        items: [
+          'The engine has long kept the information a replay would need: a seed-derived match seed, seed-derived player ids, and event payloads that carry the seed. Nothing read it back. A verifier now does',
+          'It reconstructs the action sequence from the durable event rows, re-executes from genesis with the stored root seed, and requires byte-identical event payloads and final state',
+          'A tampered event is rejected, so the check cannot pass vacuously. The seed and id-derivation guarantees that justified retaining the data are exercised directly by the reconstruction',
+        ],
+      },
+      {
+        label: 'Scope',
+        tone: 'teal',
+        items: [
+          'One test file, standard library only. No production code, dependency, gate or CI change. The real PostgreSQL log stays covered by its own gated suite',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.2.17',
     date: '2026-11-20',
     title: 'Fuzzing the rules',

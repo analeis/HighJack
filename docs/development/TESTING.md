@@ -121,9 +121,13 @@ Suite maturity (in priority order):
    checked against invariants (money conservation, ownership uniqueness,
    phase legality). Partly covered by the seeded walks in `board_test.go`
    and `legality_test.go`.
-3. **Replay tests** — event logs re-applied to genesis state must
-   reproduce final state hashes. Not done; the durable event payload keeps
-   the seed a replay verifier would need.
+3. **Replay tests** — done in `server/internal/game/replay_verifier_test.go`.
+   The verifier reconstructs the action sequence from the durable event rows
+   `(tick, seq, kind, payload)` and the root seed, re-executes from genesis,
+   and requires byte-identical event payloads and final state. A tampered
+   payload must be rejected, so the check cannot pass vacuously. It verifies
+   the durable format and the algorithm; the real PostgreSQL log is covered
+   by the gated persistence suite.
 4. **Invariant fuzzing** — done in `server/internal/game/invariant_fuzz_test.go`
    with Go's native `testing.F`. The corpus seeds run inside `test:go`; a
    longer local fuzzing session is an investigation, never a new gate.
